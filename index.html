@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Despacho RF — Inverneg</title>
-<!-- MSAL Browser — autenticación delegada sin client secret -->
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 <style>
   :root {
     --negro:    #0D0D0D;
@@ -386,13 +384,69 @@
 <script>
 'use strict';
 
+// Carga dinámica de MSAL: todo el código corre en onload,
+// garantizando que msal.PublicClientApplication existe antes de usarse.
+(function() {
+  var s = document.createElement('script');
+  s.src = 'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js';
+  s.onerror = function() {
+    document.getElementById('aviso-msal').textContent = 'Error cargando libreria de autenticacion. Verifica tu conexion.';
+    document.getElementById('aviso-msal').classList.add('show');
+  };
+  s.onload = function() {
+
 // ============================================================
-// 1. CONFIGURACION — solo valores publicos, cero secretos
+// 1. UTILIDADES PURAS — sin dependencias externas
 // ============================================================
-const CFG = {
+function generarSesion() {
+  var d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
+  return 'SES-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+
+         '-'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
+}
+function ahora() {
+  var d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
+  return {
+    fecha: d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),
+    hora:  pad(d.getHours())+':'+pad(d.getMinutes()),
+    ts:    d.toISOString().replace('T',' ').substring(0,19),
+    raw:   d,
+  };
+}
+function toast(msg, tipo, dur) {
+  tipo = tipo||'ok'; dur = dur||2400;
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show '+tipo;
+  setTimeout(function(){ t.className=''; }, dur);
+}
+function mostrar(id) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+function reloj() {
+  var d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
+  var el = document.getElementById('reloj');
+  if (el) el.textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+}
+function fechaHoy() {
+  var d = new Date();
+  var dias  = ['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+  var meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return dias[d.getDay()]+' '+d.getDate()+' '+meses[d.getMonth()]+' '+d.getFullYear();
+}
+function getSemana(d) {
+  var d2 = new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  d2.setUTCDate(d2.getUTCDate()+4-(d2.getUTCDay()||7));
+  var ys = new Date(Date.UTC(d2.getUTCFullYear(),0,1));
+  return Math.ceil((((d2-ys)/86400000)+1)/7);
+}
+
+// ============================================================
+// 2. CONFIGURACION — sin secretos
+// ============================================================
+var CFG = {
   clientId:    'ec976114-e146-4ce4-850c-5d978e12acfd',
   tenantId:    '5e008bd3-17b6-4f83-8d23-019691a40609',
-  redirectUri: window.location.href.split('?')[0],
+  redirectUri: window.location.href.split('?')[0].split('#')[0],
   driveId:     'b!BGqUjRkx90uVOKtH0ppNYx_Gik0HsqRJkQWL01ezGQYWCwyX6OlCQZ3YdHDaojQp',
   itemId:      '01DYNVTLY3X4UMPPVGXJB2HY5WTY2QK2XX',
   sheets: {
@@ -403,270 +457,219 @@ const CFG = {
   },
 };
 
-const GRAPH_SCOPES = ['Files.ReadWrite', 'Sites.Read.All'];
+var GRAPH_SCOPES = ['Files.ReadWrite', 'Sites.Read.All'];
 
 // ============================================================
-// 2. MSAL — inicializacion (debe ir ANTES de cualquier uso)
+// 3. MSAL — inicializado aqui, con CDN ya cargado
 // ============================================================
-const msalConfig = {
+var msalInstance = new msal.PublicClientApplication({
   auth: {
     clientId:    CFG.clientId,
-    authority:   'https://login.microsoftonline.com/' + CFG.tenantId,
+    authority:   'https://login.microsoftonline.com/'+CFG.tenantId,
     redirectUri: CFG.redirectUri,
   },
   cache: {
     cacheLocation:          'sessionStorage',
     storeAuthStateInCookie: false,
   },
-};
-
-const msalInstance = new msal.PublicClientApplication(msalConfig);
-let msalAccount = null;
+});
+var msalAccount = null;
 
 // ============================================================
-// 3. DB EN MEMORIA y constantes operativas
+// 4. DB EN MEMORIA — generarSesion() ya existe arriba
 // ============================================================
-const DB = {
-  operadores: ['Carlos Mendoza', 'Rosa Pinto', 'Javier Cedeno', 'Luisa Vera', 'Pedro Alvarado'],
+var DB = {
+  operadores: ['Carlos Mendoza','Rosa Pinto','Javier Cedeno','Luisa Vera','Pedro Alvarado'],
   ordenes:    {},
 };
 
-const ACT_VARIAS = [
-  { id: 'inventario',  lbl: 'Inventario',      icon: '\u{1F4CA}', css: 'v-inv'    },
-  { id: 'etiquetar',   lbl: 'Etiquetar',        icon: '\u{1F3F7}', css: 'v-etiq'  },
-  { id: 'danados',     lbl: 'Danados',          icon: '\u26A0',    css: 'v-dan'   },
-  { id: 'mkt',         lbl: 'MKT',              icon: '\u{1F4E3}', css: 'v-mkt'   },
-  { id: 'destruccion', lbl: 'Destruccion',      icon: '\u{1F5D1}', css: 'v-dest'  },
-  { id: 'embPallets',  lbl: 'Embarque Pallets', icon: '\u{1F69B}', css: 'v-embpal'},
-  { id: 'embDanados',  lbl: 'Embarque Danados', icon: '\u{1F4E6}', css: 'v-embdan'},
+var ACT_VARIAS = [
+  { id:'inventario',  lbl:'Inventario',      icon:'📊', css:'v-inv'    },
+  { id:'etiquetar',   lbl:'Etiquetar',        icon:'🏷️', css:'v-etiq'  },
+  { id:'danados',     lbl:'Danados',          icon:'⚠️', css:'v-dan'   },
+  { id:'mkt',         lbl:'MKT',              icon:'📣', css:'v-mkt'   },
+  { id:'destruccion', lbl:'Destruccion',      icon:'🗑️', css:'v-dest'  },
+  { id:'embPallets',  lbl:'Embarque Pallets', icon:'🚛', css:'v-embpal'},
+  { id:'embDanados',  lbl:'Embarque Danados', icon:'📦', css:'v-embdan'},
 ];
 
-let activasVarias    = {};
-let variaSeleccionada = null;
+var activasVarias     = {};
+var variaSeleccionada = null;
 
-let estado = {
+// estado se declara DESPUES de generarSesion — sin problema
+var estado = {
   operadorActual:  '',
   ordenActual:     '',
   accionPendiente: null,
   sesionId:        generarSesion(),
 };
 
-const ETAPAS      = ['PICKING','CHECKING','PACKING','FACTURACION'];
-const ETAPA_COLOR = { PICKING:'pick', CHECKING:'check', PACKING:'pack', FACTURACION:'fact' };
-const ETAPA_ICONO = { PICKING:'\u{1F4E6}', CHECKING:'\u2705', PACKING:'\u{1F4EB}', FACTURACION:'\u{1F9FE}' };
-
-// ============================================================
-// 4. UTILIDADES
-// ============================================================
-function generarSesion() {
-  const d = new Date(), pad = function(n) { return String(n).padStart(2,'0'); };
-  return 'SES-' + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) +
-         '-' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
-}
-function ahora() {
-  const d = new Date(), pad = function(n) { return String(n).padStart(2,'0'); };
-  return {
-    fecha: d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),
-    hora:  pad(d.getHours())+':'+pad(d.getMinutes()),
-    ts:    d.toISOString().replace('T',' ').substring(0,19),
-    raw:   d,
-  };
-}
-function toast(msg, tipo, dur) {
-  tipo = tipo||'ok'; dur = dur||2400;
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'show '+tipo;
-  setTimeout(function() { t.className=''; }, dur);
-}
-function mostrar(id) {
-  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
-  document.getElementById(id).classList.add('active');
-}
-function reloj() {
-  const d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
-  document.getElementById('reloj').textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
-}
-function fechaHoy() {
-  const d = new Date();
-  const dias  = ['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
-  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  return dias[d.getDay()]+' '+d.getDate()+' '+meses[d.getMonth()]+' '+d.getFullYear();
-}
-function getSemana(d) {
-  const d2 = new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
-  d2.setUTCDate(d2.getUTCDate()+4-(d2.getUTCDay()||7));
-  const ys = new Date(Date.UTC(d2.getUTCFullYear(),0,1));
-  return Math.ceil((((d2-ys)/86400000)+1)/7);
-}
+var ETAPAS      = ['PICKING','CHECKING','PACKING','FACTURACION'];
+var ETAPA_COLOR = { PICKING:'pick', CHECKING:'check', PACKING:'pack', FACTURACION:'fact' };
+var ETAPA_ICONO = { PICKING:'📦', CHECKING:'✅', PACKING:'📫', FACTURACION:'🧾' };
 
 // ============================================================
 // 5. MSAL — login / logout / token
 // ============================================================
-async function msalLogin() {
+function msalLogin() {
   mostrarMsalLoading(true);
   document.getElementById('aviso-msal').classList.remove('show');
-  try {
-    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
-    msalAccount  = result.account;
-    await postLogin();
-  } catch(e) {
-    mostrarMsalLoading(false);
-    const av = document.getElementById('aviso-msal');
-    av.textContent = 'Error de autenticacion: ' + e.message;
-    av.classList.add('show');
-    console.error('MSAL login error:', e);
-  }
+  msalInstance.loginPopup({ scopes: GRAPH_SCOPES })
+    .then(function(result) {
+      msalAccount = result.account;
+      postLogin();
+    })
+    .catch(function(e) {
+      mostrarMsalLoading(false);
+      var av = document.getElementById('aviso-msal');
+      av.textContent = 'Error de autenticacion: '+e.message;
+      av.classList.add('show');
+      console.error('MSAL login error:', e);
+    });
 }
 
-async function msalLogout() {
-  try {
-    await msalInstance.logoutPopup({ account: msalAccount });
-  } catch(e) { console.warn('logout error:', e.message); }
-  msalAccount = null;
-  document.getElementById('msal-user-info').style.display = 'none';
-  document.getElementById('btn-msal-login').style.display = 'block';
-  mostrar('s-msal');
+function msalLogout() {
+  msalInstance.logoutPopup({ account: msalAccount })
+    .catch(function(e){ console.warn('logout:', e.message); })
+    .finally(function() {
+      msalAccount = null;
+      document.getElementById('msal-user-info').style.display = 'none';
+      document.getElementById('btn-msal-login').style.display = 'block';
+      mostrar('s-msal');
+    });
 }
 
-async function getToken() {
-  if (!msalAccount) throw new Error('No hay sesion activa');
-  const req = { scopes: GRAPH_SCOPES, account: msalAccount };
-  try {
-    const result = await msalInstance.acquireTokenSilent(req);
-    return result.accessToken;
-  } catch(e) {
-    const result = await msalInstance.acquireTokenPopup(req);
-    return result.accessToken;
-  }
+function getToken() {
+  if (!msalAccount) return Promise.reject(new Error('No hay sesion activa'));
+  var req = { scopes: GRAPH_SCOPES, account: msalAccount };
+  return msalInstance.acquireTokenSilent(req)
+    .catch(function() { return msalInstance.acquireTokenPopup(req); })
+    .then(function(result) { return result.accessToken; });
 }
 
 function mostrarMsalLoading(visible) {
   document.getElementById('msal-loading').style.display = visible ? 'block' : 'none';
 }
 
-async function postLogin() {
-  const email  = msalAccount.username || msalAccount.name || '';
-  const infoEl = document.getElementById('msal-user-info');
-  infoEl.textContent    = '\u2713 Sesion activa: ' + email;
-  infoEl.style.display  = 'block';
+function postLogin() {
+  var email  = msalAccount.username || msalAccount.name || '';
+  var infoEl = document.getElementById('msal-user-info');
+  infoEl.textContent   = '✓ Sesion activa: '+email;
+  infoEl.style.display = 'block';
   document.getElementById('btn-msal-login').style.display = 'none';
   mostrarMsalLoading(true);
-  await leerCatalogos();
-  await leerEstadoOrdenes();
-  mostrarMsalLoading(false);
-  mostrar('s-login');
+  leerCatalogos()
+    .then(function() { return leerEstadoOrdenes(); })
+    .then(function() { mostrarMsalLoading(false); mostrar('s-login'); })
+    .catch(function(e) { mostrarMsalLoading(false); console.error('postLogin:', e.message); });
 }
 
-async function intentarSesionSilenciosa() {
+function intentarSesionSilenciosa() {
   mostrarMsalLoading(true);
-  try {
-    await msalInstance.handleRedirectPromise();
-    const accounts = msalInstance.getAllAccounts();
-    if (accounts.length > 0) {
-      msalAccount = accounts[0];
-      await postLogin();
-    } else {
+  msalInstance.handleRedirectPromise()
+    .then(function() {
+      var accounts = msalInstance.getAllAccounts();
+      if (accounts.length > 0) {
+        msalAccount = accounts[0];
+        postLogin();
+      } else {
+        mostrarMsalLoading(false);
+      }
+    })
+    .catch(function(e) {
       mostrarMsalLoading(false);
-    }
-  } catch(e) {
-    mostrarMsalLoading(false);
-    console.warn('Sesion silenciosa fallida:', e.message);
-  }
+      console.warn('Sesion silenciosa fallida:', e.message);
+    });
 }
 
 // ============================================================
 // 6. GRAPH API — helpers
 // ============================================================
 function urlHoja(hoja) {
-  return 'https://graph.microsoft.com/v1.0/drives/' + CFG.driveId +
-         '/items/' + CFG.itemId +
-         '/workbook/worksheets/' + encodeURIComponent(hoja);
+  return 'https://graph.microsoft.com/v1.0/drives/'+CFG.driveId+
+         '/items/'+CFG.itemId+
+         '/workbook/worksheets/'+encodeURIComponent(hoja);
 }
 
-async function graphGet(url) {
-  const token = await getToken();
-  const res   = await fetch(url, { headers: { Authorization: 'Bearer '+token } });
-  if (!res.ok) {
-    const err = await res.json().catch(function(){ return {}; });
-    throw new Error((err.error && err.error.message) || 'Graph GET '+res.status);
-  }
-  return res.json();
-}
-
-async function graphPatch(url, body) {
-  const token = await getToken();
-  const res   = await fetch(url, {
-    method:  'PATCH',
-    headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
+function graphGet(url) {
+  return getToken().then(function(token) {
+    return fetch(url, { headers:{ Authorization:'Bearer '+token } });
+  }).then(function(res) {
+    if (!res.ok) return res.json().then(function(e){ throw new Error((e.error&&e.error.message)||'Graph GET '+res.status); });
+    return res.json();
   });
-  if (!res.ok) {
-    const err = await res.json().catch(function(){ return {}; });
-    throw new Error((err.error && err.error.message) || 'Graph PATCH '+res.status);
-  }
-  return res.json();
 }
 
-async function getNextRow(hoja) {
-  const data = await graphGet(urlHoja(hoja)+'/usedRange');
-  return data.values ? data.values.length+1 : 2;
+function graphPatch(url, body) {
+  return getToken().then(function(token) {
+    return fetch(url, {
+      method:  'PATCH',
+      headers: { Authorization:'Bearer '+token, 'Content-Type':'application/json' },
+      body:    JSON.stringify(body),
+    });
+  }).then(function(res) {
+    if (!res.ok) return res.json().then(function(e){ throw new Error((e.error&&e.error.message)||'Graph PATCH '+res.status); });
+    return res.json();
+  });
+}
+
+function getNextRow(hoja) {
+  return graphGet(urlHoja(hoja)+'/usedRange')
+    .then(function(data) { return data.values ? data.values.length+1 : 2; });
 }
 
 // ============================================================
 // 7. OPERACIONES EXCEL
 // ============================================================
-async function leerCatalogos() {
-  try {
-    const data = await graphGet(urlHoja(CFG.sheets.catalogos)+'/usedRange');
-    if (!data.values || data.values.length < 2) { console.warn('Catalogos vacio'); return; }
-    const ops = data.values.slice(1)
-      .map(function(f){ return f[0] ? f[0].toString().trim() : ''; })
-      .filter(function(v){ return v !== ''; });
-    DB.operadores = ops;
-    poblarOperadores('sel-operador');
-    poblarOperadores('sel-op-accion');
-    console.log('Catalogos cargados:', ops.length, 'operadores');
-  } catch(e) {
-    console.error('leerCatalogos:', e.message);
-    toast('Error cargando catalogos', 'err', 4000);
-  }
+function leerCatalogos() {
+  return graphGet(urlHoja(CFG.sheets.catalogos)+'/usedRange')
+    .then(function(data) {
+      if (!data.values || data.values.length < 2) { console.warn('Catalogos vacio'); return; }
+      var ops = data.values.slice(1)
+        .map(function(f){ return f[0] ? f[0].toString().trim() : ''; })
+        .filter(function(v){ return v !== ''; });
+      DB.operadores = ops;
+      poblarOperadores('sel-operador');
+      poblarOperadores('sel-op-accion');
+      console.log('Catalogos cargados:', ops.length);
+    })
+    .catch(function(e){ console.error('leerCatalogos:', e.message); toast('Error cargando catalogos','err',4000); });
 }
 
-async function leerEstadoOrdenes() {
-  try {
-    const data = await graphGet(urlHoja(CFG.sheets.estado)+'/usedRange');
-    if (!data.values || data.values.length < 2) { console.log('Estado_Ordenes vacio'); return; }
-    const enc   = data.values[0];
-    const filas = data.values.slice(1);
-    filas.forEach(function(fila) {
-      const ordenId = fila[0] ? fila[0].toString().trim() : '';
-      if (!ordenId) return;
-      if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
-      const o = DB.ordenes[ordenId];
-      enc.forEach(function(col, i) {
-        if (i===0) return;
-        const etapa = col ? col.toString().trim().toUpperCase() : '';
-        if (!['PICKING','CHECKING','PACKING','FACTURACION'].includes(etapa)) return;
-        if (fila[i] && fila[i].toString().trim()==='finalizada') {
-          if (!o[etapa]) o[etapa] = { totalPersonas:1, personas:{} };
-          if (!o[etapa].personas['_cargado']) {
-            o[etapa].personas['_cargado'] = {
-              inicio:{ hora:'--', ts:'--', fecha:'--' },
-              fin:   { hora:'--', ts:'--', fecha:'--' },
-            };
+function leerEstadoOrdenes() {
+  return graphGet(urlHoja(CFG.sheets.estado)+'/usedRange')
+    .then(function(data) {
+      if (!data.values || data.values.length < 2) { console.log('Estado_Ordenes vacio'); return; }
+      var enc = data.values[0];
+      data.values.slice(1).forEach(function(fila) {
+        var ordenId = fila[0] ? fila[0].toString().trim() : '';
+        if (!ordenId) return;
+        if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
+        var o = DB.ordenes[ordenId];
+        enc.forEach(function(col, i) {
+          if (i===0) return;
+          var etapa = col ? col.toString().trim().toUpperCase() : '';
+          if (!ETAPAS.includes(etapa)) return;
+          if (fila[i] && fila[i].toString().trim()==='finalizada') {
+            if (!o[etapa]) o[etapa] = { totalPersonas:1, personas:{} };
+            if (!o[etapa].personas['_cargado']) {
+              o[etapa].personas['_cargado'] = {
+                inicio:{ hora:'--', ts:'--', fecha:'--' },
+                fin:   { hora:'--', ts:'--', fecha:'--' },
+              };
+            }
           }
-        }
+        });
       });
-    });
-    console.log('Estado_Ordenes cargado:', Object.keys(DB.ordenes).length, 'ordenes');
-  } catch(e) { console.error('leerEstadoOrdenes:', e.message); }
+      console.log('Estado_Ordenes cargado:', Object.keys(DB.ordenes).length);
+    })
+    .catch(function(e){ console.error('leerEstadoOrdenes:', e.message); });
 }
 
-async function escribirEnExcel(fila) {
-  try {
-    const nextRow = await getNextRow(CFG.sheets.registros);
-    const rango   = 'A'+nextRow+':P'+nextRow;
-    const valores = [[
+function escribirEnExcel(fila) {
+  getNextRow(CFG.sheets.registros).then(function(nextRow) {
+    var rango   = 'A'+nextRow+':P'+nextRow;
+    var valores = [[
       fila.Fecha||'', fila.Hora||'', fila.Sesion||'', fila.Orden||'',
       fila.Etapa||'', fila.Evento||'', fila.Operador||'', fila.Multipersona||'',
       fila.Total_Personas!==undefined ? fila.Total_Personas : '',
@@ -678,19 +681,15 @@ async function escribirEnExcel(fila) {
       fila.Anio!==undefined   ? fila.Anio   : '',
       fila.Novedades||'',
     ]];
-    await graphPatch(urlHoja(CFG.sheets.registros)+"/range(address='"+rango+"')", { values: valores });
-    console.log('Despacho registrado fila', nextRow);
-  } catch(e) {
-    console.error('escribirEnExcel:', e.message);
-    toast('Error al guardar en Excel', 'err', 4000);
-  }
+    return graphPatch(urlHoja(CFG.sheets.registros)+"/range(address='"+rango+"')", { values:valores });
+  }).then(function(){ console.log('Despacho registrado'); })
+    .catch(function(e){ console.error('escribirEnExcel:', e.message); toast('Error al guardar','err',4000); });
 }
 
-async function escribirActVaria(fila) {
-  try {
-    const nextRow = await getNextRow(CFG.sheets.varias);
-    const rango   = 'A'+nextRow+':M'+nextRow;
-    const valores = [[
+function escribirActVaria(fila) {
+  getNextRow(CFG.sheets.varias).then(function(nextRow) {
+    var rango   = 'A'+nextRow+':M'+nextRow;
+    var valores = [[
       fila.Fecha||'', fila.Hora||'', fila.Sesion||'',
       fila.Tipo||'ACT_VARIA', fila.Actividad||'', fila.Evento||'', fila.Operador||'',
       fila.Timestamp||'',
@@ -700,48 +699,39 @@ async function escribirActVaria(fila) {
       fila.Mes!==undefined    ? fila.Mes    : '',
       fila.Anio!==undefined   ? fila.Anio   : '',
     ]];
-    await graphPatch(urlHoja(CFG.sheets.varias)+"/range(address='"+rango+"')", { values: valores });
-    console.log('ActVaria registrada fila', nextRow);
-  } catch(e) {
-    console.error('escribirActVaria:', e.message);
-    toast('Error al guardar actividad', 'err', 4000);
-  }
+    return graphPatch(urlHoja(CFG.sheets.varias)+"/range(address='"+rango+"')", { values:valores });
+  }).then(function(){ console.log('ActVaria registrada'); })
+    .catch(function(e){ console.error('escribirActVaria:', e.message); toast('Error al guardar actividad','err',4000); });
 }
 
-async function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
-  try {
-    const data     = await graphGet(urlHoja(CFG.sheets.estado)+'/usedRange');
+function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
+  graphGet(urlHoja(CFG.sheets.estado)+'/usedRange').then(function(data) {
     if (!data.values) return;
-    const enc      = data.values[0];
-    const colEtapa = enc.findIndex(function(c){
-      return c && c.toString().trim().toUpperCase()===etapa.toUpperCase();
-    });
+    var enc      = data.values[0];
+    var colEtapa = enc.findIndex(function(c){ return c && c.toString().trim().toUpperCase()===etapa; });
     if (colEtapa===-1) { console.warn('Columna no encontrada:', etapa); return; }
-    let filaIdx = -1;
-    for (let i=1; i<data.values.length; i++) {
+    var filaIdx = -1;
+    for (var i=1; i<data.values.length; i++) {
       if (data.values[i][0] && data.values[i][0].toString().trim()===ordenId) { filaIdx=i; break; }
     }
-    const letraCol = String.fromCharCode(65+colEtapa);
+    var letraCol = String.fromCharCode(65+colEtapa);
     if (filaIdx!==-1) {
-      const rango = letraCol+(filaIdx+1);
-      await graphPatch(urlHoja(CFG.sheets.estado)+"/range(address='"+rango+"')", { values:[[nuevoEstado]] });
+      return graphPatch(urlHoja(CFG.sheets.estado)+"/range(address='"+(letraCol+(filaIdx+1))+"')", { values:[[nuevoEstado]] });
     } else {
-      const nextRow = data.values.length+1;
-      const rangoF  = 'A'+nextRow+':E'+nextRow;
-      const filaNew = ['','','','',''];
-      filaNew[0]        = ordenId;
-      filaNew[colEtapa] = nuevoEstado;
-      await graphPatch(urlHoja(CFG.sheets.estado)+"/range(address='"+rangoF+"')", { values:[filaNew] });
+      var nextRow = data.values.length+1;
+      var filaNew = ['','','','',''];
+      filaNew[0]=ordenId; filaNew[colEtapa]=nuevoEstado;
+      return graphPatch(urlHoja(CFG.sheets.estado)+"/range(address='A"+nextRow+":E"+nextRow+"')", { values:[filaNew] });
     }
-    console.log('Estado actualizado:', ordenId, etapa, nuevoEstado);
-  } catch(e) { console.error('actualizarEstadoOrden:', e.message); }
+  }).then(function(){ console.log('Estado actualizado:', ordenId, etapa, nuevoEstado); })
+    .catch(function(e){ console.error('actualizarEstadoOrden:', e.message); });
 }
 
 // ============================================================
 // 8. ETAPAS — logica operativa
 // ============================================================
 function initEtapa(o, etapa, tot) {
-  if (!o[etapa]) o[etapa] = { totalPersonas: tot||1, personas:{} };
+  if (!o[etapa]) o[etapa] = { totalPersonas:tot||1, personas:{} };
 }
 function personasIniciadas(o, etapa) {
   if (!o[etapa]) return 0;
@@ -751,41 +741,39 @@ function personasFinalizadas(o, etapa) {
   if (!o[etapa]) return 0;
   return Object.values(o[etapa].personas).filter(function(p){ return p.fin; }).length;
 }
-function totalPersonas(o, etapa)  { return (o[etapa] && o[etapa].totalPersonas)||1; }
+function totalPersonas(o, etapa)  { return (o[etapa]&&o[etapa].totalPersonas)||1; }
 function etapaCompleta(o, etapa)  {
   if (!o[etapa]) return false;
-  return personasFinalizadas(o,etapa) >= o[etapa].totalPersonas;
+  return personasFinalizadas(o,etapa)>=o[etapa].totalPersonas;
 }
 function estadoEtapa(ordenId, etapa) {
-  const o = DB.ordenes[ordenId];
+  var o = DB.ordenes[ordenId];
   if (!o||!o[etapa]) return 'pendiente';
   if (etapaCompleta(o,etapa)) return 'finalizada';
   if (personasIniciadas(o,etapa)>0) return 'iniciada';
   return 'pendiente';
 }
 function accionDisponibleParaOperador(ordenId, etapa) {
-  const o  = DB.ordenes[ordenId];
-  const op = estado.operadorActual;
+  var o=DB.ordenes[ordenId], op=estado.operadorActual;
   if (!o||!o[etapa]) return 'INICIO';
-  const p = o[etapa].personas[op];
+  var p=o[etapa].personas[op];
   if (!p) return personasIniciadas(o,etapa)<o[etapa].totalPersonas ? 'INICIO' : 'ESPERA';
-  if (p.inicio && !p.fin) return 'FIN';
+  if (p.inicio&&!p.fin) return 'FIN';
   return 'ESPERA';
 }
 function siguienteAccion(ordenId) {
-  const o = DB.ordenes[ordenId];
+  var o=DB.ordenes[ordenId];
   if (!o) return { etapa:'PICKING', evento:'INICIO' };
-  const pickSt  = estadoEtapa(ordenId,'PICKING');
-  const checkSt = estadoEtapa(ordenId,'CHECKING');
-  if (pickSt==='pendiente') return { etapa:'PICKING',   evento:'INICIO' };
-  if (pickSt==='iniciada') {
-    const ac = accionDisponibleParaOperador(ordenId,'PICKING');
-    return (ac==='INICIO'||ac==='FIN') ? { etapa:'PICKING', evento:ac } : { etapa:'PICKING', evento:'ESPERA' };
+  var pSt=estadoEtapa(ordenId,'PICKING'), cSt=estadoEtapa(ordenId,'CHECKING');
+  if (pSt==='pendiente') return { etapa:'PICKING',   evento:'INICIO' };
+  if (pSt==='iniciada') {
+    var a1=accionDisponibleParaOperador(ordenId,'PICKING');
+    return (a1==='INICIO'||a1==='FIN') ? { etapa:'PICKING', evento:a1 } : { etapa:'PICKING', evento:'ESPERA' };
   }
-  if (checkSt==='pendiente') return { etapa:'CHECKING', evento:'INICIO' };
-  if (checkSt==='iniciada') {
-    const ac = accionDisponibleParaOperador(ordenId,'CHECKING');
-    return (ac==='INICIO'||ac==='FIN') ? { etapa:'CHECKING', evento:ac } : { etapa:'CHECKING', evento:'ESPERA' };
+  if (cSt==='pendiente') return { etapa:'CHECKING', evento:'INICIO' };
+  if (cSt==='iniciada') {
+    var a2=accionDisponibleParaOperador(ordenId,'CHECKING');
+    return (a2==='INICIO'||a2==='FIN') ? { etapa:'CHECKING', evento:a2 } : { etapa:'CHECKING', evento:'ESPERA' };
   }
   return null;
 }
@@ -798,16 +786,15 @@ function init() {
   document.getElementById('fecha-hoy').textContent = fechaHoy();
   poblarOperadores('sel-operador');
   poblarOperadores('sel-op-accion');
-  // MSAL: intentar sesion silenciosa (msalInstance ya esta declarado arriba)
   intentarSesionSilenciosa();
 }
 
 function poblarOperadores(selId) {
-  const sel = document.getElementById(selId);
+  var sel = document.getElementById(selId);
   sel.innerHTML = '<option value="">— Selecciona operador —</option>';
   DB.operadores.forEach(function(op) {
-    const o = document.createElement('option');
-    o.value = op; o.textContent = op; sel.appendChild(o);
+    var o = document.createElement('option');
+    o.value=op; o.textContent=op; sel.appendChild(o);
   });
 }
 
@@ -815,7 +802,7 @@ function poblarOperadores(selId) {
 // 10. LOGIN OPERADOR
 // ============================================================
 function loginContinuar() {
-  const op = document.getElementById('sel-operador').value;
+  var op = document.getElementById('sel-operador').value;
   if (!op) { toast('Selecciona tu nombre primero','err'); return; }
   estado.operadorActual = op;
   document.getElementById('header-sub').textContent = op+' · CND';
@@ -825,16 +812,14 @@ function selTipo(tipo) {
   if (tipo==='orden') {
     mostrar('s-scan');
     setTimeout(function(){ document.getElementById('inp-orden').focus(); }, 100);
-  } else {
-    abrirActVarias();
-  }
+  } else { abrirActVarias(); }
 }
 
 // ============================================================
 // 11. FLUJO ORDEN DE TRABAJO
 // ============================================================
 function buscarOrden() {
-  const val = document.getElementById('inp-orden').value.trim().toUpperCase();
+  var val = document.getElementById('inp-orden').value.trim().toUpperCase();
   if (!val) { toast('Escanea o ingresa un numero de orden','err'); return; }
   estado.ordenActual = val;
   document.getElementById('inp-orden').value = '';
@@ -845,15 +830,15 @@ function volverScan() {
   setTimeout(function(){ document.getElementById('inp-orden').focus(); }, 100);
 }
 function mostrarDetalle(ordenId) {
-  const o = DB.ordenes[ordenId];
+  var o = DB.ordenes[ordenId];
   document.getElementById('d-orden-num').textContent = ordenId;
-  let ultimoTexto = 'Sin actividad registrada';
+  var ultimoTexto = 'Sin actividad registrada';
   if (o) {
-    const eventos = [];
+    var eventos = [];
     ETAPAS.forEach(function(et) {
       if (o[et]) {
         Object.entries(o[et].personas).forEach(function(entry) {
-          const op2=entry[0], p=entry[1];
+          var op2=entry[0], p=entry[1];
           if (p.fin)    eventos.push({ ts:p.fin.ts,    label:et+' finalizado por '+op2 });
           if (p.inicio) eventos.push({ ts:p.inicio.ts, label:et+' iniciado por '+op2  });
         });
@@ -865,23 +850,19 @@ function mostrarDetalle(ordenId) {
     }
   }
   document.getElementById('d-orden-meta').textContent = ultimoTexto;
-
-  const tracker = document.getElementById('etapas-tracker'); tracker.innerHTML='';
+  var tracker = document.getElementById('etapas-tracker'); tracker.innerHTML='';
   ETAPAS.forEach(function(et) {
-    const st  = estadoEtapa(ordenId,et);
-    const div = document.createElement('div');
-    div.className = 'etapa-item etapa-'+ETAPA_COLOR[et];
-    let badgeClass='badge-pend', badgeText='Pendiente', det='';
+    var st=estadoEtapa(ordenId,et), div=document.createElement('div');
+    div.className='etapa-item etapa-'+ETAPA_COLOR[et];
+    var bCls='badge-pend', bTxt='Pendiente', det='';
     if (st==='iniciada') {
-      badgeClass='badge-init'; badgeText='En curso';
-      const o2 = DB.ordenes[ordenId];
-      det = personasIniciadas(o2,et)+'/'+totalPersonas(o2,et)+' personas';
-    } else if (st==='finalizada') {
-      badgeClass='badge-ok'; badgeText='Listo';
-    }
-    div.innerHTML = '<div class="etapa-nombre">'+ETAPA_ICONO[et]+' '+et+'</div>'+
-                    '<span class="badge '+badgeClass+'">'+badgeText+'</span>'+
-                    (det ? '<div class="etapa-det" style="margin-top:4px">'+det+'</div>' : '');
+      bCls='badge-init'; bTxt='En curso';
+      var o2=DB.ordenes[ordenId];
+      det=personasIniciadas(o2,et)+'/'+totalPersonas(o2,et)+' personas';
+    } else if (st==='finalizada') { bCls='badge-ok'; bTxt='Listo'; }
+    div.innerHTML='<div class="etapa-nombre">'+ETAPA_ICONO[et]+' '+et+'</div>'+
+                  '<span class="badge '+bCls+'">'+bTxt+'</span>'+
+                  (det?'<div class="etapa-det" style="margin-top:4px">'+det+'</div>':'');
     tracker.appendChild(div);
   });
   renderAcciones(ordenId);
@@ -889,54 +870,54 @@ function mostrarDetalle(ordenId) {
 }
 
 function renderAcciones(ordenId) {
-  const cont = document.getElementById('acciones-container'); cont.innerHTML='';
-  const sig  = siguienteAccion(ordenId);
+  var cont=document.getElementById('acciones-container'); cont.innerHTML='';
+  var sig=siguienteAccion(ordenId);
   if (sig && sig.evento!=='ESPERA') {
-    const div = document.createElement('div'); div.className='card';
+    var div=document.createElement('div'); div.className='card';
     div.innerHTML='<div class="card-title">Proxima accion</div>';
-    const btn = document.createElement('button');
-    btn.className   = 'btn btn-'+ETAPA_COLOR[sig.etapa];
-    btn.textContent = (sig.evento==='INICIO' ? '\u25B6 Iniciar ' : '\u25A0 Finalizar ')+sig.etapa;
-    btn.onclick = function(){ prepararAccion(ordenId, sig.etapa, sig.evento); };
+    var btn=document.createElement('button');
+    btn.className='btn btn-'+ETAPA_COLOR[sig.etapa];
+    btn.textContent=(sig.evento==='INICIO'?'▶ Iniciar ':'■ Finalizar ')+sig.etapa;
+    btn.onclick=function(){ prepararAccion(ordenId,sig.etapa,sig.evento); };
     div.appendChild(btn); cont.appendChild(div);
   } else if (sig && sig.evento==='ESPERA') {
-    const div = document.createElement('div'); div.className='card';
-    div.innerHTML='<div class="card-title">Proxima accion</div>'+
-                  '<div style="font-size:13px;color:var(--warn);padding:8px 0">\u23F3 Esperando que las demas personas completen '+sig.etapa+'...</div>';
-    cont.appendChild(div);
+    var div2=document.createElement('div'); div2.className='card';
+    div2.innerHTML='<div class="card-title">Proxima accion</div>'+
+                   '<div style="font-size:13px;color:var(--warn);padding:8px 0">⏳ Esperando que las demas personas completen '+sig.etapa+'...</div>';
+    cont.appendChild(div2);
   } else {
-    const div = document.createElement('div'); div.className='card';
-    div.innerHTML='<div class="card-title">Acciones disponibles</div>';
+    var div3=document.createElement('div'); div3.className='card';
+    div3.innerHTML='<div class="card-title">Acciones disponibles</div>';
     ['PACKING','FACTURACION'].forEach(function(et) {
-      const ac  = accionDisponibleParaOperador(ordenId, et);
-      const row = document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-bottom:8px;';
-      const btn = document.createElement('button');
+      var ac=accionDisponibleParaOperador(ordenId,et);
+      var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-bottom:8px;';
+      var btn2=document.createElement('button');
       if (ac==='ESPERA'||estadoEtapa(ordenId,et)==='finalizada') {
-        btn.className='btn btn-gris'; btn.disabled=true;
-        btn.textContent = estadoEtapa(ordenId,et)==='finalizada' ? et+' Completado' : '\u23F3 '+et+' — esperando';
+        btn2.className='btn btn-gris'; btn2.disabled=true;
+        btn2.textContent=estadoEtapa(ordenId,et)==='finalizada'?et+' Completado':'⏳ '+et+' — esperando';
       } else {
-        btn.className   = 'btn btn-'+ETAPA_COLOR[et];
-        btn.textContent = (ac==='INICIO' ? '\u25B6 Iniciar ' : '\u25A0 Finalizar ')+et;
-        btn.onclick = function(){ prepararAccion(ordenId, et, ac); };
+        btn2.className='btn btn-'+ETAPA_COLOR[et];
+        btn2.textContent=(ac==='INICIO'?'▶ Iniciar ':'■ Finalizar ')+et;
+        btn2.onclick=(function(e,a){ return function(){ prepararAccion(ordenId,e,a); }; })(et,ac);
       }
-      btn.style.flex='1'; row.appendChild(btn); div.appendChild(row);
+      btn2.style.flex='1'; row.appendChild(btn2); div3.appendChild(row);
     });
-    cont.appendChild(div);
+    cont.appendChild(div3);
   }
 }
 
 function prepararAccion(ordenId, etapa, evento) {
   estado.accionPendiente = { etapa:etapa, evento:evento };
-  document.getElementById('conf-titulo').textContent  = (evento==='INICIO' ? 'Iniciar ' : 'Finalizar ')+etapa;
+  document.getElementById('conf-titulo').textContent  = (evento==='INICIO'?'Iniciar ':'Finalizar ')+etapa;
   document.getElementById('conf-orden').textContent   = ordenId;
   document.getElementById('conf-accion').textContent  = ETAPA_ICONO[etapa]+' '+etapa+' — '+evento;
-  const btnConf = document.getElementById('btn-confirmar-accion');
-  btnConf.className   = 'btn btn-'+ETAPA_COLOR[etapa];
-  btnConf.textContent = (evento==='INICIO' ? '\u25B6 Iniciar ' : '\u25A0 Finalizar ')+etapa;
-  const etapasMulti = ['PICKING','PACKING'];
-  document.getElementById('toggle-multi-row').style.display = (etapasMulti.includes(etapa)&&evento==='INICIO') ? 'flex' : 'none';
-  const chk = document.getElementById('chk-multi'); chk.checked=false; toggleMulti();
-  document.getElementById('sel-op-accion').value = estado.operadorActual;
+  var btnConf=document.getElementById('btn-confirmar-accion');
+  btnConf.className='btn btn-'+ETAPA_COLOR[etapa];
+  btnConf.textContent=(evento==='INICIO'?'▶ Iniciar ':'■ Finalizar ')+etapa;
+  var etapasMulti=['PICKING','PACKING'];
+  document.getElementById('toggle-multi-row').style.display=(etapasMulti.includes(etapa)&&evento==='INICIO')?'flex':'none';
+  document.getElementById('chk-multi').checked=false; toggleMulti();
+  document.getElementById('sel-op-accion').value=estado.operadorActual;
   document.getElementById('aviso-conf').classList.remove('show');
   mostrar('s-confirmar');
 }
@@ -944,158 +925,124 @@ function prepararAccion(ordenId, etapa, evento) {
 function volverDetalle() { mostrarDetalle(estado.ordenActual); }
 
 function toggleMulti() {
-  const activo = document.getElementById('chk-multi').checked;
-  document.getElementById('bloque-num-personas').style.display = activo ? 'block' : 'none';
-  document.getElementById('label-op-accion').textContent = activo ? 'Tu nombre (primera persona en registrar)' : 'Quien realiza esta accion?';
-  document.getElementById('nota-multi').style.display = activo ? 'block' : 'none';
+  var activo=document.getElementById('chk-multi').checked;
+  document.getElementById('bloque-num-personas').style.display=activo?'block':'none';
+  document.getElementById('label-op-accion').textContent=activo?'Tu nombre (primera persona en registrar)':'Quien realiza esta accion?';
+  document.getElementById('nota-multi').style.display=activo?'block':'none';
   if (activo) {
     document.getElementById('sel-num-personas').value='';
-    document.getElementById('nota-multi').innerHTML = '\u{1F465} <b>Modo multipersonas:</b> Registras el inicio ahora. Las demas personas escanean la misma orden con su RF. La etapa avanza cuando <b>todos</b> hayan finalizado.';
+    document.getElementById('nota-multi').innerHTML='👥 <b>Modo multipersonas:</b> Registras el inicio ahora. Las demas personas escanean la misma orden. La etapa avanza cuando <b>todos</b> hayan finalizado.';
   }
 }
 
 function ejecutarAccion() {
-  const etapa   = estado.accionPendiente.etapa;
-  const evento  = estado.accionPendiente.evento;
-  const ordenId = estado.ordenActual;
-  const t       = ahora();
-  const multiActivo = document.getElementById('chk-multi').checked;
-
-  if (multiActivo && evento==='INICIO') {
-    const num = parseInt(document.getElementById('sel-num-personas').value)||null;
-    if (!num) {
-      document.getElementById('aviso-conf').textContent='Selecciona cuantas personas trabajaran esta etapa.';
-      document.getElementById('aviso-conf').classList.add('show'); return;
-    }
+  var etapa=estado.accionPendiente.etapa, evento=estado.accionPendiente.evento;
+  var ordenId=estado.ordenActual, t=ahora();
+  var multiActivo=document.getElementById('chk-multi').checked;
+  if (multiActivo&&evento==='INICIO') {
+    var num=parseInt(document.getElementById('sel-num-personas').value)||null;
+    if (!num) { document.getElementById('aviso-conf').textContent='Selecciona cuantas personas trabajaran esta etapa.'; document.getElementById('aviso-conf').classList.add('show'); return; }
   }
-  const op = document.getElementById('sel-op-accion').value;
-  if (!op) {
-    document.getElementById('aviso-conf').textContent='Selecciona tu nombre.';
-    document.getElementById('aviso-conf').classList.add('show'); return;
-  }
-
+  var op=document.getElementById('sel-op-accion').value;
+  if (!op) { document.getElementById('aviso-conf').textContent='Selecciona tu nombre.'; document.getElementById('aviso-conf').classList.add('show'); return; }
   if (!DB.ordenes[ordenId]) DB.ordenes[ordenId]={};
-  const o = DB.ordenes[ordenId];
-
-  if (evento==='INICIO' && !o[etapa]) {
-    const num = multiActivo ? parseInt(document.getElementById('sel-num-personas').value) : 1;
-    initEtapa(o, etapa, num);
+  var o=DB.ordenes[ordenId];
+  if (evento==='INICIO'&&!o[etapa]) {
+    var numP=multiActivo?parseInt(document.getElementById('sel-num-personas').value):1;
+    initEtapa(o,etapa,numP);
   }
-  if (evento==='INICIO' && o[etapa] && o[etapa].personas[op] && o[etapa].personas[op].inicio) {
-    document.getElementById('aviso-conf').textContent=op+' ya inicio '+etapa+' en esta orden.';
-    document.getElementById('aviso-conf').classList.add('show'); return;
+  if (evento==='INICIO'&&o[etapa]&&o[etapa].personas[op]&&o[etapa].personas[op].inicio) {
+    document.getElementById('aviso-conf').textContent=op+' ya inicio '+etapa+' en esta orden.'; document.getElementById('aviso-conf').classList.add('show'); return;
   }
-  if (evento==='FIN' && o[etapa] && o[etapa].personas[op] && o[etapa].personas[op].fin) {
-    document.getElementById('aviso-conf').textContent=op+' ya finalizo '+etapa+' en esta orden.';
-    document.getElementById('aviso-conf').classList.add('show'); return;
+  if (evento==='FIN'&&o[etapa]&&o[etapa].personas[op]&&o[etapa].personas[op].fin) {
+    document.getElementById('aviso-conf').textContent=op+' ya finalizo '+etapa+' en esta orden.'; document.getElementById('aviso-conf').classList.add('show'); return;
   }
-
   if (!o[etapa].personas[op]) o[etapa].personas[op]={};
-  const p = o[etapa].personas[op];
-  let duracion = null;
+  var p=o[etapa].personas[op], duracion=null;
   if (evento==='INICIO') {
-    p.inicio = { hora:t.hora, ts:t.ts, fecha:t.fecha };
+    p.inicio={ hora:t.hora, ts:t.ts, fecha:t.fecha };
   } else {
-    p.fin = { hora:t.hora, ts:t.ts, fecha:t.fecha };
+    p.fin={ hora:t.hora, ts:t.ts, fecha:t.fecha };
     if (p.inicio) {
-      const ini = new Date(p.inicio.ts.replace(' ','T'));
-      const fin = new Date(t.ts.replace(' ','T'));
-      duracion = Math.round((fin-ini)/60000);
-      p.duracion = duracion;
+      duracion=Math.round((new Date(t.ts.replace(' ','T'))-new Date(p.inicio.ts.replace(' ','T')))/60000);
+      p.duracion=duracion;
     }
   }
-
-  const tot  = totalPersonas(o, etapa);
-  const fin2 = personasFinalizadas(o, etapa);
-  const esMulti = tot > 1;
-  const fila = {
+  var tot=totalPersonas(o,etapa), fin2=personasFinalizadas(o,etapa), esMulti=tot>1;
+  var fila={
     Fecha:t.fecha, Hora:t.hora, Sesion:estado.sesionId,
     Orden:ordenId, Etapa:etapa, Evento:evento, Operador:op,
-    Multipersona: esMulti ? 'SI' : 'NO', Total_Personas:tot,
-    Timestamp:t.ts, Duracion_min: duracion!==null ? duracion : '',
+    Multipersona:esMulti?'SI':'NO', Total_Personas:tot,
+    Timestamp:t.ts, Duracion_min:duracion!==null?duracion:'',
     Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
     Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(), Novedades:'',
   };
-
   escribirEnExcel(fila);
-  const estadoNuevo = (evento==='FIN' && etapaCompleta(DB.ordenes[ordenId], etapa)) ? 'finalizada' : 'iniciada';
-  actualizarEstadoOrden(ordenId, etapa, estadoNuevo);
-
-  let mensajeExtra='';
-  if (esMulti && evento==='INICIO') {
-    const ini2 = personasIniciadas(o,etapa);
-    mensajeExtra='<b>Progreso:</b> '+ini2+' de '+tot+' personas han iniciado'+
-                 (ini2<tot ? '<br><span style="color:var(--warn)">\u23F3 Faltan '+(tot-ini2)+'</span>' : '');
+  actualizarEstadoOrden(ordenId, etapa, (evento==='FIN'&&etapaCompleta(DB.ordenes[ordenId],etapa))?'finalizada':'iniciada');
+  var mExtra='';
+  if (esMulti&&evento==='INICIO') {
+    var ini2=personasIniciadas(o,etapa);
+    mExtra='<b>Progreso:</b> '+ini2+' de '+tot+' han iniciado'+(ini2<tot?'<br><span style="color:var(--warn)">⏳ Faltan '+(tot-ini2)+'</span>':'');
   }
-  if (esMulti && evento==='FIN') {
-    mensajeExtra='<b>Progreso:</b> '+fin2+' de '+tot+' han finalizado'+
-                 (fin2<tot ? '<br><span style="color:var(--warn)">\u23F3 Faltan '+(tot-fin2)+'</span>'
-                           : '<br><span style="color:var(--pick)">\u2705 Etapa completada</span>');
+  if (esMulti&&evento==='FIN') {
+    mExtra='<b>Progreso:</b> '+fin2+' de '+tot+' han finalizado'+(fin2<tot?'<br><span style="color:var(--warn)">⏳ Faltan '+(tot-fin2)+'</span>':'<br><span style="color:var(--pick)">✅ Etapa completada</span>');
   }
-
-  document.getElementById('ok-titulo').textContent = (evento==='INICIO' ? '\u25B6 Iniciado' : '\u25A0 Finalizado')+': '+etapa;
-  document.getElementById('ok-detalle').textContent= ordenId+' \u00B7 '+t.hora+' \u00B7 '+op;
+  document.getElementById('ok-titulo').textContent =(evento==='INICIO'?'▶ Iniciado':'■ Finalizado')+': '+etapa;
+  document.getElementById('ok-detalle').textContent=ordenId+' · '+t.hora+' · '+op;
   document.getElementById('ok-resumen').innerHTML  =
-    '<b>Orden:</b> '+ordenId+'<br>'+
-    '<b>Etapa:</b> '+ETAPA_ICONO[etapa]+' '+etapa+(esMulti?' ('+tot+' personas)':'')+'<br>'+
+    '<b>Orden:</b> '+ordenId+'<br><b>Etapa:</b> '+ETAPA_ICONO[etapa]+' '+etapa+(esMulti?' ('+tot+' personas)':'')+'<br>'+
     '<b>Evento:</b> '+evento+'<br><b>Operador:</b> '+op+'<br><b>Hora:</b> '+t.hora+'<br>'+
-    (duracion!==null ? '<b>Duracion:</b> '+duracion+' min<br>' : '')+mensajeExtra;
-
-  const contSig = document.getElementById('ok-siguiente'); contSig.innerHTML='';
-  const sigNext = siguienteAccion(ordenId);
-  if (sigNext && sigNext.evento!=='ESPERA') {
-    const bn = document.createElement('button');
-    bn.className   = 'btn btn-'+ETAPA_COLOR[sigNext.etapa];
-    bn.textContent = (sigNext.evento==='INICIO' ? '\u25B6 Iniciar ' : '\u25A0 Finalizar ')+sigNext.etapa;
-    bn.onclick = function(){ prepararAccion(ordenId, sigNext.etapa, sigNext.evento); };
+    (duracion!==null?'<b>Duracion:</b> '+duracion+' min<br>':'')+mExtra;
+  var contSig=document.getElementById('ok-siguiente'); contSig.innerHTML='';
+  var sigNext=siguienteAccion(ordenId);
+  if (sigNext&&sigNext.evento!=='ESPERA') {
+    var bn=document.createElement('button');
+    bn.className='btn btn-'+ETAPA_COLOR[sigNext.etapa];
+    bn.textContent=(sigNext.evento==='INICIO'?'▶ Iniciar ':'■ Finalizar ')+sigNext.etapa;
+    bn.onclick=(function(e,v){ return function(){ prepararAccion(ordenId,e,v); }; })(sigNext.etapa,sigNext.evento);
     contSig.appendChild(bn);
   } else if (!sigNext) {
     ['PACKING','FACTURACION'].forEach(function(et) {
-      const ac = accionDisponibleParaOperador(ordenId, et);
+      var ac=accionDisponibleParaOperador(ordenId,et);
       if (ac==='INICIO'||ac==='FIN') {
-        const bn = document.createElement('button');
-        bn.className='btn btn-'+ETAPA_COLOR[et];
-        bn.style.marginBottom='8px';
-        bn.textContent=(ac==='INICIO' ? '\u25B6 Iniciar ' : '\u25A0 Finalizar ')+et;
-        bn.onclick=function(){ prepararAccion(ordenId, et, ac); };
-        contSig.appendChild(bn);
+        var bn2=document.createElement('button');
+        bn2.className='btn btn-'+ETAPA_COLOR[et]; bn2.style.marginBottom='8px';
+        bn2.textContent=(ac==='INICIO'?'▶ Iniciar ':'■ Finalizar ')+et;
+        bn2.onclick=(function(e,a){ return function(){ prepararAccion(ordenId,e,a); }; })(et,ac);
+        contSig.appendChild(bn2);
       }
     });
   }
-
   mostrar('s-ok');
-  toast(etapa+' '+(evento==='INICIO' ? 'iniciado' : 'finalizado')+' \u2713','ok');
+  toast(etapa+' '+(evento==='INICIO'?'iniciado':'finalizado')+' ✓','ok');
 }
 
 // ============================================================
 // 12. FLUJO ACTIVIDADES VARIAS
 // ============================================================
 function abrirActVarias() {
-  const op     = estado.operadorActual;
-  const activa = activasVarias[op];
-  const banner = document.getElementById('banner-activa');
+  var op=estado.operadorActual, activa=activasVarias[op];
+  var banner=document.getElementById('banner-activa');
   if (activa) {
     banner.style.display='flex';
     document.getElementById('banner-activa-det').textContent=activa.lbl+' — iniciada a las '+activa.inicio+'. Debes finalizarla primero.';
-  } else {
-    banner.style.display='none';
-  }
-  const grid = document.getElementById('varias-grid'); grid.innerHTML='';
+  } else { banner.style.display='none'; }
+  var grid=document.getElementById('varias-grid'); grid.innerHTML='';
   ACT_VARIAS.forEach(function(av) {
-    const bloqueada  = activa && activa.id!==av.id;
+    var bloqueada=activa&&activa.id!==av.id;
     if (bloqueada) return;
-    const estaActiva = activa && activa.id===av.id;
-    const div = document.createElement('div');
-    div.className = 'var-card '+av.css;
-    div.innerHTML = '<div class="v-icon">'+av.icon+'</div><div class="v-lbl">'+av.lbl+(estaActiva?' \u23F3':'')+'</div>';
-    div.onclick = function(){ selActVaria(av, estaActiva); };
+    var estaActiva=activa&&activa.id===av.id;
+    var div=document.createElement('div');
+    div.className='var-card '+av.css;
+    div.innerHTML='<div class="v-icon">'+av.icon+'</div><div class="v-lbl">'+av.lbl+(estaActiva?' ⏳':'')+'</div>';
+    div.onclick=(function(a,e){ return function(){ selActVaria(a,e); }; })(av,estaActiva);
     grid.appendChild(div);
   });
   mostrar('s-varias');
 }
 
 function selActVaria(av, estaActiva) {
-  variaSeleccionada = av;
+  variaSeleccionada=av;
   if (estaActiva) { mostrarVariaActiva(); return; }
   document.getElementById('vc-icon').textContent=av.icon;
   document.getElementById('vc-act').textContent =av.lbl;
@@ -1105,15 +1052,15 @@ function selActVaria(av, estaActiva) {
 }
 
 function iniciarActividadVaria() {
-  const op=estado.operadorActual, av=variaSeleccionada, t=ahora();
+  var op=estado.operadorActual, av=variaSeleccionada, t=ahora();
   activasVarias[op]={ id:av.id, lbl:av.lbl, icon:av.icon, inicio:t.hora, ts:t.ts };
-  logearActVaria('INICIO', av.lbl, t, null);
-  toast(av.lbl+' iniciada \u2713','ok');
+  logearActVaria('INICIO',av.lbl,t,null);
+  toast(av.lbl+' iniciada ✓','ok');
   mostrarVariaActiva();
 }
 
 function mostrarVariaActiva() {
-  const op=estado.operadorActual, activa=activasVarias[op];
+  var op=estado.operadorActual, activa=activasVarias[op];
   document.getElementById('va-act-lbl').textContent    =activa.lbl;
   document.getElementById('va-op-val').textContent     =op;
   document.getElementById('va-inicio-sub').textContent ='Inicio: '+activa.inicio;
@@ -1126,33 +1073,31 @@ function mostrarVariaActiva() {
 }
 
 function finActividadVaria() {
-  const op=estado.operadorActual, activa=activasVarias[op];
+  var op=estado.operadorActual, activa=activasVarias[op];
   if (!activa) return;
-  const t=ahora(), ini=new Date(activa.ts.replace(' ','T')), fin=new Date(t.ts.replace(' ','T'));
-  const dur=Math.round((fin-ini)/60000);
-  logearActVaria('FIN', activa.lbl, t, dur);
+  var t=ahora(), dur=Math.round((new Date(t.ts.replace(' ','T'))-new Date(activa.ts.replace(' ','T')))/60000);
+  logearActVaria('FIN',activa.lbl,t,dur);
   document.getElementById('va-fin').textContent       =t.hora;
   document.getElementById('va-fin-row').style.display ='flex';
   document.getElementById('btn-va-fin').style.display ='none';
   delete activasVarias[op];
-  toast(activa.lbl+' finalizada \u00B7 '+dur+' min','ok');
+  toast(activa.lbl+' finalizada · '+dur+' min','ok');
   setTimeout(function(){ mostrar('s-tipo'); }, 1800);
 }
 
 function logearActVaria(evento, actividadLbl, t, duracion) {
-  const fila={
+  escribirActVaria({
     Fecha:t.fecha, Hora:t.hora, Sesion:estado.sesionId,
     Tipo:'ACT_VARIA', Actividad:actividadLbl, Evento:evento,
     Operador:estado.operadorActual, Timestamp:t.ts,
-    Duracion_min: duracion!==null ? duracion : '',
+    Duracion_min:duracion!==null?duracion:'',
     Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
     Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(),
-  };
-  escribirActVaria(fila);
+  });
 }
 
 // ============================================================
-// 13. HELPERS NAV
+// 13. NAV
 // ============================================================
 function otraOrden() {
   mostrar('s-scan');
@@ -1161,15 +1106,34 @@ function otraOrden() {
 function irInicio() {
   if (!msalAccount) { mostrar('s-msal'); return; }
   mostrar('s-login');
-  document.getElementById('header-sub').textContent='Inverneg \u00B7 CND';
+  document.getElementById('header-sub').textContent='Inverneg · CND';
   estado.operadorActual=''; estado.ordenActual=''; estado.accionPendiente=null;
   document.getElementById('sel-operador').value='';
 }
 
+// Exponer funciones llamadas desde HTML onclick
+window.msalLogin      = msalLogin;
+window.msalLogout     = msalLogout;
+window.loginContinuar = loginContinuar;
+window.selTipo        = selTipo;
+window.buscarOrden    = buscarOrden;
+window.volverScan     = volverScan;
+window.volverDetalle  = volverDetalle;
+window.toggleMulti    = toggleMulti;
+window.ejecutarAccion = ejecutarAccion;
+window.otraOrden      = otraOrden;
+window.irInicio       = irInicio;
+window.iniciarActividadVaria = iniciarActividadVaria;
+window.finActividadVaria     = finActividadVaria;
+
 // ============================================================
-// ARRANQUE — init() al final, todo declarado arriba
+// ARRANQUE
 // ============================================================
 init();
+
+  }; // fin onload
+  document.head.appendChild(s);
+})();
 </script>
 </body>
 </html>
