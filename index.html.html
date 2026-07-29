@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Despacho RF — Inverneg</title>
+<!-- MSAL Browser — autenticación delegada sin client secret -->
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<style>
+  :root {
+    --negro:    #0D0D0D;
+    --gris-dk:  #1C1C1E;
+    --gris-md:  #2C2C2E;
+    --gris-lt:  #3A3A3C;
+    --borde:    #48484A;
+    --texto:    #F5F5F7;
+    --sub:      #AEAEB2;
+    --pick:     #30D158;
+    --check:    #FF9F0A;
+    --pack:     #BF5AF2;
+    --fact:     #0A84FF;
+    --danger:   #FF453A;
+    --warn:     #FFD60A;
+    --teal:     #2EC4B6;
+    --r:        12px;
+    --r-sm:     8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--negro); color: var(--texto); font-family: -apple-system, "SF Pro Display", Arial, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* HEADER */
+  header { background: var(--gris-dk); border-bottom: 1px solid var(--borde); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  header h1 { font-size: 15px; font-weight: 700; letter-spacing: .3px; }
+  header span.sub { font-size: 11px; color: var(--sub); display: block; }
+  .btn-inicio { background: var(--gris-lt); border: none; color: var(--texto); font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: var(--r-sm); cursor: pointer; }
+  .btn-inicio:active { opacity: .7; }
+
+  /* MAIN */
+  main { flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-bottom: 30px; }
+
+  /* PANTALLAS */
+  .screen { display: none; flex-direction: column; gap: 12px; }
+  .screen.active { display: flex; }
+
+  /* CARD */
+  .card { background: var(--gris-dk); border: 1px solid var(--borde); border-radius: var(--r); padding: 14px; }
+  .card-title { font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+
+  /* INPUTS */
+  input, select { width: 100%; background: var(--gris-md); border: 1px solid var(--borde); border-radius: var(--r-sm); color: var(--texto); font-size: 20px; font-weight: 600; padding: 13px 14px; outline: none; -webkit-appearance: none; }
+  input:focus, select:focus { border-color: var(--fact); }
+  input.scan { font-size: 22px; letter-spacing: 1px; }
+  select { font-size: 18px; }
+  select option { background: var(--gris-dk); }
+  label { font-size: 12px; color: var(--sub); display: block; margin-bottom: 5px; }
+
+  /* BOTONES */
+  .btn { width: 100%; border: none; border-radius: var(--r); font-size: 17px; font-weight: 700; padding: 16px; cursor: pointer; letter-spacing: .2px; transition: opacity .15s; }
+  .btn:active { opacity: .75; }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .btn-pick   { background: var(--pick);    color: #000; }
+  .btn-check  { background: var(--check);   color: #000; }
+  .btn-pack   { background: var(--pack);    color: #fff; }
+  .btn-fact   { background: var(--fact);    color: #fff; }
+  .btn-gris   { background: var(--gris-lt); color: var(--texto); }
+  .btn-teal   { background: var(--teal);    color: #000; }
+  .btn-danger { background: var(--danger);  color: #fff; }
+  .btn-sm { font-size: 14px; padding: 11px 14px; border-radius: var(--r-sm); }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .badge-pick  { background: rgba(48,209,88,.18);   color: var(--pick);  border: 1px solid var(--pick); }
+  .badge-check { background: rgba(255,159,10,.18);  color: var(--check); border: 1px solid var(--check); }
+  .badge-pack  { background: rgba(191,90,242,.18);  color: var(--pack);  border: 1px solid var(--pack); }
+  .badge-fact  { background: rgba(10,132,255,.18);  color: var(--fact);  border: 1px solid var(--fact); }
+  .badge-ok    { background: rgba(48,209,88,.18);   color: var(--pick);  border: 1px solid var(--pick); }
+  .badge-pend  { background: rgba(174,174,178,.12); color: var(--sub);   border: 1px solid var(--borde); }
+  .badge-init  { background: rgba(255,214,10,.18);  color: var(--warn);  border: 1px solid var(--warn); }
+
+  /* ETAPAS TRACKER */
+  .etapas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .etapa-item { background: var(--gris-md); border: 1px solid var(--borde); border-radius: var(--r-sm); padding: 10px 12px; }
+  .etapa-item .etapa-nombre { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+  .etapa-item .etapa-det { font-size: 10px; color: var(--sub); line-height: 1.4; }
+  .etapa-pick  .etapa-nombre { color: var(--pick); }
+  .etapa-check .etapa-nombre { color: var(--check); }
+  .etapa-pack  .etapa-nombre { color: var(--pack); }
+  .etapa-fact  .etapa-nombre { color: var(--fact); }
+
+  /* ORDEN INFO */
+  .orden-num  { font-size: 30px; font-weight: 800; letter-spacing: 1px; color: var(--texto); margin-bottom: 4px; }
+  .orden-meta { font-size: 12px; color: var(--sub); }
+  .divider    { height: 1px; background: var(--borde); }
+
+  /* TOAST */
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--gris-lt); color: var(--texto); border-radius: var(--r); padding: 12px 20px; font-size: 14px; font-weight: 600; z-index: 999; transition: transform .3s ease; white-space: nowrap; border: 1px solid var(--borde); max-width: 90vw; text-align: center; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.ok   { border-color: var(--pick);   color: var(--pick); }
+  #toast.err  { border-color: var(--danger); color: var(--danger); }
+  #toast.warn { border-color: var(--warn);   color: var(--warn); }
+
+  /* AVISO */
+  .aviso { background: rgba(255,69,58,.1); border: 1px solid var(--danger); border-radius: var(--r-sm); padding: 10px 12px; font-size: 13px; color: #FF6B63; display: none; }
+  .aviso.show { display: block; }
+
+  /* ROW */
+  .row { display: flex; gap: 8px; }
+  .row .btn { flex: 1; }
+
+  /* HORA DISPLAY */
+  .hora-grande { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--warn); letter-spacing: 2px; }
+  .fecha-label { font-size: 11px; color: var(--sub); margin-top: 2px; }
+
+  /* TOGGLE MULTIPERSONAS */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0 6px; border-bottom: 1px solid var(--borde); margin-bottom: 12px; }
+  .toggle-label { font-size: 13px; font-weight: 700; color: var(--texto); }
+  .toggle-sub   { font-size: 11px; color: var(--sub); }
+  .toggle-wrap  { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+  .toggle-wrap input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--gris-lt); border-radius: 26px; cursor: pointer; transition: background .2s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+  .toggle-wrap input:checked + .toggle-slider { background: var(--fact); }
+  .toggle-wrap input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+  /* TIPO SELECCION */
+  .tipo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .tipo-card { border: 2px solid var(--borde); border-radius: 16px; padding: 24px 14px; text-align: center; cursor: pointer; transition: all .18s; background: var(--gris-dk); }
+  .tipo-card:active { transform: scale(.96); opacity: .85; }
+  .tipo-card .tc-icon { font-size: 38px; margin-bottom: 10px; }
+  .tipo-card .tc-lbl  { font-size: 14px; font-weight: 800; letter-spacing: .2px; }
+  .tipo-card .tc-sub  { font-size: 11px; color: var(--sub); margin-top: 5px; line-height: 1.4; }
+  .tipo-card.t-orden  { border-color: var(--fact); }
+  .tipo-card.t-varias { border-color: var(--teal); }
+  .tipo-card.t-orden  .tc-lbl { color: var(--fact); }
+  .tipo-card.t-varias .tc-lbl { color: var(--teal); }
+
+  /* ACTIVIDADES VARIAS */
+  .varias-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var-card { border: 2px solid var(--borde); border-radius: 12px; padding: 18px 10px; text-align: center; cursor: pointer; transition: all .18s; background: var(--gris-dk); }
+  .var-card:active { transform: scale(.95); }
+  .var-card .v-icon { font-size: 28px; margin-bottom: 6px; }
+  .var-card .v-lbl  { font-size: 13px; font-weight: 700; }
+  .var-card.v-inv    { border-color: var(--fact);  color: var(--fact); }
+  .var-card.v-etiq   { border-color: var(--warn);  color: var(--warn); }
+  .var-card.v-dan    { border-color: var(--danger); color: var(--danger); }
+  .var-card.v-mkt    { border-color: #FF6AD2;       color: #FF6AD2; }
+  .var-card.v-dest   { border-color: #FF8C42;       color: #FF8C42; }
+  .var-card.v-embpal { border-color: var(--teal);  color: var(--teal); }
+  .var-card.v-embdan { border-color: var(--pack);  color: var(--pack); }
+
+  /* Banner actividad pendiente */
+  .activa-banner { background: rgba(255,214,10,.08); border: 1px solid var(--warn); border-radius: var(--r); padding: 12px 14px; display: flex; align-items: flex-start; gap: 10px; }
+  .activa-banner .ab-icon   { font-size: 22px; flex-shrink: 0; }
+  .activa-banner .ab-titulo { font-size: 13px; font-weight: 700; color: var(--warn); }
+  .activa-banner .ab-det    { font-size: 11px; color: var(--sub); margin-top: 3px; line-height: 1.4; }
+
+  /* Box actividad en curso */
+  .box-varias { border-radius: var(--r); padding: 20px 16px; text-align: center; background: linear-gradient(135deg, #0D3B38, #0a5c56); border: 1px solid var(--teal); }
+  .box-varias .bv-act { font-size: 11px; color: var(--teal); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+  .box-varias .bv-val { font-size: 26px; font-weight: 800; color: #fff; margin: 8px 0 4px; }
+  .box-varias .bv-sub { font-size: 12px; color: rgba(255,255,255,.6); }
+
+  /* PANTALLA MSAL — autenticacion Microsoft */
+  .msal-card { background: var(--gris-dk); border: 1px solid var(--borde); border-radius: var(--r); padding: 28px 20px; text-align: center; }
+  .msal-logo { font-size: 48px; margin-bottom: 12px; }
+  .msal-titulo { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+  .msal-sub { font-size: 12px; color: var(--sub); margin-bottom: 20px; line-height: 1.5; }
+  .msal-user { background: rgba(10,132,255,.12); border: 1px solid var(--fact); border-radius: var(--r-sm); padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--fact); margin-bottom: 14px; word-break: break-all; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid var(--borde); border-top-color: var(--fact); border-radius: 50%; animation: spin .8s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Despacho RF</h1>
+    <span class="sub" id="header-sub">Inverneg · CND</span>
+  </div>
+  <button class="btn-inicio" onclick="irInicio()">⌂ Inicio</button>
+</header>
+
+<main>
+
+<!-- PANTALLA MSAL: autenticacion Microsoft -->
+<div class="screen active" id="s-msal">
+  <div class="msal-card">
+    <div class="msal-logo">🔐</div>
+    <div class="msal-titulo">Inverneg · Despacho RF</div>
+    <div class="msal-sub">Inicia sesión con tu cuenta Microsoft<br>de Inverneg para continuar.</div>
+    <div class="msal-user" id="msal-user-info" style="display:none;"></div>
+    <button class="btn btn-fact" id="btn-msal-login" onclick="msalLogin()">
+      Iniciar sesión con Microsoft
+    </button>
+    <div id="msal-loading" style="display:none; margin-top:14px; font-size:13px; color:var(--sub);">
+      <span class="spinner"></span>Verificando sesión...
+    </div>
+    <div class="aviso" id="aviso-msal" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+<!-- PANTALLA LOGIN: seleccion de operador -->
+<div class="screen" id="s-login">
+  <div class="card">
+    <div class="card-title">Identificación</div>
+    <label>Selecciona tu nombre</label>
+    <select id="sel-operador"><option value="">— Operador —</option></select>
+  </div>
+  <div class="card" style="text-align:center; padding:10px 14px;">
+    <div class="hora-grande" id="reloj">--:--:--</div>
+    <div class="fecha-label" id="fecha-hoy"></div>
+  </div>
+  <button class="btn btn-fact" onclick="loginContinuar()">Continuar →</button>
+  <button class="btn btn-gris btn-sm" onclick="msalLogout()">Cerrar sesión Microsoft</button>
+</div>
+
+<!-- PANTALLA TIPO -->
+<div class="screen" id="s-tipo">
+  <div class="card">
+    <div class="card-title">¿Qué vas a realizar?</div>
+    <div class="tipo-grid">
+      <div class="tipo-card t-orden" onclick="selTipo('orden')">
+        <div class="tc-icon">📋</div>
+        <div class="tc-lbl">Orden de Trabajo</div>
+        <div class="tc-sub">Picking, Checking, Packing, Facturación</div>
+      </div>
+      <div class="tipo-card t-varias" onclick="selTipo('varias')">
+        <div class="tc-icon">⚡</div>
+        <div class="tc-lbl">Actividades Varias</div>
+        <div class="tc-sub">Inventario, MKT, Dañados y más</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA 1: ESCANEO DE ORDEN -->
+<div class="screen" id="s-scan">
+  <div class="card">
+    <div class="card-title">Escanear Orden</div>
+    <label>Código / # de Orden</label>
+    <input id="inp-orden" class="scan" type="text" placeholder="Escanea o ingresa..."
+           autocomplete="off" autocorrect="off" spellcheck="false"
+           onkeydown="if(event.key==='Enter') buscarOrden()">
+  </div>
+  <button class="btn btn-gris" onclick="buscarOrden()">Buscar Orden</button>
+  <div class="aviso" id="aviso-scan"></div>
+  <button class="btn btn-gris btn-sm" onclick="mostrar('s-tipo')">← Volver</button>
+</div>
+
+<!-- PANTALLA 2: DETALLE / ACCIONES DE ORDEN -->
+<div class="screen" id="s-detalle">
+  <div class="card">
+    <div class="card-title">Orden</div>
+    <div class="orden-num" id="d-orden-num">—</div>
+    <div class="orden-meta" id="d-orden-meta"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Estado actual</div>
+    <div class="etapas" id="etapas-tracker"></div>
+  </div>
+  <div id="acciones-container"></div>
+  <button class="btn btn-gris btn-sm" onclick="volverScan()">← Escanear otra orden</button>
+</div>
+
+<!-- PANTALLA 3: CONFIRMAR ACCION -->
+<div class="screen" id="s-confirmar">
+  <div class="card">
+    <div class="card-title" id="conf-titulo">Confirmar acción</div>
+    <div class="orden-num" id="conf-orden">—</div>
+    <div class="orden-meta" id="conf-accion" style="margin-top:6px; font-size:14px; font-weight:600;"></div>
+  </div>
+  <div class="card" id="card-operadores">
+    <div class="toggle-row" id="toggle-multi-row" style="display:none;">
+      <div>
+        <div class="toggle-label">👥 Multipersonas</div>
+        <div class="toggle-sub">Varias personas trabajarán esta etapa</div>
+      </div>
+      <label class="toggle-wrap">
+        <input type="checkbox" id="chk-multi" onchange="toggleMulti()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div id="bloque-num-personas" style="display:none; margin-bottom:12px;">
+      <label>¿Cuántas personas en total?</label>
+      <select id="sel-num-personas">
+        <option value="">— Selecciona —</option>
+        <option value="2">2 personas</option>
+        <option value="3">3 personas</option>
+        <option value="4">4 personas</option>
+        <option value="5">5 personas</option>
+      </select>
+    </div>
+    <div id="modo-individual">
+      <label id="label-op-accion">¿Quién realiza esta acción?</label>
+      <select id="sel-op-accion"><option value="">— Selecciona tu nombre —</option></select>
+    </div>
+  </div>
+  <div id="nota-multi" style="display:none; background:rgba(10,132,255,.1); border:1px solid var(--fact); border-radius:var(--r-sm); padding:10px 12px; font-size:12px; color:#5AC8FA; line-height:1.6;"></div>
+  <div class="aviso" id="aviso-conf"></div>
+  <button class="btn" id="btn-confirmar-accion" onclick="ejecutarAccion()">Registrar</button>
+  <button class="btn btn-gris btn-sm" onclick="volverDetalle()">← Volver</button>
+</div>
+
+<!-- PANTALLA 4: CONFIRMACION REGISTRADA -->
+<div class="screen" id="s-ok">
+  <div class="card" style="text-align:center; padding: 24px 14px;">
+    <div style="font-size:48px; margin-bottom:8px;">✓</div>
+    <div style="font-size:20px; font-weight:800; color: var(--pick); margin-bottom:6px;" id="ok-titulo">Registrado</div>
+    <div style="font-size:14px; color: var(--sub);" id="ok-detalle"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Resumen</div>
+    <div id="ok-resumen" style="font-size:13px; line-height:1.8; color: var(--sub);"></div>
+  </div>
+  <div id="ok-siguiente" style="display:flex; flex-direction:column; gap:8px;"></div>
+  <div class="divider"></div>
+  <button class="btn btn-fact" onclick="otraOrden()">Escanear otra orden</button>
+  <button class="btn btn-gris btn-sm" onclick="irInicio()">⌂ Menú principal</button>
+</div>
+
+<!-- PANTALLA A: ACTIVIDADES VARIAS — seleccion -->
+<div class="screen" id="s-varias">
+  <div class="activa-banner" id="banner-activa" style="display:none;">
+    <div class="ab-icon">⚠️</div>
+    <div>
+      <div class="ab-titulo">Actividad pendiente de finalizar</div>
+      <div class="ab-det" id="banner-activa-det">—</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">⚡ Selecciona la actividad</div>
+    <div class="varias-grid" id="varias-grid"></div>
+  </div>
+  <button class="btn btn-gris btn-sm" onclick="mostrar('s-tipo')">← Volver</button>
+</div>
+
+<!-- PANTALLA B: ACTIVIDADES VARIAS — confirmar inicio -->
+<div class="screen" id="s-varias-confirmar">
+  <div class="card" style="text-align:center; padding: 20px 14px;">
+    <div style="font-size:40px; margin-bottom:8px;" id="vc-icon">⚡</div>
+    <div style="font-size:22px; font-weight:800; color: var(--teal); margin-bottom:4px;" id="vc-act">—</div>
+    <div style="font-size:13px; color: var(--sub);" id="vc-op">—</div>
+  </div>
+  <div class="aviso" id="aviso-vc"></div>
+  <button class="btn btn-teal" style="font-size:18px; padding:18px;" onclick="iniciarActividadVaria()">
+    ▶ Iniciar Actividad
+  </button>
+  <button class="btn btn-gris btn-sm" onclick="mostrar('s-varias')">← Cambiar actividad</button>
+</div>
+
+<!-- PANTALLA C: ACTIVIDADES VARIAS — en curso -->
+<div class="screen" id="s-varias-activa">
+  <div class="box-varias">
+    <div class="bv-act" id="va-act-lbl">—</div>
+    <div class="bv-val" id="va-op-val">—</div>
+    <div class="bv-sub" id="va-inicio-sub">Inicio: —</div>
+  </div>
+  <div class="card">
+    <div class="card-title">⏱ Control de tiempo</div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <span style="font-size:12px; color:var(--sub);">Operador</span>
+      <span style="font-size:13px; font-weight:700;" id="va-op">—</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <span style="font-size:12px; color:var(--sub);">Actividad</span>
+      <span style="font-size:13px; font-weight:700;" id="va-act">—</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <span style="font-size:12px; color:var(--sub);">Inicio</span>
+      <span style="font-size:13px; font-weight:700;" id="va-inicio">—</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;" id="va-fin-row">
+      <span style="font-size:12px; color:var(--sub);">Fin</span>
+      <span style="font-size:13px; font-weight:700; color:var(--pick);" id="va-fin">—</span>
+    </div>
+    <button class="btn btn-teal" id="btn-va-fin" onclick="finActividadVaria()" style="margin-top:12px; font-size:16px;">
+      ■ Finalizar Actividad
+    </button>
+  </div>
+  <button class="btn btn-gris btn-sm" onclick="mostrar('s-tipo')">⌂ Menú principal</button>
+</div>
+
+</main>
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ============================================================
+// 1. CONFIGURACION — solo valores publicos, cero secretos
+// ============================================================
+const CFG = {
+  clientId:    'ec976114-e146-4ce4-850c-5d978e12acfd',
+  tenantId:    '5e008bd3-17b6-4f83-8d23-019691a40609',
+  redirectUri: window.location.href.split('?')[0],
+  driveId:     'b!BGqUjRkx90uVOKtH0ppNYx_Gik0HsqRJkQWL01ezGQYWCwyX6OlCQZ3YdHDaojQp',
+  itemId:      '01DYNVTLY3X4UMPPVGXJB2HY5WTY2QK2XX',
+  sheets: {
+    catalogos: 'Catalogos',
+    registros: 'Registros_Despacho',
+    estado:    'Estado_Ordenes',
+    varias:    'Registros_ActVarias',
+  },
+};
+
+const GRAPH_SCOPES = ['Files.ReadWrite', 'Sites.Read.All'];
+
+// ============================================================
+// 2. MSAL — inicializacion (debe ir ANTES de cualquier uso)
+// ============================================================
+const msalConfig = {
+  auth: {
+    clientId:    CFG.clientId,
+    authority:   'https://login.microsoftonline.com/' + CFG.tenantId,
+    redirectUri: CFG.redirectUri,
+  },
+  cache: {
+    cacheLocation:          'sessionStorage',
+    storeAuthStateInCookie: false,
+  },
+};
+
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+let msalAccount = null;
+
+// ============================================================
+// 3. DB EN MEMORIA y constantes operativas
+// ============================================================
+const DB = {
+  operadores: ['Carlos Mendoza', 'Rosa Pinto', 'Javier Cedeno', 'Luisa Vera', 'Pedro Alvarado'],
+  ordenes:    {},
+};
+
+const ACT_VARIAS = [
+  { id: 'inventario',  lbl: 'Inventario',      icon: '\u{1F4CA}', css: 'v-inv'    },
+  { id: 'etiquetar',   lbl: 'Etiquetar',        icon: '\u{1F3F7}', css: 'v-etiq'  },
+  { id: 'danados',     lbl: 'Danados',          icon: '\u26A0',    css: 'v-dan'   },
+  { id: 'mkt',         lbl: 'MKT',              icon: '\u{1F4E3}', css: 'v-mkt'   },
+  { id: 'destruccion', lbl: 'Destruccion',      icon: '\u{1F5D1}', css: 'v-dest'  },
+  { id: 'embPallets',  lbl: 'Embarque Pallets', icon: '\u{1F69B}', css: 'v-embpal'},
+  { id: 'embDanados',  lbl: 'Embarque Danados', icon: '\u{1F4E6}', css: 'v-embdan'},
+];
+
+let activasVarias    = {};
+let variaSeleccionada = null;
+
+let estado = {
+  operadorActual:  '',
+  ordenActual:     '',
+  accionPendiente: null,
+  sesionId:        generarSesion(),
+};
+
+const ETAPAS      = ['PICKING','CHECKING','PACKING','FACTURACION'];
+const ETAPA_COLOR = { PICKING:'pick', CHECKING:'check', PACKING:'pack', FACTURACION:'fact' };
+const ETAPA_ICONO = { PICKING:'\u{1F4E6}', CHECKING:'\u2705', PACKING:'\u{1F4EB}', FACTURACION:'\u{1F9FE}' };
+
+// ============================================================
+// 4. UTILIDADES
+// ============================================================
+function generarSesion() {
+  const d = new Date(), pad = function(n) { return String(n).padStart(2,'0'); };
+  return 'SES-' + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) +
+         '-' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+}
+function ahora() {
+  const d = new Date(), pad = function(n) { return String(n).padStart(2,'0'); };
+  return {
+    fecha: d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),
+    hora:  pad(d.getHours())+':'+pad(d.getMinutes()),
+    ts:    d.toISOString().replace('T',' ').substring(0,19),
+    raw:   d,
+  };
+}
+function toast(msg, tipo, dur) {
+  tipo = tipo||'ok'; dur = dur||2400;
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show '+tipo;
+  setTimeout(function() { t.className=''; }, dur);
+}
+function mostrar(id) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+function reloj() {
+  const d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
+  document.getElementById('reloj').textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+}
+function fechaHoy() {
+  const d = new Date();
+  const dias  = ['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return dias[d.getDay()]+' '+d.getDate()+' '+meses[d.getMonth()]+' '+d.getFullYear();
+}
+function getSemana(d) {
+  const d2 = new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  d2.setUTCDate(d2.getUTCDate()+4-(d2.getUTCDay()||7));
+  const ys = new Date(Date.UTC(d2.getUTCFullYear(),0,1));
+  return Math.ceil((((d2-ys)/86400000)+1)/7);
+}
+
+// ============================================================
+// 5. MSAL — login / logout / token
+// ============================================================
+async function msalLogin() {
+  mostrarMsalLoading(true);
+  document.getElementById('aviso-msal').classList.remove('show');
+  try {
+    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
+    msalAccount  = result.account;
+    await postLogin();
+  } catch(e) {
+    mostrarMsalLoading(false);
+    const av = document.getElementById('aviso-msal');
+    av.textContent = 'Error de autenticacion: ' + e.message;
+    av.classList.add('show');
+    console.error('MSAL login error:', e);
+  }
+}
+
+async function msalLogout() {
+  try {
+    await msalInstance.logoutPopup({ account: msalAccount });
+  } catch(e) { console.warn('logout error:', e.message); }
+  msalAccount = null;
+  document.getElementById('msal-user-info').style.display = 'none';
+  document.getElementById('btn-msal-login').style.display = 'block';
+  mostrar('s-msal');
+}
+
+async function getToken() {
+  if (!msalAccount) throw new Error('No hay sesion activa');
+  const req = { scopes: GRAPH_SCOPES, account: msalAccount };
+  try {
+    const result = await msalInstance.acquireTokenSilent(req);
+    return result.accessToken;
+  } catch(e) {
+    const result = await msalInstance.acquireTokenPopup(req);
+    return result.accessToken;
+  }
+}
+
+function mostrarMsalLoading(visible) {
+  document.getElementById('msal-loading').style.display = visible ? 'block' : 'none';
+}
+
+async function postLogin() {
+  const email  = msalAccount.username || msalAccount.name || '';
+  const infoEl = document.getElementById('msal-user-info');
+  infoEl.textContent    = '\u2713 Sesion activa: ' + email;
+  infoEl.style.display  = 'block';
+  document.getElementById('btn-msal-login').style.display = 'none';
+  mostrarMsalLoading(true);
+  await leerCatalogos();
+  await leerEstadoOrdenes();
+  mostrarMsalLoading(false);
+  mostrar('s-login');
+}
+
+async function intentarSesionSilenciosa() {
+  mostrarMsalLoading(true);
+  try {
+    await msalInstance.handleRedirectPromise();
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      msalAccount = accounts[0];
+      await postLogin();
+    } else {
+      mostrarMsalLoading(false);
+    }
+  } catch(e) {
+    mostrarMsalLoading(false);
+    console.warn('Sesion silenciosa fallida:', e.message);
+  }
+}
+
+// ============================================================
+// 6. GRAPH API — helpers
+// ============================================================
+function urlHoja(hoja) {
+  return 'https://graph.microsoft.com/v1.0/drives/' + CFG.driveId +
+         '/items/' + CFG.itemId +
+         '/workbook/worksheets/' + encodeURIComponent(hoja);
+}
+
+async function graphGet(url) {
+  const token = await getToken();
+  const res   = await fetch(url, { headers: { Authorization: 'Bearer '+token } });
+  if (!res.ok) {
+    const err = await res.json().catch(function(){ return {}; });
+    throw new Error((err.error && err.error.message) || 'Graph GET '+res.status);
+  }
+  return res.json();
+}
+
+async function graphPatch(url, body) {
+  const token = await getToken();
+  const res   = await fetch(url, {
+    method:  'PATCH',
+    headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(function(){ return {}; });
+    throw new Error((err.error && err.error.message) || 'Graph PATCH '+res.status);
+  }
+  return res.json();
+}
+
+async function getNextRow(hoja) {
+  const data = await graphGet(urlHoja(hoja)+'/usedRange');
+  return data.values ? data.values.length+1 : 2;
+}
+
+// ============================================================
+// 7. OPERACIONES EXCEL
+// ============================================================
+async function leerCatalogos() {
+  try {
+    const data = await graphGet(urlHoja(CFG.sheets.catalogos)+'/usedRange');
+    if (!data.values || data.values.length < 2) { console.warn('Catalogos vacio'); return; }
+    const ops = data.values.slice(1)
+      .map(function(f){ return f[0] ? f[0].toString().trim() : ''; })
+      .filter(function(v){ return v !== ''; });
+    DB.operadores = ops;
+    poblarOperadores('sel-operador');
+    poblarOperadores('sel-op-accion');
+    console.log('Catalogos cargados:', ops.length, 'operadores');
+  } catch(e) {
+    console.error('leerCatalogos:', e.message);
+    toast('Error cargando catalogos', 'err', 4000);
+  }
+}
+
+async function leerEstadoOrdenes() {
+  try {
+    const data = await graphGet(urlHoja(CFG.sheets.estado)+'/usedRange');
+    if (!data.values || data.values.length < 2) { console.log('Estado_Ordenes vacio'); return; }
+    const enc   = data.values[0];
+    const filas = data.values.slice(1);
+    filas.forEach(function(fila) {
+      const ordenId = fila[0] ? fila[0].toString().trim() : '';
+      if (!ordenId) return;
+      if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
+      const o = DB.ordenes[ordenId];
+      enc.forEach(function(col, i) {
+        if (i===0) return;
+        const etapa = col ? col.toString().trim().toUpperCase() : '';
+        if (!['PICKING','CHECKING','PACKING','FACTURACION'].includes(etapa)) return;
+        if (fila[i] && fila[i].toString().trim()==='finalizada') {
+          if (!o[etapa]) o[etapa] = { totalPersonas:1, personas:{} };
+          if (!o[etapa].personas['_cargado']) {
+            o[etapa].personas['_cargado'] = {
+              inicio:{ hora:'--', ts:'--', fecha:'--' },
+              fin:   { hora:'--', ts:'--', fecha:'--' },
+            };
+          }
+        }
+      });
+    });
+    console.log('Estado_Ordenes cargado:', Object.keys(DB.ordenes).length, 'ordenes');
+  } catch(e) { console.error('leerEstadoOrdenes:', e.message); }
+}
+
+async function escribirEnExcel(fila) {
+  try {
+    const nextRow = await getNextRow(CFG.sheets.registros);
+    const rango   = 'A'+nextRow+':P'+nextRow;
+    const valores = [[
+      fila.Fecha||'', fila.Hora||'', fila.Sesion||'', fila.Orden||'',
+      fila.Etapa||'', fila.Evento||'', fila.Operador||'', fila.Multipersona||'',
+      fila.Total_Personas!==undefined ? fila.Total_Personas : '',
+      fila.Timestamp||'',
+      fila.Duracion_min!==undefined ? fila.Duracion_min : '',
+      fila.Dia_Semana||'',
+      fila.Semana!==undefined ? fila.Semana : '',
+      fila.Mes!==undefined    ? fila.Mes    : '',
+      fila.Anio!==undefined   ? fila.Anio   : '',
+      fila.Novedades||'',
+    ]];
+    await graphPatch(urlHoja(CFG.sheets.registros)+"/range(address='"+rango+"')", { values: valores });
+    console.log('Despacho registrado fila', nextRow);
+  } catch(e) {
+    console.error('escribirEnExcel:', e.message);
+    toast('Error al guardar en Excel', 'err', 4000);
+  }
+}
+
+async function escribirActVaria(fila) {
+  try {
+    const nextRow = await getNextRow(CFG.sheets.varias);
+    const rango   = 'A'+nextRow+':M'+nextRow;
+    const valores = [[
+      fila.Fecha||'', fila.Hora||'', fila.Sesion||'',
+      fila.Tipo||'ACT_VARIA', fila.Actividad||'', fila.Evento||'', fila.Operador||'',
+      fila.Timestamp||'',
+      fila.Duracion_min!==undefined ? fila.Duracion_min : '',
+      fila.Dia_Semana||'',
+      fila.Semana!==undefined ? fila.Semana : '',
+      fila.Mes!==undefined    ? fila.Mes    : '',
+      fila.Anio!==undefined   ? fila.Anio   : '',
+    ]];
+    await graphPatch(urlHoja(CFG.sheets.varias)+"/range(address='"+rango+"')", { values: valores });
+    console.log('ActVaria registrada fila', nextRow);
+  } catch(e) {
+    console.error('escribirActVaria:', e.message);
+    toast('Error al guardar actividad', 'err', 4000);
+  }
+}
+
+async function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
+  try {
+    const data     = await graphGet(urlHoja(CFG.sheets.estado)+'/usedRange');
+    if (!data.values) return;
+    const enc      = data.values[0];
+    const colEtapa = enc.findIndex(function(c){
+      return c && c.toString().trim().toUpperCase()===etapa.toUpperCase();
+    });
+    if (colEtapa===-1) { console.warn('Columna no encontrada:', etapa); return; }
+    let filaIdx = -1;
+    for (let i=1; i<data.values.length; i++) {
+      if (data.values[i][0] && data.values[i][0].toString().trim()===ordenId) { filaIdx=i; break; }
+    }
+    const letraCol = String.fromCharCode(65+colEtapa);
+    if (filaIdx!==-1) {
+      const rango = letraCol+(filaIdx+1);
+      await graphPatch(urlHoja(CFG.sheets.estado)+"/range(address='"+rango+"')", { values:[[nuevoEstado]] });
+    } else {
+      const nextRow = data.values.length+1;
+      const rangoF  = 'A'+nextRow+':E'+nextRow;
+      const filaNew = ['','','','',''];
+      filaNew[0]        = ordenId;
+      filaNew[colEtapa] = nuevoEstado;
+      await graphPatch(urlHoja(CFG.sheets.estado)+"/range(address='"+rangoF+"')", { values:[filaNew] });
+    }
+    console.log('Estado actualizado:', ordenId, etapa, nuevoEstado);
+  } catch(e) { console.error('actualizarEstadoOrden:', e.message); }
+}
+
+// ============================================================
+// 8. ETAPAS — logica operativa
+// ============================================================
+function initEtapa(o, etapa, tot) {
+  if (!o[etapa]) o[etapa] = { totalPersonas: tot||1, personas:{} };
+}
+function personasIniciadas(o, etapa) {
+  if (!o[etapa]) return 0;
+  return Object.values(o[etapa].personas).filter(function(p){ return p.inicio; }).length;
+}
+function personasFinalizadas(o, etapa) {
+  if (!o[etapa]) return 0;
+  return Object.values(o[etapa].personas).filter(function(p){ return p.fin; }).length;
+}
+function totalPersonas(o, etapa)  { return (o[etapa] && o[etapa].totalPersonas)||1; }
+function etapaCompleta(o, etapa)  {
+  if (!o[etapa]) return false;
+  return personasFinalizadas(o,etapa) >= o[etapa].totalPersonas;
+}
+function estadoEtapa(ordenId, etapa) {
+  const o = DB.ordenes[ordenId];
+  if (!o||!o[etapa]) return 'pendiente';
+  if (etapaCompleta(o,etapa)) return 'finalizada';
+  if (personasIniciadas(o,etapa)>0) return 'iniciada';
+  return 'pendiente';
+}
+function accionDisponibleParaOperador(ordenId, etapa) {
+  const o  = DB.ordenes[ordenId];
+  const op = estado.operadorActual;
+  if (!o||!o[etapa]) return 'INICIO';
+  const p = o[etapa].personas[op];
+  if (!p) return personasIniciadas(o,etapa)<o[etapa].totalPersonas ? 'INICIO' : 'ESPERA';
+  if (p.inicio && !p.fin) return 'FIN';
+  return 'ESPERA';
+}
+function siguienteAccion(ordenId) {
+  const o = DB.ordenes[ordenId];
+  if (!o) return { etapa:'PICKING', evento:'INICIO' };
+  const pickSt  = estadoEtapa(ordenId,'PICKING');
+  const checkSt = estadoEtapa(ordenId,'CHECKING');
+  if (pickSt==='pendiente') return { etapa:'PICKING',   evento:'INICIO' };
+  if (pickSt==='iniciada') {
+    const ac = accionDisponibleParaOperador(ordenId,'PICKING');
+    return (ac==='INICIO'||ac==='FIN') ? { etapa:'PICKING', evento:ac } : { etapa:'PICKING', evento:'ESPERA' };
+  }
+  if (checkSt==='pendiente') return { etapa:'CHECKING', evento:'INICIO' };
+  if (checkSt==='iniciada') {
+    const ac = accionDisponibleParaOperador(ordenId,'CHECKING');
+    return (ac==='INICIO'||ac==='FIN') ? { etapa:'CHECKING', evento:ac } : { etapa:'CHECKING', evento:'ESPERA' };
+  }
+  return null;
+}
+
+// ============================================================
+// 9. INIT y UI base
+// ============================================================
+function init() {
+  setInterval(reloj, 1000); reloj();
+  document.getElementById('fecha-hoy').textContent = fechaHoy();
+  poblarOperadores('sel-operador');
+  poblarOperadores('sel-op-accion');
+  // MSAL: intentar sesion silenciosa (msalInstance ya esta declarado arriba)
+  intentarSesionSilenciosa();
+}
+
+function poblarOperadores(selId) {
+  const sel = document.getElementById(selId);
+  sel.innerHTML = '<option value="">— Selecciona operador —</option>';
+  DB.operadores.forEach(function(op) {
+    const o = document.createElement('option');
+    o.value = op; o.textContent = op; sel.appendChild(o);
+  });
+}
+
+// ============================================================
+// 10. LOGIN OPERADOR
+// ============================================================
+function loginContinuar() {
+  const op = document.getElementById('sel-operador').value;
+  if (!op) { toast('Selecciona tu nombre primero','err'); return; }
+  estado.operadorActual = op;
+  document.getElementById('header-sub').textContent = op+' · CND';
+  mostrar('s-tipo');
+}
+function selTipo(tipo) {
+  if (tipo==='orden') {
+    mostrar('s-scan');
+    setTimeout(function(){ document.getElementById('inp-orden').focus(); }, 100);
+  } else {
+    abrirActVarias();
+  }
+}
+
+// ============================================================
+// 11. FLUJO ORDEN DE TRABAJO
+// ============================================================
+function buscarOrden() {
+  const val = document.getElementById('inp-orden').value.trim().toUpperCase();
+  if (!val) { toast('Escanea o ingresa un numero de orden','err'); return; }
+  estado.ordenActual = val;
+  document.getElementById('inp-orden').value = '';
+  mostrarDetalle(val);
+}
+function volverScan() {
+  mostrar('s-scan');
+  setTimeout(function(){ document.getElementById('inp-orden').focus(); }, 100);
+}
+function mostrarDetalle(ordenId) {
+  const o = DB.ordenes[ordenId];
+  document.getElementById('d-orden-num').textContent = ordenId;
+  let ultimoTexto = 'Sin actividad registrada';
+  if (o) {
+    const eventos = [];
+    ETAPAS.forEach(function(et) {
+      if (o[et]) {
+        Object.entries(o[et].personas).forEach(function(entry) {
+          const op2=entry[0], p=entry[1];
+          if (p.fin)    eventos.push({ ts:p.fin.ts,    label:et+' finalizado por '+op2 });
+          if (p.inicio) eventos.push({ ts:p.inicio.ts, label:et+' iniciado por '+op2  });
+        });
+      }
+    });
+    if (eventos.length) {
+      eventos.sort(function(a,b){ return b.ts.localeCompare(a.ts); });
+      ultimoTexto = 'Ultimo: '+eventos[0].label;
+    }
+  }
+  document.getElementById('d-orden-meta').textContent = ultimoTexto;
+
+  const tracker = document.getElementById('etapas-tracker'); tracker.innerHTML='';
+  ETAPAS.forEach(function(et) {
+    const st  = estadoEtapa(ordenId,et);
+    const div = document.createElement('div');
+    div.className = 'etapa-item etapa-'+ETAPA_COLOR[et];
+    let badgeClass='badge-pend', badgeText='Pendiente', det='';
+    if (st==='iniciada') {
+      badgeClass='badge-init'; badgeText='En curso';
+      const o2 = DB.ordenes[ordenId];
+      det = personasIniciadas(o2,et)+'/'+totalPersonas(o2,et)+' personas';
+    } else if (st==='finalizada') {
+      badgeClass='badge-ok'; badgeText='Listo';
+    }
+    div.innerHTML = '<div class="etapa-nombre">'+ETAPA_ICONO[et]+' '+et+'</div>'+
+                    '<span class="badge '+badgeClass+'">'+badgeText+'</span>'+
+                    (det ? '<div class="etapa-det" style="margin-top:4px">'+det+'</div>' : '');
+    tracker.appendChild(div);
+  });
+  renderAcciones(ordenId);
+  mostrar('s-detalle');
+}
+
+function renderAcciones(ordenId) {
+  const cont = document.getElementById('acciones-container'); cont.innerHTML='';
+  const sig  = siguienteAccion(ordenId);
+  if (sig && sig.evento!=='ESPERA') {
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML='<div class="card-title">Proxima accion</div>';
+    const btn = document.createElement('button');
+    btn.className   = 'btn btn-'+ETAPA_COLOR[sig.etapa];
+    btn.textContent = (sig.evento==='INICIO' ? '\u25B6 Iniciar ' : '\u25A0 Finalizar ')+sig.etapa;
+    btn.onclick = function(){ prepararAccion(ordenId, sig.etapa, sig.evento); };
+    div.appendChild(btn); cont.appendChild(div);
+  } else if (sig && sig.evento==='ESPERA') {
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML='<div class="card-title">Proxima accion</div>'+
+                  '<div style="font-size:13px;color:var(--warn);padding:8px 0">\u23F3 Esperando que las demas personas completen '+sig.etapa+'...</div>';
+    cont.appendChild(div);
+  } else {
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML='<div class="card-title">Acciones disponibles</div>';
+    ['PACKING','FACTURACION'].forEach(function(et) {
+      const ac  = accionDisponibleParaOperador(ordenId, et);
+      const row = document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-bottom:8px;';
+      const btn = document.createElement('button');
+      if (ac==='ESPERA'||estadoEtapa(ordenId,et)==='finalizada') {
+        btn.className='btn btn-gris'; btn.disabled=true;
+        btn.textContent = estadoEtapa(ordenId,et)==='finalizada' ? et+' Completado' : '\u23F3 '+et+' — esperando';
+      } else {
+        btn.className   = 'btn btn-'+ETAPA_COLOR[et];
+        btn.textContent = (ac==='INICIO' ? '\u25B6 Iniciar ' : '\u25A0 Finalizar ')+et;
+        btn.onclick = function(){ prepararAccion(ordenId, et, ac); };
+      }
+      btn.style.flex='1'; row.appendChild(btn); div.appendChild(row);
+    });
+    cont.appendChild(div);
+  }
+}
+
+function prepararAccion(ordenId, etapa, evento) {
+  estado.accionPendiente = { etapa:etapa, evento:evento };
+  document.getElementById('conf-titulo').textContent  = (evento==='INICIO' ? 'Iniciar ' : 'Finalizar ')+etapa;
+  document.getElementById('conf-orden').textContent   = ordenId;
+  document.getElementById('conf-accion').textContent  = ETAPA_ICONO[etapa]+' '+etapa+' — '+evento;
+  const btnConf = document.getElementById('btn-confirmar-accion');
+  btnConf.className   = 'btn btn-'+ETAPA_COLOR[etapa];
+  btnConf.textContent = (evento==='INICIO' ? '\u25B6 Iniciar ' : '\u25A0 Finalizar ')+etapa;
+  const etapasMulti = ['PICKING','PACKING'];
+  document.getElementById('toggle-multi-row').style.display = (etapasMulti.includes(etapa)&&evento==='INICIO') ? 'flex' : 'none';
+  const chk = document.getElementById('chk-multi'); chk.checked=false; toggleMulti();
+  document.getElementById('sel-op-accion').value = estado.operadorActual;
+  document.getElementById('aviso-conf').classList.remove('show');
+  mostrar('s-confirmar');
+}
+
+function volverDetalle() { mostrarDetalle(estado.ordenActual); }
+
+function toggleMulti() {
+  const activo = document.getElementById('chk-multi').checked;
+  document.getElementById('bloque-num-personas').style.display = activo ? 'block' : 'none';
+  document.getElementById('label-op-accion').textContent = activo ? 'Tu nombre (primera persona en registrar)' : 'Quien realiza esta accion?';
+  document.getElementById('nota-multi').style.display = activo ? 'block' : 'none';
+  if (activo) {
+    document.getElementById('sel-num-personas').value='';
+    document.getElementById('nota-multi').innerHTML = '\u{1F465} <b>Modo multipersonas:</b> Registras el inicio ahora. Las demas personas escanean la misma orden con su RF. La etapa avanza cuando <b>todos</b> hayan finalizado.';
+  }
+}
+
+function ejecutarAccion() {
+  const etapa   = estado.accionPendiente.etapa;
+  const evento  = estado.accionPendiente.evento;
+  const ordenId = estado.ordenActual;
+  const t       = ahora();
+  const multiActivo = document.getElementById('chk-multi').checked;
+
+  if (multiActivo && evento==='INICIO') {
+    const num = parseInt(document.getElementById('sel-num-personas').value)||null;
+    if (!num) {
+      document.getElementById('aviso-conf').textContent='Selecciona cuantas personas trabajaran esta etapa.';
+      document.getElementById('aviso-conf').classList.add('show'); return;
+    }
+  }
+  const op = document.getElementById('sel-op-accion').value;
+  if (!op) {
+    document.getElementById('aviso-conf').textContent='Selecciona tu nombre.';
+    document.getElementById('aviso-conf').classList.add('show'); return;
+  }
+
+  if (!DB.ordenes[ordenId]) DB.ordenes[ordenId]={};
+  const o = DB.ordenes[ordenId];
+
+  if (evento==='INICIO' && !o[etapa]) {
+    const num = multiActivo ? parseInt(document.getElementById('sel-num-personas').value) : 1;
+    initEtapa(o, etapa, num);
+  }
+  if (evento==='INICIO' && o[etapa] && o[etapa].personas[op] && o[etapa].personas[op].inicio) {
+    document.getElementById('aviso-conf').textContent=op+' ya inicio '+etapa+' en esta orden.';
+    document.getElementById('aviso-conf').classList.add('show'); return;
+  }
+  if (evento==='FIN' && o[etapa] && o[etapa].personas[op] && o[etapa].personas[op].fin) {
+    document.getElementById('aviso-conf').textContent=op+' ya finalizo '+etapa+' en esta orden.';
+    document.getElementById('aviso-conf').classList.add('show'); return;
+  }
+
+  if (!o[etapa].personas[op]) o[etapa].personas[op]={};
+  const p = o[etapa].personas[op];
+  let duracion = null;
+  if (evento==='INICIO') {
+    p.inicio = { hora:t.hora, ts:t.ts, fecha:t.fecha };
+  } else {
+    p.fin = { hora:t.hora, ts:t.ts, fecha:t.fecha };
+    if (p.inicio) {
+      const ini = new Date(p.inicio.ts.replace(' ','T'));
+      const fin = new Date(t.ts.replace(' ','T'));
+      duracion = Math.round((fin-ini)/60000);
+      p.duracion = duracion;
+    }
+  }
+
+  const tot  = totalPersonas(o, etapa);
+  const fin2 = personasFinalizadas(o, etapa);
+  const esMulti = tot > 1;
+  const fila = {
+    Fecha:t.fecha, Hora:t.hora, Sesion:estado.sesionId,
+    Orden:ordenId, Etapa:etapa, Evento:evento, Operador:op,
+    Multipersona: esMulti ? 'SI' : 'NO', Total_Personas:tot,
+    Timestamp:t.ts, Duracion_min: duracion!==null ? duracion : '',
+    Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
+    Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(), Novedades:'',
+  };
+
+  escribirEnExcel(fila);
+  const estadoNuevo = (evento==='FIN' && etapaCompleta(DB.ordenes[ordenId], etapa)) ? 'finalizada' : 'iniciada';
+  actualizarEstadoOrden(ordenId, etapa, estadoNuevo);
+
+  let mensajeExtra='';
+  if (esMulti && evento==='INICIO') {
+    const ini2 = personasIniciadas(o,etapa);
+    mensajeExtra='<b>Progreso:</b> '+ini2+' de '+tot+' personas han iniciado'+
+                 (ini2<tot ? '<br><span style="color:var(--warn)">\u23F3 Faltan '+(tot-ini2)+'</span>' : '');
+  }
+  if (esMulti && evento==='FIN') {
+    mensajeExtra='<b>Progreso:</b> '+fin2+' de '+tot+' han finalizado'+
+                 (fin2<tot ? '<br><span style="color:var(--warn)">\u23F3 Faltan '+(tot-fin2)+'</span>'
+                           : '<br><span style="color:var(--pick)">\u2705 Etapa completada</span>');
+  }
+
+  document.getElementById('ok-titulo').textContent = (evento==='INICIO' ? '\u25B6 Iniciado' : '\u25A0 Finalizado')+': '+etapa;
+  document.getElementById('ok-detalle').textContent= ordenId+' \u00B7 '+t.hora+' \u00B7 '+op;
+  document.getElementById('ok-resumen').innerHTML  =
+    '<b>Orden:</b> '+ordenId+'<br>'+
+    '<b>Etapa:</b> '+ETAPA_ICONO[etapa]+' '+etapa+(esMulti?' ('+tot+' personas)':'')+'<br>'+
+    '<b>Evento:</b> '+evento+'<br><b>Operador:</b> '+op+'<br><b>Hora:</b> '+t.hora+'<br>'+
+    (duracion!==null ? '<b>Duracion:</b> '+duracion+' min<br>' : '')+mensajeExtra;
+
+  const contSig = document.getElementById('ok-siguiente'); contSig.innerHTML='';
+  const sigNext = siguienteAccion(ordenId);
+  if (sigNext && sigNext.evento!=='ESPERA') {
+    const bn = document.createElement('button');
+    bn.className   = 'btn btn-'+ETAPA_COLOR[sigNext.etapa];
+    bn.textContent = (sigNext.evento==='INICIO' ? '\u25B6 Iniciar ' : '\u25A0 Finalizar ')+sigNext.etapa;
+    bn.onclick = function(){ prepararAccion(ordenId, sigNext.etapa, sigNext.evento); };
+    contSig.appendChild(bn);
+  } else if (!sigNext) {
+    ['PACKING','FACTURACION'].forEach(function(et) {
+      const ac = accionDisponibleParaOperador(ordenId, et);
+      if (ac==='INICIO'||ac==='FIN') {
+        const bn = document.createElement('button');
+        bn.className='btn btn-'+ETAPA_COLOR[et];
+        bn.style.marginBottom='8px';
+        bn.textContent=(ac==='INICIO' ? '\u25B6 Iniciar ' : '\u25A0 Finalizar ')+et;
+        bn.onclick=function(){ prepararAccion(ordenId, et, ac); };
+        contSig.appendChild(bn);
+      }
+    });
+  }
+
+  mostrar('s-ok');
+  toast(etapa+' '+(evento==='INICIO' ? 'iniciado' : 'finalizado')+' \u2713','ok');
+}
+
+// ============================================================
+// 12. FLUJO ACTIVIDADES VARIAS
+// ============================================================
+function abrirActVarias() {
+  const op     = estado.operadorActual;
+  const activa = activasVarias[op];
+  const banner = document.getElementById('banner-activa');
+  if (activa) {
+    banner.style.display='flex';
+    document.getElementById('banner-activa-det').textContent=activa.lbl+' — iniciada a las '+activa.inicio+'. Debes finalizarla primero.';
+  } else {
+    banner.style.display='none';
+  }
+  const grid = document.getElementById('varias-grid'); grid.innerHTML='';
+  ACT_VARIAS.forEach(function(av) {
+    const bloqueada  = activa && activa.id!==av.id;
+    if (bloqueada) return;
+    const estaActiva = activa && activa.id===av.id;
+    const div = document.createElement('div');
+    div.className = 'var-card '+av.css;
+    div.innerHTML = '<div class="v-icon">'+av.icon+'</div><div class="v-lbl">'+av.lbl+(estaActiva?' \u23F3':'')+'</div>';
+    div.onclick = function(){ selActVaria(av, estaActiva); };
+    grid.appendChild(div);
+  });
+  mostrar('s-varias');
+}
+
+function selActVaria(av, estaActiva) {
+  variaSeleccionada = av;
+  if (estaActiva) { mostrarVariaActiva(); return; }
+  document.getElementById('vc-icon').textContent=av.icon;
+  document.getElementById('vc-act').textContent =av.lbl;
+  document.getElementById('vc-op').textContent  =estado.operadorActual;
+  document.getElementById('aviso-vc').classList.remove('show');
+  mostrar('s-varias-confirmar');
+}
+
+function iniciarActividadVaria() {
+  const op=estado.operadorActual, av=variaSeleccionada, t=ahora();
+  activasVarias[op]={ id:av.id, lbl:av.lbl, icon:av.icon, inicio:t.hora, ts:t.ts };
+  logearActVaria('INICIO', av.lbl, t, null);
+  toast(av.lbl+' iniciada \u2713','ok');
+  mostrarVariaActiva();
+}
+
+function mostrarVariaActiva() {
+  const op=estado.operadorActual, activa=activasVarias[op];
+  document.getElementById('va-act-lbl').textContent    =activa.lbl;
+  document.getElementById('va-op-val').textContent     =op;
+  document.getElementById('va-inicio-sub').textContent ='Inicio: '+activa.inicio;
+  document.getElementById('va-op').textContent         =op;
+  document.getElementById('va-act').textContent        =activa.lbl;
+  document.getElementById('va-inicio').textContent     =activa.inicio;
+  document.getElementById('va-fin-row').style.display  ='none';
+  document.getElementById('btn-va-fin').style.display  ='block';
+  mostrar('s-varias-activa');
+}
+
+function finActividadVaria() {
+  const op=estado.operadorActual, activa=activasVarias[op];
+  if (!activa) return;
+  const t=ahora(), ini=new Date(activa.ts.replace(' ','T')), fin=new Date(t.ts.replace(' ','T'));
+  const dur=Math.round((fin-ini)/60000);
+  logearActVaria('FIN', activa.lbl, t, dur);
+  document.getElementById('va-fin').textContent       =t.hora;
+  document.getElementById('va-fin-row').style.display ='flex';
+  document.getElementById('btn-va-fin').style.display ='none';
+  delete activasVarias[op];
+  toast(activa.lbl+' finalizada \u00B7 '+dur+' min','ok');
+  setTimeout(function(){ mostrar('s-tipo'); }, 1800);
+}
+
+function logearActVaria(evento, actividadLbl, t, duracion) {
+  const fila={
+    Fecha:t.fecha, Hora:t.hora, Sesion:estado.sesionId,
+    Tipo:'ACT_VARIA', Actividad:actividadLbl, Evento:evento,
+    Operador:estado.operadorActual, Timestamp:t.ts,
+    Duracion_min: duracion!==null ? duracion : '',
+    Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
+    Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(),
+  };
+  escribirActVaria(fila);
+}
+
+// ============================================================
+// 13. HELPERS NAV
+// ============================================================
+function otraOrden() {
+  mostrar('s-scan');
+  setTimeout(function(){ document.getElementById('inp-orden').focus(); }, 100);
+}
+function irInicio() {
+  if (!msalAccount) { mostrar('s-msal'); return; }
+  mostrar('s-login');
+  document.getElementById('header-sub').textContent='Inverneg \u00B7 CND';
+  estado.operadorActual=''; estado.ordenActual=''; estado.accionPendiente=null;
+  document.getElementById('sel-operador').value='';
+}
+
+// ============================================================
+// ARRANQUE — init() al final, todo declarado arriba
+// ============================================================
+init();
+</script>
+</body>
+</html>
