@@ -405,10 +405,12 @@ function generarSesion() {
 }
 function ahora() {
   var d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
+  var fecha = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  var hora  = pad(d.getHours())+':'+pad(d.getMinutes());
   return {
-    fecha: d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),
-    hora:  pad(d.getHours())+':'+pad(d.getMinutes()),
-    ts:    d.toISOString().replace('T',' ').substring(0,19),
+    fecha: fecha,
+    hora:  hora,
+    ts:    fecha+' '+hora+':'+pad(d.getSeconds()),
     raw:   d,
   };
 }
@@ -947,6 +949,22 @@ function ejecutarAccion() {
   }
   var op=document.getElementById('sel-op-accion').value;
   if (!op) { document.getElementById('aviso-conf').textContent='Selecciona tu nombre.'; document.getElementById('aviso-conf').classList.add('show'); return; }
+
+  // Restriccion: no se pueden hacer etapas consecutivas
+  // Picking -> Checking bloqueado para la misma persona
+  // Checking -> Packing bloqueado para la misma persona
+  var RESTRICCIONES = { 'CHECKING': 'PICKING', 'PACKING': 'CHECKING' };
+  var etapaRestringida = RESTRICCIONES[etapa];
+  if (etapaRestringida && evento === 'INICIO') {
+    var oCheck = DB.ordenes[ordenId];
+    if (oCheck && oCheck[etapaRestringida] && oCheck[etapaRestringida].personas[op]) {
+      document.getElementById('aviso-conf').textContent =
+        '⛔ ' + op + ' realizo ' + etapaRestringida + ' en esta orden. No puede hacer ' + etapa + ' (etapas consecutivas no permitidas).';
+      document.getElementById('aviso-conf').classList.add('show');
+      return;
+    }
+  }
+
   if (!DB.ordenes[ordenId]) DB.ordenes[ordenId]={};
   var o=DB.ordenes[ordenId];
   if (evento==='INICIO'&&!o[etapa]) {
