@@ -514,11 +514,7 @@ var ETAPA_ICONO = { PICKING:'📦', CHECKING:'✅', PACKING:'📫', FACTURACION:
 function msalLogin() {
   mostrarMsalLoading(true);
   document.getElementById('aviso-msal').classList.remove('show');
-  msalInstance.loginPopup({ scopes: GRAPH_SCOPES })
-    .then(function(result) {
-      msalAccount = result.account;
-      postLogin();
-    })
+  msalInstance.loginRedirect({ scopes: GRAPH_SCOPES })
     .catch(function(e) {
       mostrarMsalLoading(false);
       var av = document.getElementById('aviso-msal');
@@ -529,22 +525,19 @@ function msalLogin() {
 }
 
 function msalLogout() {
-  msalInstance.logoutPopup({ account: msalAccount })
-    .catch(function(e){ console.warn('logout:', e.message); })
-    .finally(function() {
-      msalAccount = null;
-      document.getElementById('msal-user-info').style.display = 'none';
-      document.getElementById('btn-msal-login').style.display = 'block';
-      mostrar('s-msal');
-    });
+  msalInstance.logoutRedirect({ account: msalAccount })
+    .catch(function(e){ console.warn('logout:', e.message); });
 }
 
 function getToken() {
   if (!msalAccount) return Promise.reject(new Error('No hay sesion activa'));
   var req = { scopes: GRAPH_SCOPES, account: msalAccount };
   return msalInstance.acquireTokenSilent(req)
-    .catch(function() { return msalInstance.acquireTokenPopup(req); })
-    .then(function(result) { return result.accessToken; });
+    .catch(function() {
+      // Token silencioso fallido: redirigir a Microsoft para renovar
+      return msalInstance.acquireTokenRedirect(req);
+    })
+    .then(function(result) { return result ? result.accessToken : null; });
 }
 
 function mostrarMsalLoading(visible) {
@@ -566,19 +559,29 @@ function postLogin() {
 
 function intentarSesionSilenciosa() {
   mostrarMsalLoading(true);
+  // handleRedirectPromise SIEMPRE debe llamarse primero al cargar la pagina.
+  // Cuando Microsoft redirige de vuelta a GitHub Pages tras el login,
+  // esta funcion captura el resultado y llama a postLogin().
   msalInstance.handleRedirectPromise()
-    .then(function() {
-      var accounts = msalInstance.getAllAccounts();
-      if (accounts.length > 0) {
-        msalAccount = accounts[0];
+    .then(function(result) {
+      if (result && result.account) {
+        // Venimos de un loginRedirect exitoso
+        msalAccount = result.account;
         postLogin();
       } else {
-        mostrarMsalLoading(false);
+        // No hay redirect en curso — verificar si ya habia sesion previa
+        var accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+          msalAccount = accounts[0];
+          postLogin();
+        } else {
+          mostrarMsalLoading(false);
+        }
       }
     })
     .catch(function(e) {
       mostrarMsalLoading(false);
-      console.warn('Sesion silenciosa fallida:', e.message);
+      console.warn('handleRedirectPromise error:', e.message);
     });
 }
 
