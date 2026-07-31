@@ -589,9 +589,8 @@ function intentarSesionSilenciosa() {
 // 6. GRAPH API — helpers
 // ============================================================
 function urlHoja(hoja) {
-  return 'https://graph.microsoft.com/v1.0/drives/'+CFG.driveId+
-         '/items/'+CFG.itemId+
-         '/workbook/worksheets/'+encodeURIComponent(hoja);
+  var base = 'https://graph.microsoft.com/v1.0/drives/'+CFG.driveId+'/items/'+CFG.itemId+'/workbook/worksheets';
+  return base + "('" + hoja + "')";
 }
 
 function graphGet(url) {
