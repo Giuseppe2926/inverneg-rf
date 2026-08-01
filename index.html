@@ -311,6 +311,7 @@
     <div id="ok-resumen" style="font-size:13px; line-height:1.8; color: var(--sub);"></div>
   </div>
   <div id="ok-siguiente" style="display:flex; flex-direction:column; gap:8px;"></div>
+  <button class="btn btn-pick" id="btn-add-picking" style="display:none;" onclick="agregarOrdenAlPicking()">＋ Agregar otra orden al Picking</button>
   <div class="divider"></div>
   <button class="btn btn-fact" onclick="otraOrden()">Escanear otra orden</button>
   <button class="btn btn-gris btn-sm" onclick="irInicio()">⌂ Menú principal</button>
@@ -482,18 +483,29 @@ var msalAccount = null;
 // ============================================================
 var DB = {
   operadores: ['Carlos Mendoza','Rosa Pinto','Javier Cedeno','Luisa Vera','Pedro Alvarado'],
+  actividades: [],
   ordenes:    {},
 };
 
-var ACT_VARIAS = [
-  { id:'inventario',  lbl:'Inventario',      icon:'📊', css:'v-inv'    },
-  { id:'etiquetar',   lbl:'Etiquetar',        icon:'🏷️', css:'v-etiq'  },
-  { id:'danados',     lbl:'Danados',          icon:'⚠️', css:'v-dan'   },
-  { id:'mkt',         lbl:'MKT',              icon:'📣', css:'v-mkt'   },
-  { id:'destruccion', lbl:'Destruccion',      icon:'🗑️', css:'v-dest'  },
-  { id:'embPallets',  lbl:'Embarque Pallets', icon:'🚛', css:'v-embpal'},
-  { id:'embDanados',  lbl:'Embarque Danados', icon:'📦', css:'v-embdan'},
-];
+// Mapa de colores por nombre (columna C del Excel, opcional)
+// Si no se especifica color, usa 'teal' por defecto
+var COLOR_MAP = {
+  'azul':     'var(--fact)',
+  'amarillo': 'var(--warn)',
+  'rojo':     'var(--danger)',
+  'rosado':   '#FF6AD2',
+  'naranja':  '#FF8C42',
+  'teal':     'var(--teal)',
+  'morado':   'var(--pack)',
+  'verde':    'var(--pick)',
+};
+function colorActividad(c) {
+  var key = c ? c.toString().trim().toLowerCase() : '';
+  return COLOR_MAP[key] || 'var(--teal)';
+}
+
+// Actividades cargadas dinámicamente desde columna B de la hoja Catalogos
+// Se puebla en leerCatalogos() al iniciar sesión
 
 var activasVarias     = {};
 var variaSeleccionada = null;
@@ -629,13 +641,27 @@ function leerCatalogos() {
   return graphGet(urlHoja(CFG.sheets.catalogos)+'/usedRange')
     .then(function(data) {
       if (!data.values || data.values.length < 2) { console.warn('Catalogos vacio'); return; }
-      var ops = data.values.slice(1)
+      var filas = data.values.slice(1);
+
+      // Columna A: operadores
+      var ops = filas
         .map(function(f){ return f[0] ? f[0].toString().trim() : ''; })
         .filter(function(v){ return v !== ''; });
       DB.operadores = ops;
       poblarOperadores('sel-operador');
       poblarOperadores('sel-op-accion');
-      console.log('Catalogos cargados:', ops.length);
+
+      // Columna B: actividades, Columna C: color (opcional)
+      var acts = filas
+        .filter(function(f){ return f[1] && f[1].toString().trim() !== ''; })
+        .map(function(f, i){
+          var lbl   = f[1].toString().trim();
+          var color = colorActividad(f[2]);
+          return { id: 'act_'+i+'_'+lbl.toLowerCase().replace(/\s+/g,'_'), lbl: lbl, color: color };
+        });
+      DB.actividades = acts;
+
+      console.log('Catalogos cargados:', ops.length, 'operadores,', acts.length, 'actividades');
     })
     .catch(function(e){ console.error('leerCatalogos:', e.message); toast('Error cargando catalogos','err',4000); });
 }
@@ -827,9 +853,15 @@ function buscarOrden() {
   if (!val) { toast('Escanea o ingresa un numero de orden','err'); return; }
   estado.ordenActual = val;
   document.getElementById('inp-orden').value = '';
-  mostrarDetalle(val);
+  // Si venimos de "Agregar otra orden al Picking", ir directo a confirmar
+  if (estado.accionPendiente && estado.accionPendiente.etapa === 'PICKING' && estado.accionPendiente.evento === 'INICIO') {
+    prepararAccion(val, 'PICKING', 'INICIO');
+  } else {
+    mostrarDetalle(val);
+  }
 }
 function volverScan() {
+  estado.accionPendiente = null; // limpiar modo "agregar al picking"
   mostrar('s-scan');
   setTimeout(function(){ document.getElementById('inp-orden').focus(); }, 100);
 }
@@ -1033,6 +1065,14 @@ function ejecutarAccion() {
       }
     });
   }
+  // Mostrar boton "Agregar otra orden al Picking" solo cuando se acaba de iniciar Picking
+  var btnAddPick = document.getElementById('btn-add-picking');
+  if (etapa === 'PICKING' && evento === 'INICIO') {
+    btnAddPick.style.display = 'block';
+  } else {
+    btnAddPick.style.display = 'none';
+  }
+
   mostrar('s-ok');
   toast(etapa+' '+(evento==='INICIO'?'iniciado':'finalizado')+' ✓','ok');
 }
@@ -1048,13 +1088,24 @@ function abrirActVarias() {
     document.getElementById('banner-activa-det').textContent=activa.lbl+' — iniciada a las '+activa.inicio+'. Debes finalizarla primero.';
   } else { banner.style.display='none'; }
   var grid=document.getElementById('varias-grid'); grid.innerHTML='';
-  ACT_VARIAS.forEach(function(av) {
+  var lista = DB.actividades.length > 0 ? DB.actividades : [
+    { id:'inventario',  lbl:'Inventario',      color:'var(--fact)'  },
+    { id:'etiquetar',   lbl:'Etiquetar',        color:'var(--warn)'  },
+    { id:'danados',     lbl:'Danados',          color:'var(--danger)'},
+    { id:'mkt',         lbl:'MKT',              color:'#FF6AD2'      },
+    { id:'destruccion', lbl:'Destruccion',      color:'#FF8C42'      },
+    { id:'embPallets',  lbl:'Embarque Pallets', color:'var(--teal)'  },
+    { id:'embDanados',  lbl:'Embarque Danados', color:'var(--pack)'  },
+  ];
+  lista.forEach(function(av) {
     var bloqueada=activa&&activa.id!==av.id;
     if (bloqueada) return;
     var estaActiva=activa&&activa.id===av.id;
     var div=document.createElement('div');
-    div.className='var-card '+av.css;
-    div.innerHTML='<div class="v-icon">'+av.icon+'</div><div class="v-lbl">'+av.lbl+(estaActiva?' ⏳':'')+'</div>';
+    div.className='var-card';
+    div.style.borderColor = av.color;
+    div.style.color       = av.color;
+    div.innerHTML='<div class="v-lbl">'+av.lbl+(estaActiva?' ⏳':'')+'</div>';
     div.onclick=(function(a,e){ return function(){ selActVaria(a,e); }; })(av,estaActiva);
     grid.appendChild(div);
   });
@@ -1123,6 +1174,14 @@ function otraOrden() {
   mostrar('s-scan');
   setTimeout(function(){ document.getElementById('inp-orden').focus(); }, 100);
 }
+
+// Ir directo al escaner para agregar otra orden al mismo Picking
+// sin pasar por el menú principal — el operador ya tiene el contexto
+function agregarOrdenAlPicking() {
+  estado.accionPendiente = { etapa: 'PICKING', evento: 'INICIO' };
+  mostrar('s-scan');
+  setTimeout(function(){ document.getElementById('inp-orden').focus(); }, 100);
+}
 function irInicio() {
   if (!msalAccount) { mostrar('s-msal'); return; }
   mostrar('s-login');
@@ -1141,7 +1200,8 @@ window.volverScan     = volverScan;
 window.volverDetalle  = volverDetalle;
 window.toggleMulti    = toggleMulti;
 window.ejecutarAccion = ejecutarAccion;
-window.otraOrden      = otraOrden;
+window.otraOrden             = otraOrden;
+window.agregarOrdenAlPicking = agregarOrdenAlPicking;
 window.irInicio       = irInicio;
 window.iniciarActividadVaria = iniciarActividadVaria;
 window.finActividadVaria     = finActividadVaria;
