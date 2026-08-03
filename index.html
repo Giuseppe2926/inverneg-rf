@@ -982,10 +982,8 @@ function ejecutarAccion() {
   var op=document.getElementById('sel-op-accion').value;
   if (!op) { document.getElementById('aviso-conf').textContent='Selecciona tu nombre.'; document.getElementById('aviso-conf').classList.add('show'); return; }
 
-  // Restriccion: no se pueden hacer etapas consecutivas
-  // Picking -> Checking bloqueado para la misma persona
-  // Checking -> Packing bloqueado para la misma persona
-  var RESTRICCIONES = { 'CHECKING': 'PICKING', 'PACKING': 'CHECKING' };
+  // Restriccion: solo Picking -> Checking bloqueado para la misma persona
+  var RESTRICCIONES = { 'CHECKING': 'PICKING' };
   var etapaRestringida = RESTRICCIONES[etapa];
   if (etapaRestringida && evento === 'INICIO') {
     var oCheck = DB.ordenes[ordenId];
@@ -1089,13 +1087,25 @@ function abrirActVarias() {
   } else { banner.style.display='none'; }
   var grid=document.getElementById('varias-grid'); grid.innerHTML='';
   var lista = DB.actividades.length > 0 ? DB.actividades : [
-    { id:'inventario',  lbl:'Inventario',      color:'var(--fact)'  },
-    { id:'etiquetar',   lbl:'Etiquetar',        color:'var(--warn)'  },
-    { id:'danados',     lbl:'Danados',          color:'var(--danger)'},
-    { id:'mkt',         lbl:'MKT',              color:'#FF6AD2'      },
-    { id:'destruccion', lbl:'Destruccion',      color:'#FF8C42'      },
-    { id:'embPallets',  lbl:'Embarque Pallets', color:'var(--teal)'  },
-    { id:'embDanados',  lbl:'Embarque Danados', color:'var(--pack)'  },
+    { id:'inventario',   lbl:'Inventario',                color:'var(--fact)'  },
+    { id:'etiquetar',    lbl:'Etiquetar',                 color:'var(--warn)'  },
+    { id:'danados',      lbl:'Danados',                   color:'var(--danger)'},
+    { id:'mkt',          lbl:'MKT',                       color:'#FF6AD2'      },
+    { id:'destruccion',  lbl:'Destruccion',               color:'#FF8C42'      },
+    { id:'embPallets',   lbl:'Embarque Pallets',          color:'var(--teal)'  },
+    { id:'embDanados',   lbl:'Embarque Danados',          color:'var(--pack)'  },
+    { id:'stock',        lbl:'Stock',                     color:'var(--fact)'  },
+    { id:'diario',       lbl:'Diario',                    color:'var(--pick)'  },
+    { id:'perchado',     lbl:'Perchado',                  color:'var(--warn)'  },
+    { id:'abastecimiento',lbl:'Abastecimiento',           color:'var(--teal)'  },
+    { id:'recepTransf',  lbl:'Recepcion de Transferencias',color:'#FF8C42'     },
+    { id:'recepDevol',   lbl:'Recepcion de Devoluciones', color:'var(--pack)'  },
+    { id:'procDevol',    lbl:'Procesar Devoluciones',     color:'var(--danger)'},
+    { id:'recepCont',    lbl:'Recepcion de Contenedores', color:'var(--fact)'  },
+    { id:'revImport',    lbl:'Revision de Importaciones', color:'var(--warn)'  },
+    { id:'sepImport',    lbl:'Separacion de Importaciones',color:'#FF6AD2'     },
+    { id:'desalojo',     lbl:'Desalojo de Materiales',    color:'#FF8C42'      },
+    { id:'infImport',    lbl:'Informe de Importaciones',  color:'var(--pick)'  },
   ];
   lista.forEach(function(av) {
     var bloqueada=activa&&activa.id!==av.id;
