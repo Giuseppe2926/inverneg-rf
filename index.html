@@ -836,6 +836,54 @@ function selTipo(tipo) {
 // ============================================================
 // 12. FLUJO ORDEN DE TRABAJO
 // ============================================================
+// Consulta RF_Estado_OT filtrando por OrdenId — solo el registro de esa orden
+function refrescarEstadoOrden(ordenId) {
+  var listId = DB.listIds['estado'];
+  if (!listId) return Promise.resolve();
+  var filtro = encodeURIComponent("fields/OrdenId eq '"+ordenId+"'");
+  var url = urlLista(listId)+'/items?$filter='+filtro+'&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=1';
+  return graphGet(url).then(function(data) {
+    if (!data.value || data.value.length === 0) return; // orden nueva, sin estado previo
+    var item = data.value[0];
+    var f    = item.fields;
+    if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
+    var o = DB.ordenes[ordenId];
+    o._spItemId = item.id;
+    var mapaEtapas = {
+      PICKING:     f['Picking']             || '',
+      CHECKING:    f['Checking']            || '',
+      PACKING:     f['Packing']             || '',
+      FACTURACION: f['Facturaci_x00f3_n']   || '',
+    };
+    Object.keys(mapaEtapas).forEach(function(et) {
+      if (mapaEtapas[et] === 'finalizada') {
+        // Etapa completa — marcar con persona cargada que tiene inicio Y fin
+        if (!o[et]) o[et] = { totalPersonas:1, personas:{} };
+        if (!o[et].personas['_cargado']) {
+          o[et].personas['_cargado'] = {
+            inicio:{ hora:'--', ts:'--', fecha:'--' },
+            fin:   { hora:'--', ts:'--', fecha:'--' },
+          };
+        }
+      } else if (mapaEtapas[et] === 'iniciada') {
+        // Etapa en curso — marcar con persona que tiene inicio pero NO fin
+        // Esto hace que personasIniciadas() > 0 y bloquea nuevo INICIO
+        if (!o[et]) o[et] = { totalPersonas:1, personas:{} };
+        if (!o[et].personas['_sp_iniciada']) {
+          o[et].personas['_sp_iniciada'] = {
+            inicio:{ hora:'--', ts:'--', fecha:'--' },
+            fin:   null,
+          };
+        }
+      }
+    });
+    console.log('Estado refrescado desde SP para orden:', ordenId);
+  }).catch(function(e) {
+    console.warn('refrescarEstadoOrden error (no critico):', e.message);
+    // Si falla el refresco continuamos con el estado en memoria
+  });
+}
+
 function buscarOrden() {
   var val=document.getElementById('inp-orden').value.trim().toUpperCase();
   if (!val){ toast('Escanea o ingresa un numero de orden','err'); return; }
@@ -843,7 +891,16 @@ function buscarOrden() {
   document.getElementById('inp-orden').value='';
   if (estado.accionPendiente&&estado.accionPendiente.etapa==='PICKING'&&estado.accionPendiente.evento==='INICIO') {
     prepararAccion(val,'PICKING','INICIO');
-  } else { mostrarDetalle(val); }
+  } else {
+    // Mostrar mensaje de verificación y refrescar estado antes de renderizar
+    var aviso = document.getElementById('aviso-scan');
+    aviso.textContent = '🔄 Verificando estado...';
+    aviso.classList.add('show');
+    refrescarEstadoOrden(val).then(function() {
+      aviso.classList.remove('show');
+      mostrarDetalle(val);
+    });
+  }
 }
 function volverScan() {
   estado.accionPendiente=null;
