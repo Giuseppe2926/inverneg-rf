@@ -682,15 +682,16 @@ function escribirEnExcel(fila) {
     Evento:               fila.Evento        || '',
     Operador:             fila.Operador      || '',
     Sesi_x00f3_n:         fila.Sesion        || '',
-    Multipersona:         fila.Multipersona  || 'NO',
-    N_x00fa_mero:         fila.Total_Personas!==undefined ? fila.Total_Personas : 1,
+    Multipersona:         fila.Multipersona === 'SI' ? true : false,
+    N_x00fa_mero:         fila.Total_Personas!==undefined ? Number(fila.Total_Personas) : 1,
     TimestampEvento:      fila.Timestamp     || '',
-    DuracionMin:          fila.Duracion_min  !==undefined ? fila.Duracion_min : 0,
+    DuracionMin:          fila.Duracion_min  !==undefined ? Number(fila.Duracion_min) : 0,
     Novedades:            fila.Novedades     || '',
   };
+  console.log('[POST] RF_Registros_Despacho — campos:', JSON.stringify(fields));
   graphPost(url, { fields:fields })
-    .then(function(){ console.log('Registro despacho guardado en SharePoint Lists'); })
-    .catch(function(e){ console.error('escribirEnExcel:',e.message); toast('Error al guardar registro','err',4000); });
+    .then(function(){ console.log('[OK] RF_Registros_Despacho guardado'); })
+    .catch(function(e){ console.error('[ERROR] RF_Registros_Despacho:', e.message); toast('Error al guardar registro','err',4000); });
 }
 
 // Escribir registro en RF_Actividades_Varias
@@ -706,9 +707,10 @@ function escribirActVaria(fila) {
     TimestampEvento:      fila.Timestamp     || '',
     Duraci_x00f3_nMin:    fila.Duracion_min  !==undefined ? fila.Duracion_min : 0,
   };
+  console.log('[POST] RF_Actividades_Varias — campos:', JSON.stringify(fields));
   graphPost(url, { fields:fields })
-    .then(function(){ console.log('ActVaria guardada en SharePoint Lists'); })
-    .catch(function(e){ console.error('escribirActVaria:',e.message); toast('Error al guardar actividad','err',4000); });
+    .then(function(){ console.log('[OK] RF_Actividades_Varias guardada'); })
+    .catch(function(e){ console.error('[ERROR] RF_Actividades_Varias:', e.message); toast('Error al guardar actividad','err',4000); });
 }
 
 // Actualizar estado de orden en RF_Estado_OT
@@ -727,9 +729,10 @@ function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
   if (o && o._spItemId) {
     // Item existe en SP — actualizar
     var url = urlLista(listId)+'/items/'+o._spItemId;
+    console.log('[PATCH] RF_Estado_OT id:', o._spItemId, '— campos:', JSON.stringify(fields));
     graphPatch(url, { fields:fields })
-      .then(function(){ console.log('Estado actualizado SP Lists:', ordenId, etapa, nuevoEstado); })
-      .catch(function(e){ console.error('actualizarEstadoOrden PATCH:',e.message); });
+      .then(function(){ console.log('[OK] RF_Estado_OT actualizado:', ordenId, etapa, nuevoEstado); })
+      .catch(function(e){ console.error('[ERROR] RF_Estado_OT PATCH:', e.message); });
   } else {
     // Item no existe — crear
     fields['OrdenId'] = ordenId;
@@ -737,13 +740,14 @@ function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
     ['Picking','Checking','Packing','Facturaci_x00f3_n'].forEach(function(c){
       if (!fields[c]) fields[c]='';
     });
+    console.log('[POST] RF_Estado_OT nueva orden:', ordenId, '— campos:', JSON.stringify(fields));
     graphPost(urlLista(listId)+'/items', { fields:fields })
       .then(function(result){
-        console.log('Estado creado SP Lists:', ordenId);
+        console.log('[OK] RF_Estado_OT creado:', ordenId);
         if (!DB.ordenes[ordenId]) DB.ordenes[ordenId]={};
         DB.ordenes[ordenId]._spItemId = result.id;
       })
-      .catch(function(e){ console.error('actualizarEstadoOrden POST:',e.message); });
+      .catch(function(e){ console.error('[ERROR] RF_Estado_OT POST:', e.message); });
   }
 }
 
