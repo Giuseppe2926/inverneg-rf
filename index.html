@@ -762,6 +762,8 @@ function estadoEtapa(ordenId,etapa) {
 function accionDisponibleParaOperador(ordenId,etapa) {
   var o=DB.ordenes[ordenId], op=estado.operadorActual;
   if (!o||!o[etapa]) return 'INICIO';
+  // Si la etapa fue cargada desde SP como iniciada, el operador puede finalizar
+  if (o[etapa]._spIniciada) return 'FIN';
   var p=o[etapa].personas[op];
   if (!p) return personasIniciadas(o,etapa)<o[etapa].totalPersonas?'INICIO':'ESPERA';
   if (p.inicio&&!p.fin) return 'FIN';
