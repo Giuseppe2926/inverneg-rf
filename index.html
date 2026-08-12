@@ -755,6 +755,8 @@ function estadoEtapa(ordenId,etapa) {
   if (!o||!o[etapa]) return 'pendiente';
   if (etapaCompleta(o,etapa)) return 'finalizada';
   if (personasIniciadas(o,etapa)>0) return 'iniciada';
+  // Estado cargado desde SharePoint — etapa existe y fue iniciada
+  if (o[etapa]._spIniciada) return 'iniciada';
   return 'pendiente';
 }
 function accionDisponibleParaOperador(ordenId,etapa) {
@@ -841,13 +843,12 @@ function aplicarEstadoDesdeItem(item, ordenId) {
         };
       }
     } else if (mapaEtapas[et] === 'iniciada') {
+      // Etapa iniciada en SP — marcar la etapa como existente con _spIniciada=true.
+      // NO creamos persona ficticia para no bloquear el cupo.
+      // estadoEtapa() detecta _spIniciada y devuelve 'iniciada' (muestra EN CURSO).
+      // El operador que escanee puede registrar FIN libremente.
       if (!o[et]) o[et] = { totalPersonas:1, personas:{} };
-      if (!o[et].personas['_sp_iniciada']) {
-        o[et].personas['_sp_iniciada'] = {
-          inicio:{ hora:'--', ts:'--', fecha:'--' },
-          fin:   null,
-        };
-      }
+      o[et]._spIniciada = true;
     }
   });
 }
