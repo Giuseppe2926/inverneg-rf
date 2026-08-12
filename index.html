@@ -677,16 +677,16 @@ function escribirEnExcel(fila) {
   if (!listId) { console.warn('Lista registros no disponible'); return; }
   var url = urlLista(listId)+'/items';
   var fields = {
-    Orden:           fila.Orden         || '',
-    Etapa:           fila.Etapa         || '',
-    Evento:          fila.Evento        || '',
-    Operador:        fila.Operador      || '',
-    Sesion:          fila.Sesion        || '',
-    Multipersona:    fila.Multipersona  || 'NO',
-    TotalPersonas:   fila.Total_Personas!==undefined ? fila.Total_Personas : 1,
-    TimestampEvento: fila.Timestamp     || '',
-    DuracionMin:     fila.Duracion_min  !==undefined ? fila.Duracion_min : 0,
-    Novedades:       fila.Novedades     || '',
+    Orden:                fila.Orden         || '',
+    Etapa:                fila.Etapa         || '',
+    Evento:               fila.Evento        || '',
+    Operador:             fila.Operador      || '',
+    Sesi_x00f3_n:         fila.Sesion        || '',
+    Multipersona:         fila.Multipersona  || 'NO',
+    N_x00fa_mero:         fila.Total_Personas!==undefined ? fila.Total_Personas : 1,
+    TimestampEvento:      fila.Timestamp     || '',
+    DuracionMin:          fila.Duracion_min  !==undefined ? fila.Duracion_min : 0,
+    Novedades:            fila.Novedades     || '',
   };
   graphPost(url, { fields:fields })
     .then(function(){ console.log('Registro despacho guardado en SharePoint Lists'); })
@@ -699,12 +699,12 @@ function escribirActVaria(fila) {
   if (!listId) { console.warn('Lista varias no disponible'); return; }
   var url = urlLista(listId)+'/items';
   var fields = {
-    Actividad:       fila.Actividad     || '',
-    Evento:          fila.Evento        || '',
-    Operador:        fila.Operador      || '',
-    Sesion:          fila.Sesion        || '',
-    TimestampEvento: fila.Timestamp     || '',
-    DuracionMin:     fila.Duracion_min  !==undefined ? fila.Duracion_min : 0,
+    Actividad:            fila.Actividad     || '',
+    Evento:               fila.Evento        || '',
+    Operador:             fila.Operador      || '',
+    Sesi_x00f3_n:         fila.Sesion        || '',
+    TimestampEvento:      fila.Timestamp     || '',
+    Duraci_x00f3_nMin:    fila.Duracion_min  !==undefined ? fila.Duracion_min : 0,
   };
   graphPost(url, { fields:fields })
     .then(function(){ console.log('ActVaria guardada en SharePoint Lists'); })
@@ -721,7 +721,7 @@ function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
   var campoSP = etapa[0]+etapa.slice(1).toLowerCase();
   var fields = {};
   fields[campoSP] = nuevoEstado;
-  fields['UltimaActualizacion'] = ahora().ts;
+  fields['UltimaActualizaci_x00f3_n'] = ahora().ts;
 
   var o = DB.ordenes[ordenId];
   if (o && o._spItemId) {
