@@ -645,27 +645,9 @@ function leerEstadoOrdenes() {
     if (!data.value) return;
     data.value.forEach(function(item) {
       var f = item.fields;
-      if (!f||!f.OrdenId) return;
+      if (!f || !f.OrdenId) return;
       var ordenId = f.OrdenId.toString().trim();
-      if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
-      var o = DB.ordenes[ordenId];
-      o._spItemId = item.id; // guardar el id del item de SharePoint para PATCH
-      ETAPAS.forEach(function(et) {
-        var val = f[et.charAt(0).toUpperCase()+et.slice(1).toLowerCase()];
-        // campo en SP: Picking, Checking, Packing, Facturacion
-        var campo = et.charAt(0)+et.slice(1).toLowerCase();
-        // normalizar: PICKING -> Picking
-        var campoSP = et==='FACTURACION' ? 'Facturaci_x00f3_n' : et[0]+et.slice(1).toLowerCase();
-        if (f[campoSP]==='finalizada') {
-          if (!o[et]) o[et]={ totalPersonas:1, personas:{} };
-          if (!o[et].personas['_cargado']) {
-            o[et].personas['_cargado']={
-              inicio:{hora:'--',ts:'--',fecha:'--'},
-              fin:{hora:'--',ts:'--',fecha:'--'},
-            };
-          }
-        }
-      });
+      aplicarEstadoDesdeItem(item, ordenId);
     });
     console.log('Estado_OT cargado:', Object.keys(DB.ordenes).length, 'ordenes');
   }).catch(function(e){ console.error('leerEstadoOrdenes:',e.message); });
@@ -837,56 +819,63 @@ function selTipo(tipo) {
 // 12. FLUJO ORDEN DE TRABAJO
 // ============================================================
 // Consulta RF_Estado_OT filtrando por OrdenId — solo el registro de esa orden
+// Aplica el estado de un item de RF_Estado_OT a DB.ordenes
+function aplicarEstadoDesdeItem(item, ordenId) {
+  var f = item.fields;
+  if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
+  var o = DB.ordenes[ordenId];
+  o._spItemId = item.id;
+  var mapaEtapas = {
+    PICKING:     f['Picking']           || '',
+    CHECKING:    f['Checking']          || '',
+    PACKING:     f['Packing']           || '',
+    FACTURACION: f['Facturaci_x00f3_n'] || '',
+  };
+  Object.keys(mapaEtapas).forEach(function(et) {
+    if (mapaEtapas[et] === 'finalizada') {
+      if (!o[et]) o[et] = { totalPersonas:1, personas:{} };
+      if (!o[et].personas['_cargado']) {
+        o[et].personas['_cargado'] = {
+          inicio:{ hora:'--', ts:'--', fecha:'--' },
+          fin:   { hora:'--', ts:'--', fecha:'--' },
+        };
+      }
+    } else if (mapaEtapas[et] === 'iniciada') {
+      if (!o[et]) o[et] = { totalPersonas:1, personas:{} };
+      if (!o[et].personas['_sp_iniciada']) {
+        o[et].personas['_sp_iniciada'] = {
+          inicio:{ hora:'--', ts:'--', fecha:'--' },
+          fin:   null,
+        };
+      }
+    }
+  });
+}
+
 function refrescarEstadoOrden(ordenId) {
   var listId = DB.listIds['estado'];
   if (!listId) return Promise.resolve();
-  // Usar $filter con comillas simples escapadas correctamente para OData
-  // Las comillas simples dentro de valores OData se escapan duplicándolas: '' 
-  var ordenIdEscapado = ordenId.replace(/'/g, "''");
-  var filtro = "$filter=fields/OrdenId eq '" + ordenIdEscapado + "'";
-  var url = urlLista(listId)+'/items?'+filtro+'&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=1';
+  // Traer todos los items y buscar en JS — el filtro OData de Graph
+  // con listas SharePoint no es confiable en todos los tenants
+  var url = urlLista(listId)+'/items?$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
   return graphGet(url).then(function(data) {
-    if (!data.value || data.value.length === 0) {
-      console.log('refrescarEstadoOrden: orden no encontrada en SP, estado limpio:', ordenId);
-      return; // orden nueva, sin estado previo
-    }
-    var item = data.value[0];
-    var f    = item.fields;
-    if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
-    var o = DB.ordenes[ordenId];
-    o._spItemId = item.id;
-    var mapaEtapas = {
-      PICKING:     f['Picking']             || '',
-      CHECKING:    f['Checking']            || '',
-      PACKING:     f['Packing']             || '',
-      FACTURACION: f['Facturaci_x00f3_n']   || '',
-    };
-    Object.keys(mapaEtapas).forEach(function(et) {
-      if (mapaEtapas[et] === 'finalizada') {
-        // Etapa completa — marcar con persona cargada que tiene inicio Y fin
-        if (!o[et]) o[et] = { totalPersonas:1, personas:{} };
-        if (!o[et].personas['_cargado']) {
-          o[et].personas['_cargado'] = {
-            inicio:{ hora:'--', ts:'--', fecha:'--' },
-            fin:   { hora:'--', ts:'--', fecha:'--' },
-          };
-        }
-      } else if (mapaEtapas[et] === 'iniciada') {
-        // Etapa en curso — marcar con persona que tiene inicio pero NO fin
-        // Esto hace que personasIniciadas() > 0 y bloquea nuevo INICIO
-        if (!o[et]) o[et] = { totalPersonas:1, personas:{} };
-        if (!o[et].personas['_sp_iniciada']) {
-          o[et].personas['_sp_iniciada'] = {
-            inicio:{ hora:'--', ts:'--', fecha:'--' },
-            fin:   null,
-          };
-        }
-      }
+    if (!data.value || data.value.length === 0) return;
+    var encontrado = false;
+    data.value.forEach(function(item) {
+      var f = item.fields;
+      if (!f || !f.OrdenId) return;
+      var id = f.OrdenId.toString().trim();
+      // Actualizar memoria de todas las ordenes que vengan — aprovecha el GET
+      aplicarEstadoDesdeItem(item, id);
+      if (id === ordenId) encontrado = true;
     });
-    console.log('Estado refrescado desde SP para orden:', ordenId);
+    if (!encontrado) {
+      console.log('refrescarEstadoOrden: orden nueva sin estado en SP:', ordenId);
+    } else {
+      console.log('Estado refrescado desde SP para orden:', ordenId);
+    }
   }).catch(function(e) {
     console.warn('refrescarEstadoOrden error (no critico):', e.message);
-    // Si falla el refresco continuamos con el estado en memoria
   });
 }
 
