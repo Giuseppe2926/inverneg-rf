@@ -840,10 +840,16 @@ function selTipo(tipo) {
 function refrescarEstadoOrden(ordenId) {
   var listId = DB.listIds['estado'];
   if (!listId) return Promise.resolve();
-  var filtro = encodeURIComponent("fields/OrdenId eq '"+ordenId+"'");
-  var url = urlLista(listId)+'/items?$filter='+filtro+'&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=1';
+  // Usar $filter con comillas simples escapadas correctamente para OData
+  // Las comillas simples dentro de valores OData se escapan duplicándolas: '' 
+  var ordenIdEscapado = ordenId.replace(/'/g, "''");
+  var filtro = "$filter=fields/OrdenId eq '" + ordenIdEscapado + "'";
+  var url = urlLista(listId)+'/items?'+filtro+'&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=1';
   return graphGet(url).then(function(data) {
-    if (!data.value || data.value.length === 0) return; // orden nueva, sin estado previo
+    if (!data.value || data.value.length === 0) {
+      console.log('refrescarEstadoOrden: orden no encontrada en SP, estado limpio:', ordenId);
+      return; // orden nueva, sin estado previo
+    }
     var item = data.value[0];
     var f    = item.fields;
     if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
@@ -917,6 +923,8 @@ function mostrarDetalle(ordenId) {
       if (o[et]) {
         Object.entries(o[et].personas).forEach(function(entry){
           var op2=entry[0],p=entry[1];
+          // Ignorar personas internas cargadas desde SP (empiezan con _)
+          if (op2.charAt(0) === '_') return;
           if (p.fin)    eventos.push({ts:p.fin.ts,    label:et+' finalizado por '+op2});
           if (p.inicio) eventos.push({ts:p.inicio.ts, label:et+' iniciado por '+op2});
         });
