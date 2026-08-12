@@ -640,7 +640,7 @@ function leerCatalogos() {
 function leerEstadoOrdenes() {
   var listId = DB.listIds['estado'];
   if (!listId) { console.warn('Lista estado no disponible'); return Promise.resolve(); }
-  var url = urlLista(listId)+'/items?$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturacion)&$top=500';
+  var url = urlLista(listId)+'/items?$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
   return graphGet(url).then(function(data) {
     if (!data.value) return;
     data.value.forEach(function(item) {
@@ -655,7 +655,7 @@ function leerEstadoOrdenes() {
         // campo en SP: Picking, Checking, Packing, Facturacion
         var campo = et.charAt(0)+et.slice(1).toLowerCase();
         // normalizar: PICKING -> Picking
-        var campoSP = et[0]+et.slice(1).toLowerCase();
+        var campoSP = et==='FACTURACION' ? 'Facturaci_x00f3_n' : et[0]+et.slice(1).toLowerCase();
         if (f[campoSP]==='finalizada') {
           if (!o[et]) o[et]={ totalPersonas:1, personas:{} };
           if (!o[et].personas['_cargado']) {
@@ -718,7 +718,7 @@ function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
   if (!listId) { console.warn('Lista estado no disponible'); return; }
 
   // Normalizar nombre del campo: PICKING -> Picking
-  var campoSP = etapa[0]+etapa.slice(1).toLowerCase();
+  var campoSP = etapa==='FACTURACION' ? 'Facturaci_x00f3_n' : etapa[0]+etapa.slice(1).toLowerCase();
   var fields = {};
   fields[campoSP] = nuevoEstado;
   fields['UltimaActualizaci_x00f3_n'] = ahora().ts;
@@ -734,7 +734,7 @@ function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
     // Item no existe — crear
     fields['OrdenId'] = ordenId;
     // Inicializar etapas vacías
-    ['Picking','Checking','Packing','Facturacion'].forEach(function(c){
+    ['Picking','Checking','Packing','Facturaci_x00f3_n'].forEach(function(c){
       if (!fields[c]) fields[c]='';
     });
     graphPost(urlLista(listId)+'/items', { fields:fields })
