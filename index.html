@@ -644,11 +644,21 @@ function descubrirListas() {
 // ============================================================
 function descubrirCatalogoExcel() {
   var nombre = CFG.catalogoNombre;
-  var url = 'https://graph.microsoft.com/v1.0/me/drive/root/search(q=' +
-            encodeURIComponent("'" + nombre + "'") + ')';
+  // Buscar en el sitio SharePoint corporativo, no en OneDrive personal
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + CFG.siteId +
+            '/drive/root/search(q=' + encodeURIComponent("'" + nombre + "'") + ')';
+  console.log('[descubrirCatalogoExcel] URL de búsqueda:', url);
   return graphGet(url).then(function(data) {
-    if (!data.value || data.value.length === 0) {
-      console.warn('Catálogo Excel no encontrado:', nombre);
+    var total = data.value ? data.value.length : 0;
+    console.log('[descubrirCatalogoExcel] Archivos encontrados:', total);
+    if (data.value) {
+      data.value.forEach(function(f, i) {
+        console.log('  ['+i+'] nombre:', f.name, '| id:', f.id,
+                    '| driveId:', f.parentReference ? f.parentReference.driveId : 'N/A');
+      });
+    }
+    if (total === 0) {
+      console.warn('[descubrirCatalogoExcel] Sin resultados para:', nombre);
       return false;
     }
     // Buscar coincidencia exacta por nombre
@@ -656,17 +666,20 @@ function descubrirCatalogoExcel() {
     for (var i = 0; i < data.value.length; i++) {
       if (data.value[i].name === nombre) { archivo = data.value[i]; break; }
     }
-    if (!archivo) { console.warn('No hay coincidencia exacta para:', nombre); return false; }
+    if (!archivo) {
+      console.warn('[descubrirCatalogoExcel] Sin coincidencia exacta para:', nombre);
+      console.warn('  Nombres encontrados:', data.value.map(function(f){ return f.name; }).join(', '));
+      return false;
+    }
     DB.catalogoDriveId = archivo.parentReference && archivo.parentReference.driveId
-      ? archivo.parentReference.driveId
-      : null;
+      ? archivo.parentReference.driveId : null;
     DB.catalogoItemId = archivo.id;
-    console.log('Catálogo Excel descubierto:', nombre);
+    console.log('[descubrirCatalogoExcel] Encontrado:', nombre);
     console.log('  driveId:', DB.catalogoDriveId);
     console.log('  itemId: ', DB.catalogoItemId);
     return true;
   }).catch(function(e) {
-    console.warn('descubrirCatalogoExcel error:', e.message);
+    console.warn('[descubrirCatalogoExcel] Error:', e.message);
     return false;
   });
 }
