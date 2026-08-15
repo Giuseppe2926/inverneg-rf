@@ -449,6 +449,9 @@ var CFG = {
     estado:    'RF_Estado_OT',
     varias:    'RF_Actividades_Varias',
   },
+  // Nombre del archivo Excel de catálogos en SharePoint
+  // driveId e itemId se descubren automáticamente al iniciar sesión
+  catalogoNombre: 'Inverneg_DespachoRF_Base_Catálogos.xlsx',
 };
 
 var GRAPH_SCOPES = ['Files.ReadWrite', 'Sites.ReadWrite.All'];
@@ -470,16 +473,25 @@ var msalAccount = null;
 // 4. DB EN MEMORIA
 // ============================================================
 var DB = {
+  // Operadores de respaldo — se sobreescriben al cargar el Excel de catálogos
   operadores:  ['ALAVA LUIS','ALBAN FERNANDO','BACILIO WILLIAN','BRIONES JOHNNY','CAMPOVERDE ERWIN','CORDERO JOEL','GARCIA JAVIER','JUMBO JONATHAN','LEDEZMA CRISTIAN','LUCAS DAVE','MENDOZA HENRY','COBOS CRISTHIAN','RIVERO BRYAN','MORA KEVIN','MUDUMBA ISAAC','MURILLO JOSE','VERA OMAR','RODRIGUEZ PETER','SALDAÑA JHON','TOALA ERICK','ZAMBRANO ANDRES','LOPEZ KEVIN','MONTEVERDE LONDRES','JUNCO GIUSEPPE'],
   actividades: [],
   ordenes:     {},
-  listIds:     {},  // se puebla en descubrirListas()
+  listIds:     {},
+  catalogoDriveId: null,  // se descubre automáticamente
+  catalogoItemId:  null,  // se descubre automáticamente
 };
 
 var COLOR_MAP = {
-  'azul':'var(--fact)', 'amarillo':'var(--warn)', 'rojo':'var(--danger)',
-  'rosado':'#FF6AD2',   'naranja':'#FF8C42',       'teal':'var(--teal)',
-  'morado':'var(--pack)', 'verde':'var(--pick)',
+  // Inglés (compatibilidad anterior)
+  'azul':'var(--fact)',    'amarillo':'var(--warn)',   'rojo':'var(--danger)',
+  'rosado':'#FF6AD2',      'naranja':'#FF8C42',         'teal':'var(--teal)',
+  'morado':'var(--pack)',  'verde':'var(--pick)',        'gris':'var(--sub)',
+  'blanco':'#FFFFFF',      'marron':'#8B5E3C',          'aguamarina':'var(--teal)',
+  // Español con tilde (tal como vienen del Excel)
+  'amarillo':'var(--warn)',  'rojo':'var(--danger)',    'verde':'var(--pick)',
+  'azul':'var(--fact)',      'gris':'var(--sub)',        'blanco':'#FFFFFF',
+  'marrón':'#8B5E3C',  'aguamarina':'var(--teal)', 'naranja':'#FF8C42',
 };
 function colorActividad(c) {
   var key=c?c.toString().trim().toLowerCase():'';
@@ -625,15 +637,103 @@ function descubrirListas() {
 // 8. OPERACIONES SHAREPOINT LISTS
 // ============================================================
 
-// Leer operadores y actividades desde lista RF_Catalogos si existe,
-// o usar los valores en memoria si no hay lista de catalogos
+// ============================================================
+// DESCUBRIR CATALOGO EXCEL
+// Busca Inverneg_DespachoRF_Base_Catálogos.xlsx en el drive del usuario
+// y guarda driveId e itemId en DB para usarlos en leerCatalogos()
+// ============================================================
+function descubrirCatalogoExcel() {
+  var nombre = CFG.catalogoNombre;
+  var url = 'https://graph.microsoft.com/v1.0/me/drive/root/search(q=' +
+            encodeURIComponent("'" + nombre + "'") + ')';
+  return graphGet(url).then(function(data) {
+    if (!data.value || data.value.length === 0) {
+      console.warn('Catálogo Excel no encontrado:', nombre);
+      return false;
+    }
+    // Buscar coincidencia exacta por nombre
+    var archivo = null;
+    for (var i = 0; i < data.value.length; i++) {
+      if (data.value[i].name === nombre) { archivo = data.value[i]; break; }
+    }
+    if (!archivo) { console.warn('No hay coincidencia exacta para:', nombre); return false; }
+    DB.catalogoDriveId = archivo.parentReference && archivo.parentReference.driveId
+      ? archivo.parentReference.driveId
+      : null;
+    DB.catalogoItemId = archivo.id;
+    console.log('Catálogo Excel descubierto:', nombre);
+    console.log('  driveId:', DB.catalogoDriveId);
+    console.log('  itemId: ', DB.catalogoItemId);
+    return true;
+  }).catch(function(e) {
+    console.warn('descubrirCatalogoExcel error:', e.message);
+    return false;
+  });
+}
+
+// URL base para workbook del Excel de catálogos
+function urlWorkbook(hoja) {
+  return 'https://graph.microsoft.com/v1.0/drives/' + DB.catalogoDriveId +
+         '/items/' + DB.catalogoItemId +
+         "/workbook/worksheets('" + hoja + "')/usedRange";
+}
+
+// ============================================================
+// LEER CATALOGOS DESDE EXCEL
+// Lee hoja Operadores (col A desde fila 2) y hoja Actividades (col A+B desde fila 2)
+// Si el Excel no responde, mantiene los valores de respaldo en DB
+// ============================================================
 function leerCatalogos() {
-  // Los catalogos se mantienen en DB directamente
-  // Si en el futuro se crea RF_Catalogos en SharePoint, se puede agregar aqui
-  poblarOperadores('sel-operador');
-  poblarOperadores('sel-op-accion');
-  console.log('Catalogos en memoria:', DB.operadores.length, 'operadores');
-  return Promise.resolve();
+  return descubrirCatalogoExcel().then(function(encontrado) {
+    if (!encontrado || !DB.catalogoDriveId || !DB.catalogoItemId) {
+      console.warn('Usando catálogos de respaldo (Excel no disponible)');
+      poblarOperadores('sel-operador');
+      poblarOperadores('sel-op-accion');
+      console.log('Operadores cargados (respaldo):', DB.operadores.length);
+      return;
+    }
+    // Leer operadores y actividades en paralelo
+    return Promise.all([
+      graphGet(urlWorkbook('Operadores')),
+      graphGet(urlWorkbook('Actividades')),
+    ]).then(function(resultados) {
+      var dataOps  = resultados[0];
+      var dataActs = resultados[1];
+
+      // Hoja Operadores — columna A desde fila 2
+      if (dataOps && dataOps.values && dataOps.values.length > 1) {
+        var ops = dataOps.values.slice(1)
+          .map(function(f){ return f[0] ? f[0].toString().trim() : ''; })
+          .filter(function(v){ return v !== ''; });
+        if (ops.length > 0) {
+          DB.operadores = ops;
+          console.log('Operadores cargados desde Excel:', ops.length);
+        }
+      }
+
+      // Hoja Actividades — columna A = nombre, columna B = color
+      if (dataActs && dataActs.values && dataActs.values.length > 1) {
+        var acts = dataActs.values.slice(1)
+          .filter(function(f){ return f[0] && f[0].toString().trim() !== ''; })
+          .map(function(f, i){
+            var lbl   = f[0].toString().trim();
+            var color = colorActividad(f[1]);
+            return { id:'act_'+i+'_'+lbl.replace(/\s+/g,'_').toLowerCase(), lbl:lbl, color:color };
+          });
+        if (acts.length > 0) {
+          DB.actividades = acts;
+          console.log('Actividades cargadas desde Excel:', acts.length);
+        }
+      }
+
+      poblarOperadores('sel-operador');
+      poblarOperadores('sel-op-accion');
+    }).catch(function(e) {
+      console.warn('Error leyendo hojas del Excel:', e.message, '— usando respaldo');
+      poblarOperadores('sel-operador');
+      poblarOperadores('sel-op-accion');
+    });
+  });
 }
 
 // Leer estado de ordenes desde RF_Estado_OT
