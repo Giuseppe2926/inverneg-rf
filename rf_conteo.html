@@ -445,9 +445,18 @@ function _parsearAsignaciones(data){
     status:         r[6]?r[6].toString().trim():'',
     fechaInventario:r[7]?r[7].toString():'',
   };});
-  console.log('[INIT] ✓ Asignaciones activas:',DB.asignaciones.length);
-  if(DB.asignaciones.length===0)
-    console.warn('[INIT]   → Ninguna pasó el filtro — verifica Status="Activo"');
+  // Log detallado para diagnosticar por qué filtra 0
+  if(DB.asignaciones.length===0){
+    var statusValores=raw.filter(function(r){return r[2];})
+      .map(function(r){return r[6]?'"'+r[6].toString().trim()+'"':'(vacío)';});
+    console.error('[INIT] ✗ Asignaciones activas: 0');
+    console.error('[INIT]   Valores de Status encontrados en col G:',statusValores.join(', '));
+    console.error('[INIT]   Se esperaba exactamente "Activo" (con A mayúscula)');
+    console.error('[INIT]   Filas con Operario (col C) no vacío:',
+      raw.filter(function(r){return r[2];}).length);
+  } else {
+    console.log('[INIT] ✓ Asignaciones activas:',DB.asignaciones.length);
+  }
 }
 
 function _parsearD365(data){
@@ -669,23 +678,29 @@ function getItemsAsignados(asig){
   } else {
     var val=asig.valor.trim();
     console.log('[INV] Muestra ubicaciones D365:',DB.d365.slice(0,5).map(function(r){return r.ubicacion;}).join(','));
-    if(val.indexOf(',')>-1){
-      var pasillos=val.split(',').map(function(s){return s.trim();});
-      console.log('[INV] Pasillos:',pasillos.join(','));
-      resultado=DB.d365.filter(function(r){return pasillos.some(function(p){return r.ubicacion.startsWith(p);});});
-    } else if(val.indexOf('-')>-1){
-      var pts=val.split('-');
+    // Normalizar a mayúsculas para comparación case-insensitive
+    var valUp=val.toUpperCase();
+    if(valUp.indexOf(',')>-1){
+      var pasillos=valUp.split(',').map(function(s){return s.trim();});
+      console.log('[INV] Pasillos (norm):',pasillos.join(','));
+      resultado=DB.d365.filter(function(r){
+        var uUp=r.ubicacion.toUpperCase();
+        return pasillos.some(function(p){return uUp.startsWith(p);});
+      });
+    } else if(valUp.indexOf('-')>-1){
+      var pts=valUp.split('-');
       var base=pts[0].replace(/[0-9]+$/,'');
       var n1=parseInt(pts[0].replace(base,''));
       var n2=parseInt(pts[1].replace(base,''));
-      console.log('[INV] Rango base:"'+base+'" n1:'+n1+' n2:'+n2);
+      console.log('[INV] Rango (norm): base:"'+base+'" n1:'+n1+' n2:'+n2);
       resultado=DB.d365.filter(function(r){
-        var mx=r.ubicacion.match(/^([A-Za-z]+)([0-9]+)/);
-        if(!mx||mx[1].toUpperCase()!==base.toUpperCase()) return false;
+        var mx=r.ubicacion.toUpperCase().match(/^([A-Z]+)([0-9]+)/);
+        if(!mx||mx[1]!==base) return false;
         var n=parseInt(mx[2]); return n>=n1&&n<=n2;
       });
     } else {
-      resultado=DB.d365.filter(function(r){return r.ubicacion.startsWith(val);});
+      console.log('[INV] Prefijo (norm):"'+valUp+'"');
+      resultado=DB.d365.filter(function(r){return r.ubicacion.toUpperCase().startsWith(valUp);});
     }
     if(resultado.length===0) console.warn('[INV] ✗ Sin items para "'+asig.valor+'"');
     else console.log('[INV] ✓ Items "'+asig.valor+'":',resultado.length);
@@ -914,11 +929,14 @@ function showInvOperario(){
   console.log('[INV] invItems:'+S.invItems.length+' invGrupos:'+S.invGrupos.length);
   if(S.invItems.length===0){
     var mds=[]; DB.d365.forEach(function(r){if(mds.indexOf(r.marca)<0)mds.push(r.marca);});
+    var prefijosObj={}; DB.d365.forEach(function(r){var mx=r.ubicacion.match(/^([A-Za-z]+[0-9]+)/);if(mx)prefijosObj[mx[1].toUpperCase()]=1;});
+    var ubicPrefijos=Object.keys(prefijosObj).sort().slice(0,30).join(', ')+(Object.keys(prefijosObj).length>30?' ...':'');
     render('<div class="badge badge-inv">📦 INVENTARIO</div>'+
       '<div class="alert" style="margin-top:8px;font-size:12px">'+
         '✗ Sin ítems para '+asig.tipo+': "'+asig.valor+'"<br><br>'+
-        (asig.tipo==='Marca'?'Marcas en D365:<br><span style="font-size:10px;color:var(--text)">'+mds.sort().join(', ')+'</span>'
-          :'Verifica formato del rango (ej: N301-N313)')+
+        (asig.tipo==='Marca'
+          ?'Marcas en D365:<br><span style="font-size:10px;color:var(--text)">'+mds.sort().join(', ')+'</span>'
+          :'Prefijos de ubicación en D365:<br><span style="font-size:10px;color:var(--text)">'+ubicPrefijos+'</span>')+
       '</div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:6px">Revisa consola (F12) → [INV].</div>'+
       '<button class="btn btn-sec btn-big" style="margin-top:12px" onclick="goHome()">← Volver</button>');
@@ -1592,13 +1610,15 @@ function postLogin(){
   console.log('[INIT] Cuenta:', msalAccount?msalAccount.username:'desconocida');
   console.log('[INIT] ══════════════════════════════════════');
 
-  // Mostrar Home inmediatamente — no bloquear al usuario
-  showHome();
+  // Mostrar pantalla de carga — NO mostrar Home hasta que catálogos estén listos
+  // Evita race condition donde supervisor crea asignación antes de que Excel cargue
+  render('<div style="text-align:center;padding:40px 0">'+
+    '<div style="font-size:32px;margin-bottom:12px">⏳</div>'+
+    '<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px">Cargando catálogos...</div>'+
+    '<div style="font-size:11px;color:var(--muted)">Conectando con SharePoint y Excel</div>'+
+  '</div>');
 
-  // Carga en background — paralelo pero con orden de logs claro
-  // 1. Primero listas SP (crítico para escritura)
-  // 2. En paralelo catálogos Excel (crítico para lectura)
-  console.log('[INIT] Paso 1: descubrirListas (en background)...');
+  console.log('[INIT] Paso 1: descubrirListas...');
   var promListas = descubrirListas().then(function(ok){
     if(ok){
       setConn('ok');
@@ -1620,7 +1640,7 @@ function postLogin(){
     if(S.step==='home') showHome();
   });
 
-  // Log final cuando ambos terminan
+  // Mostrar Home solo cuando ambos terminan — catálogos ya disponibles
   Promise.all([promListas,promExcel]).then(function(resultados){
     var listasOk=resultados[0];
     var listasStr=listasOk?'✓ SP OK':'✗ SP sin listas';
@@ -1636,6 +1656,7 @@ function postLogin(){
     console.log('[INIT] ══════════════════════════════════════');
     document.getElementById('hdr-sub').textContent=
       'Inverneg · CND'+(listasOk?'':' · sin SP');
+    showHome(); // Mostrar Home solo cuando catálogos están listos
   }).catch(function(e){
     console.error('[INIT] Error en carga background:',e.message);
   });
