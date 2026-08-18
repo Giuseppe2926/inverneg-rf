@@ -1274,9 +1274,10 @@ function abrirActVarias() {
     { id:'infImport',     lbl:'Informe de Importaciones',    color:'var(--pick)'  },
   ];
   lista.forEach(function(av){
-    var bloqueada=activa&&activa.id!==av.id;
+    // Comparar por nombre (lbl) porque el id puede tener prefijo distinto si viene de SP
+    var estaActiva=activa&&activa.lbl===av.lbl;
+    var bloqueada=activa&&!estaActiva;
     if (bloqueada) return;
-    var estaActiva=activa&&activa.id===av.id;
     var div=document.createElement('div'); div.className='var-card';
     div.style.borderColor=av.color; div.style.color=av.color;
     div.innerHTML='<div class="v-lbl">'+av.lbl+(estaActiva?' ⏳':'')+'</div>';
