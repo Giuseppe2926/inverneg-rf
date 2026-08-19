@@ -750,20 +750,33 @@ function leerCatalogos() {
 }
 
 // Leer estado de ordenes desde RF_Estado_OT
+function procesarPaginaEstado(data) {
+  if (!data.value) return;
+  data.value.forEach(function(item) {
+    var f = item.fields;
+    if (!f || !f.OrdenId) return;
+    aplicarEstadoDesdeItem(item, f.OrdenId.toString().trim());
+  });
+}
+
 function leerEstadoOrdenes() {
   var listId = DB.listIds['estado'];
   if (!listId) { console.warn('Lista estado no disponible'); return Promise.resolve(); }
-  var url = urlLista(listId)+'/items?$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
-  return graphGet(url).then(function(data) {
-    if (!data.value) return;
-    data.value.forEach(function(item) {
-      var f = item.fields;
-      if (!f || !f.OrdenId) return;
-      var ordenId = f.OrdenId.toString().trim();
-      aplicarEstadoDesdeItem(item, ordenId);
+  var baseUrl = urlLista(listId)+'/items?$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
+
+  function cargarPagina(url) {
+    return graphGet(url).then(function(data) {
+      procesarPaginaEstado(data);
+      // Si hay mas paginas, seguir cargando
+      if (data['@odata.nextLink']) {
+        return cargarPagina(data['@odata.nextLink']);
+      }
     });
-    console.log('Estado_OT cargado:', Object.keys(DB.ordenes).length, 'ordenes');
-  }).catch(function(e){ console.error('leerEstadoOrdenes:',e.message); });
+  }
+
+  return cargarPagina(baseUrl)
+    .then(function(){ console.log('Estado_OT cargado:', Object.keys(DB.ordenes).length, 'ordenes'); })
+    .catch(function(e){ console.error('leerEstadoOrdenes:',e.message); });
 }
 
 // Escribir registro en RF_Registros_Despacho
@@ -971,26 +984,33 @@ function aplicarEstadoDesdeItem(item, ordenId) {
 function refrescarEstadoOrden(ordenId) {
   var listId = DB.listIds['estado'];
   if (!listId) return Promise.resolve();
-  // Traer todos los items y buscar en JS — el filtro OData de Graph
-  // con listas SharePoint no es confiable en todos los tenants
-  var url = urlLista(listId)+'/items?$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
-  return graphGet(url).then(function(data) {
-    if (!data.value || data.value.length === 0) return;
-    var encontrado = false;
-    data.value.forEach(function(item) {
-      var f = item.fields;
-      if (!f || !f.OrdenId) return;
-      var id = f.OrdenId.toString().trim();
-      // Actualizar memoria de todas las ordenes que vengan — aprovecha el GET
-      aplicarEstadoDesdeItem(item, id);
-      if (id === ordenId) encontrado = true;
-    });
-    if (!encontrado) {
+  var baseUrl = urlLista(listId)+'/items?$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
+
+  function buscarEnPagina(url) {
+    return graphGet(url).then(function(data) {
+      if (!data.value || data.value.length === 0) return false;
+      var encontrado = false;
+      data.value.forEach(function(item) {
+        var f = item.fields;
+        if (!f || !f.OrdenId) return;
+        var id = f.OrdenId.toString().trim();
+        aplicarEstadoDesdeItem(item, id);
+        if (id === ordenId) encontrado = true;
+      });
+      if (encontrado) {
+        console.log('Estado refrescado desde SP para orden:', ordenId);
+        return true;
+      }
+      // Si no encontrado y hay mas paginas, seguir buscando
+      if (data['@odata.nextLink']) {
+        return buscarEnPagina(data['@odata.nextLink']);
+      }
       console.log('refrescarEstadoOrden: orden nueva sin estado en SP:', ordenId);
-    } else {
-      console.log('Estado refrescado desde SP para orden:', ordenId);
-    }
-  }).catch(function(e) {
+      return false;
+    });
+  }
+
+  return buscarEnPagina(baseUrl).catch(function(e) {
     console.warn('refrescarEstadoOrden error (no critico):', e.message);
   });
 }
@@ -1209,12 +1229,49 @@ function ejecutarAccion() {
 // ============================================================
 // 13. FLUJO ACTIVIDADES VARIAS
 // ============================================================
+function refrescarActividadVaria() {
+  var listId = DB.listIds['varias'];
+  var op = estado.operadorActual;
+  if (!listId || !op) return Promise.resolve();
+  var url = urlLista(listId)+'/items?$expand=fields($select=Actividad,Evento,Operador,Sesi_x00f3_n,TimestampEvento)&$top=500';
+  return graphGet(url).then(function(data) {
+    if (!data.value || data.value.length === 0) return;
+    var registros = data.value
+      .filter(function(item){ return item.fields && item.fields.Operador === op; })
+      .map(function(item){ return { actividad:item.fields.Actividad||'', evento:item.fields.Evento||'', ts:item.fields.TimestampEvento||'', }; })
+      .sort(function(a,b){ return a.ts.localeCompare(b.ts); });
+    var mapaActs = {};
+    registros.forEach(function(r){
+      if (!mapaActs[r.actividad]) mapaActs[r.actividad]=[];
+      mapaActs[r.actividad].push(r);
+    });
+    var activa = null;
+    Object.keys(mapaActs).forEach(function(nombre){
+      var evts = mapaActs[nombre];
+      var ultimo = evts[evts.length-1];
+      if (ultimo.evento === 'INICIO') {
+        activa = { id:'act_sp_'+nombre.replace(/\s+/g,'_').toLowerCase(), lbl:nombre, icon:'!', inicio:ultimo.ts?ultimo.ts.substring(11,16):'--', ts:ultimo.ts };
+      }
+    });
+    if (activa && !activasVarias[op]) {
+      activasVarias[op] = activa;
+      console.log('Actividad recuperada desde SP:', activa.lbl, 'para', op);
+    }
+  }).catch(function(e){ console.warn('refrescarActividadVaria:', e.message); });
+}
+
 function abrirActVarias() {
-  var op=estado.operadorActual, activa=activasVarias[op];
+  var op=estado.operadorActual;
   var banner=document.getElementById('banner-activa');
-  if (activa){ banner.style.display='flex'; document.getElementById('banner-activa-det').textContent=activa.lbl+' — iniciada a las '+activa.inicio+'. Debes finalizarla primero.'; }
-  else { banner.style.display='none'; }
-  var grid=document.getElementById('varias-grid'); grid.innerHTML='';
+  var grid=document.getElementById('varias-grid');
+  banner.style.display='none';
+  grid.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">Verificando actividades...</div>';
+  mostrar('s-varias');
+  refrescarActividadVaria().then(function(){
+    var activa=activasVarias[op];
+    if (activa){ banner.style.display='flex'; document.getElementById('banner-activa-det').textContent=activa.lbl+' — iniciada a las '+activa.inicio+'. Debes finalizarla primero.'; }
+    else { banner.style.display='none'; }
+    grid.innerHTML='';
   var lista=DB.actividades.length>0?DB.actividades:[
     { id:'inventario',    lbl:'Inventario',                  color:'var(--fact)'  },
     { id:'etiquetar',     lbl:'Etiquetar',                   color:'var(--warn)'  },
@@ -1237,16 +1294,17 @@ function abrirActVarias() {
     { id:'infImport',     lbl:'Informe de Importaciones',    color:'var(--pick)'  },
   ];
   lista.forEach(function(av){
-    var bloqueada=activa&&activa.id!==av.id;
+    // Comparar por nombre (lbl) porque el id puede tener prefijo distinto si viene de SP
+    var estaActiva=activa&&activa.lbl===av.lbl;
+    var bloqueada=activa&&!estaActiva;
     if (bloqueada) return;
-    var estaActiva=activa&&activa.id===av.id;
     var div=document.createElement('div'); div.className='var-card';
     div.style.borderColor=av.color; div.style.color=av.color;
     div.innerHTML='<div class="v-lbl">'+av.lbl+(estaActiva?' ⏳':'')+'</div>';
     div.onclick=(function(a,e){ return function(){ selActVaria(a,e); }; })(av,estaActiva);
     grid.appendChild(div);
   });
-  mostrar('s-varias');
+  }); // fin then
 }
 function selActVaria(av,estaActiva) {
   variaSeleccionada=av;
