@@ -915,11 +915,24 @@ function siguienteAccion(ordenId) {
 // ============================================================
 // 10. INIT y UI base
 // ============================================================
+function refrescoAutomatico() {
+  // Solo corre si hay sesion activa — no consume llamadas si el operador no ha entrado
+  if (!msalAccount) return;
+  console.log('[Auto] Refrescando estado de ordenes...');
+  leerEstadoOrdenes().then(function() {
+    console.log('[Auto] Estado actualizado en background');
+  }).catch(function(e) {
+    console.warn('[Auto] Refresco fallido (no critico):', e.message);
+  });
+}
+
 function init() {
   setInterval(reloj,1000); reloj();
   document.getElementById('fecha-hoy').textContent=fechaHoy();
   poblarOperadores('sel-operador');
   poblarOperadores('sel-op-accion');
+  // Refresco automatico cada 3 minutos en background
+  setInterval(refrescoAutomatico, 3 * 60 * 1000);
   intentarSesionSilenciosa();
 }
 function poblarOperadores(selId) {
