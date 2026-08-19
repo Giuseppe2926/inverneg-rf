@@ -257,7 +257,26 @@
     <div class="etapas" id="etapas-tracker"></div>
   </div>
   <div id="acciones-container"></div>
+  <button class="btn btn-gris btn-sm" id="btn-override" onclick="abrirOverride()" disabled
+    style="border:1px solid #FF9F0A;color:#FF9F0A;background:transparent;opacity:.4;margin-top:4px">
+    ⚡ Override supervisorial
+  </button>
   <button class="btn btn-gris btn-sm" onclick="volverScan()">← Escanear otra orden</button>
+</div>
+
+<!-- MODAL OVERRIDE -->
+<div id="modal-override" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--gris-dk);border:1px solid #FF9F0A;border-radius:var(--r);padding:20px;width:90%;max-width:360px">
+    <div style="font-size:13px;font-weight:700;color:#FF9F0A;margin-bottom:6px">⚡ Override supervisorial</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:14px" id="override-desc">—</div>
+    <label style="font-size:12px;color:var(--sub)">Contraseña de supervisor</label>
+    <input id="override-pass" type="password" placeholder="••••••"
+      style="font-size:20px;margin-top:6px;margin-bottom:12px;letter-spacing:4px"
+      onkeydown="if(event.key==='Enter') confirmarOverride()">
+    <div class="aviso" id="aviso-override" style="margin-bottom:10px"></div>
+    <button class="btn" style="background:#FF9F0A;color:#000;margin-bottom:8px" onclick="confirmarOverride()">Aprobar override</button>
+    <button class="btn btn-gris btn-sm" onclick="cerrarOverride()">Cancelar</button>
+  </div>
 </div>
 
 <!-- PANTALLA 3: CONFIRMAR ACCION -->
@@ -887,9 +906,17 @@ function estadoEtapa(ordenId,etapa) {
 }
 function accionDisponibleParaOperador(ordenId,etapa) {
   var o=DB.ordenes[ordenId], op=estado.operadorActual;
-  if (!o||!o[etapa]) return 'INICIO';
-  // Si la etapa fue cargada desde SP como iniciada, el operador puede finalizar
+  if (!o||!o[etapa]) {
+    // Sin override: verificar restriccion de secuencia
+    if (!o) return 'INICIO';
+    // Con override aprobado: permitir INICIO aunque la anterior no haya finalizado
+    var idx = ETAPAS.indexOf(etapa);
+    if (idx > 0 && o[etapa] && o[etapa]._overrideAprobado) return 'INICIO';
+    return 'INICIO';
+  }
   if (o[etapa]._spIniciada) return 'FIN';
+  // Override aprobado: permitir INICIO de esta etapa
+  if (o[etapa]._overrideAprobado) return 'INICIO';
   var p=o[etapa].personas[op];
   if (!p) return personasIniciadas(o,etapa)<o[etapa].totalPersonas?'INICIO':'ESPERA';
   if (p.inicio&&!p.fin) return 'FIN';
@@ -899,14 +926,19 @@ function siguienteAccion(ordenId) {
   var o=DB.ordenes[ordenId];
   if (!o) return { etapa:'PICKING', evento:'INICIO' };
   var pSt=estadoEtapa(ordenId,'PICKING'), cSt=estadoEtapa(ordenId,'CHECKING');
-  if (pSt==='pendiente') return { etapa:'PICKING',   evento:'INICIO' };
+  if (pSt==='pendiente') return { etapa:'PICKING', evento:'INICIO' };
   if (pSt==='iniciada') {
     var a1=accionDisponibleParaOperador(ordenId,'PICKING');
+    // Con override: Checking disponible aunque Picking no haya finalizado
+    var cOverride = o['CHECKING'] && o['CHECKING']._overrideAprobado;
+    if (cOverride && cSt==='pendiente') return null; // mostrar ambos en acciones disponibles
     return (a1==='INICIO'||a1==='FIN')?{ etapa:'PICKING',evento:a1 }:{ etapa:'PICKING',evento:'ESPERA' };
   }
   if (cSt==='pendiente') return { etapa:'CHECKING', evento:'INICIO' };
   if (cSt==='iniciada') {
     var a2=accionDisponibleParaOperador(ordenId,'CHECKING');
+    var pkOverride = o['PACKING'] && o['PACKING']._overrideAprobado;
+    if (pkOverride && estadoEtapa(ordenId,'PACKING')==='pendiente') return null;
     return (a2==='INICIO'||a2==='FIN')?{ etapa:'CHECKING',evento:a2 }:{ etapa:'CHECKING',evento:'ESPERA' };
   }
   return null;
@@ -1084,8 +1116,83 @@ function mostrarDetalle(ordenId) {
     tracker.appendChild(div);
   });
   renderAcciones(ordenId);
+  actualizarBtnOverride(ordenId);
   mostrar('s-detalle');
 }
+// ============================================================
+// OVERRIDE SUPERVISORIAL
+// ============================================================
+var OVERRIDE_PASS = '123789';
+var overrideEtapaPendiente = null; // etapa que espera aprobacion
+
+function actualizarBtnOverride(ordenId) {
+  var btn = document.getElementById('btn-override');
+  if (!btn) return;
+  // Habilitar si hay alguna etapa En Curso (iniciada pero no finalizada)
+  var hayEnCurso = ETAPAS.some(function(et) {
+    return estadoEtapa(ordenId, et) === 'iniciada';
+  });
+  btn.disabled = !hayEnCurso;
+  btn.style.opacity = hayEnCurso ? '1' : '.35';
+}
+
+function abrirOverride() {
+  var ordenId = estado.ordenActual;
+  // Mostrar etapas que se pueden adelantar (siguiente a una En Curso)
+  var opciones = [];
+  ETAPAS.forEach(function(et, i) {
+    var st = estadoEtapa(ordenId, et);
+    // Una etapa es candidata si la anterior está En Curso
+    if (i > 0) {
+      var anterior = ETAPAS[i-1];
+      if (estadoEtapa(ordenId, anterior) === 'iniciada' && st === 'pendiente') {
+        opciones.push(et);
+      }
+    }
+  });
+  if (opciones.length === 0) return;
+  overrideEtapaPendiente = opciones[0]; // por default la primera disponible
+  document.getElementById('override-desc').innerHTML =
+    'Adelantar inicio de <b>' + opciones.join(', ') + '</b> en orden <b>' + ordenId + '</b><br>' +
+    '<span style="color:var(--warn);font-size:11px">La etapa anterior no ha finalizado.</span>';
+  document.getElementById('override-pass').value = '';
+  document.getElementById('aviso-override').classList.remove('show');
+  document.getElementById('modal-override').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('override-pass').focus(); }, 100);
+}
+
+function cerrarOverride() {
+  document.getElementById('modal-override').style.display = 'none';
+  overrideEtapaPendiente = null;
+}
+
+function confirmarOverride() {
+  var pass = document.getElementById('override-pass').value;
+  var av   = document.getElementById('aviso-override');
+  if (pass !== OVERRIDE_PASS) {
+    av.textContent = 'Contrasena incorrecta.';
+    av.classList.add('show');
+    document.getElementById('override-pass').value = '';
+    return;
+  }
+  cerrarOverride();
+  // Habilitar todas las etapas candidatas para esta orden en esta sesion
+  var ordenId = estado.ordenActual;
+  if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
+  // Marcar override aprobado para las etapas pendientes con anterior En Curso
+  ETAPAS.forEach(function(et, i) {
+    if (i > 0) {
+      var anterior = ETAPAS[i-1];
+      if (estadoEtapa(ordenId, anterior) === 'iniciada' && estadoEtapa(ordenId, et) === 'pendiente') {
+        if (!DB.ordenes[ordenId][et]) DB.ordenes[ordenId][et] = { totalPersonas:1, personas:{} };
+        DB.ordenes[ordenId][et]._overrideAprobado = true;
+      }
+    }
+  });
+  toast('Override aprobado para ' + ordenId, 'warn', 3000);
+  mostrarDetalle(ordenId); // re-renderizar con override activo
+}
+
 function renderAcciones(ordenId) {
   var cont=document.getElementById('acciones-container'); cont.innerHTML='';
   var sig=siguienteAccion(ordenId);
@@ -1399,6 +1506,9 @@ window.irInicio              = irInicio;
 window.iniciarActividadVaria = iniciarActividadVaria;
 window.finActividadVaria     = finActividadVaria;
 window.mostrar               = mostrar;
+window.abrirOverride         = abrirOverride;
+window.cerrarOverride        = cerrarOverride;
+window.confirmarOverride     = confirmarOverride;
 window.selActVaria           = selActVaria;
 
 init();
