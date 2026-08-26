@@ -1390,7 +1390,10 @@ function refrescarActividadVaria() {
   var op = estado.operadorActual;
   if (!listId || !op) return Promise.resolve();
   var url = urlLista(listId)+'/items?$expand=fields($select=Actividad,Evento,Operador,Sesi_x00f3_n,TimestampEvento)&$top=500';
+  console.log('[ActVaria] Refrescando para operador:', op);
   return graphGet(url).then(function(data) {
+    var total = data.value ? data.value.length : 0;
+    console.log('[ActVaria] Total items en lista:', total);
     if (!data.value || data.value.length === 0) return;
 
     // Filtrar registros del operador y ordenar por timestamp
@@ -1413,6 +1416,9 @@ function refrescarActividadVaria() {
         };
       })
       .sort(function(a,b){ return a.ts.localeCompare(b.ts); });
+
+    console.log('[ActVaria] Registros del operador:', registros.length);
+    registros.forEach(function(r){ console.log('[ActVaria]  ', r.ts, r.actividad, r.evento); });
 
     // Agrupar por actividad
     var mapaActs = {};
