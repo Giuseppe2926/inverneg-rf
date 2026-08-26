@@ -1016,6 +1016,9 @@ function loginContinuar() {
   if (!op){ toast('Selecciona tu nombre primero','err'); return; }
   estado.operadorActual=op;
   document.getElementById('header-sub').textContent=op+' · CND';
+  // Recuperar actividad varia activa desde SP al seleccionar operador
+  // Cubre el caso en que el timeout de inactividad regresó a s-login
+  refrescarActividadVaria().catch(function(){});
   mostrar('s-tipo');
 }
 function selTipo(tipo) {
@@ -1513,7 +1516,13 @@ function selActVaria(av,estaActiva) {
   mostrar('s-varias-confirmar');
 }
 function iniciarActividadVaria() {
-  var op=estado.operadorActual, av=variaSeleccionada, t=ahora();
+  var op=estado.operadorActual, av=variaSeleccionada;
+  if (activasVarias[op]) {
+    toast('Ya tienes una actividad activa: '+activasVarias[op].lbl,'warn',3000);
+    mostrarVariaActiva();
+    return;
+  }
+  var t=ahora();
   activasVarias[op]={ id:av.id, lbl:av.lbl, icon:av.icon||'⚡', inicio:t.hora, ts:t.ts };
   logearActVaria('Iniciada',av.lbl,t,null);
   toast(av.lbl+' iniciada ✓','ok');
