@@ -948,7 +948,6 @@ function siguienteAccion(ordenId) {
 // 10. INIT y UI base
 // ============================================================
 function refrescoAutomatico() {
-  // Solo corre si hay sesion activa — no consume llamadas si el operador no ha entrado
   if (!msalAccount) return;
   console.log('[Auto] Refrescando estado de ordenes...');
   leerEstadoOrdenes().then(function() {
@@ -958,13 +957,47 @@ function refrescoAutomatico() {
   });
 }
 
+// ============================================================
+// TIMEOUT DE INACTIVIDAD — 20 segundos
+// Si el operador no toca la pantalla, vuelve a seleccion de operador
+// sin cerrar sesion Microsoft
+// ============================================================
+var _inactividadTimer = null;
+var INACTIVIDAD_MS = 20 * 1000;
+
+function resetInactividad() {
+  if (!msalAccount || !estado.operadorActual) return;
+  clearTimeout(_inactividadTimer);
+  _inactividadTimer = setTimeout(function() {
+    console.log('[Inactividad] Timeout — volviendo a seleccion de operador');
+    // Resetear operador pero mantener sesion Microsoft
+    estado.operadorActual = '';
+    estado.ordenActual = '';
+    estado.accionPendiente = null;
+    document.getElementById('header-sub').textContent = 'Inverneg · CND';
+    document.getElementById('sel-operador').value = '';
+    // Cerrar modal override si estaba abierto
+    var modal = document.getElementById('modal-override');
+    if (modal) modal.style.display = 'none';
+    mostrar('s-login');
+  }, INACTIVIDAD_MS);
+}
+
+function iniciarMonitorInactividad() {
+  var eventos = ['touchstart','touchend','click','keydown','scroll'];
+  eventos.forEach(function(ev) {
+    document.addEventListener(ev, resetInactividad, true);
+  });
+  resetInactividad();
+}
+
 function init() {
   setInterval(reloj,1000); reloj();
   document.getElementById('fecha-hoy').textContent=fechaHoy();
   poblarOperadores('sel-operador');
   poblarOperadores('sel-op-accion');
-  // Refresco automatico cada 3 minutos en background
   setInterval(refrescoAutomatico, 3 * 60 * 1000);
+  iniciarMonitorInactividad();
   intentarSesionSilenciosa();
 }
 function poblarOperadores(selId) {
@@ -1356,26 +1389,61 @@ function refrescarActividadVaria() {
   var url = urlLista(listId)+'/items?$expand=fields($select=Actividad,Evento,Operador,Sesi_x00f3_n,TimestampEvento)&$top=500';
   return graphGet(url).then(function(data) {
     if (!data.value || data.value.length === 0) return;
+
+    // Filtrar registros del operador y ordenar por timestamp
     var registros = data.value
       .filter(function(item){ return item.fields && item.fields.Operador === op; })
-      .map(function(item){ return { actividad:item.fields.Actividad||'', evento:item.fields.Evento||'', ts:item.fields.TimestampEvento||'', }; })
+      .map(function(item){
+        return {
+          actividad: item.fields.Actividad || '',
+          evento:    item.fields.Evento    || '',
+          ts:        item.fields.TimestampEvento || '',
+        };
+      })
       .sort(function(a,b){ return a.ts.localeCompare(b.ts); });
+
+    // Agrupar por actividad
     var mapaActs = {};
     registros.forEach(function(r){
-      if (!mapaActs[r.actividad]) mapaActs[r.actividad]=[];
+      if (!mapaActs[r.actividad]) mapaActs[r.actividad] = [];
       mapaActs[r.actividad].push(r);
     });
+
+    // Para cada actividad, procesar ciclos INICIO->FIN en secuencia por timestamp
+    // Un INICIO sin FIN posterior = actividad pendiente
     var activa = null;
-    Object.keys(mapaActs).forEach(function(nombre){
-      var evts = mapaActs[nombre];
-      var ultimo = evts[evts.length-1];
-      if (ultimo.evento === 'INICIO') {
-        activa = { id:'act_sp_'+nombre.replace(/\s+/g,'_').toLowerCase(), lbl:nombre, icon:'!', inicio:ultimo.ts?ultimo.ts.substring(11,16):'--', ts:ultimo.ts };
+    Object.keys(mapaActs).forEach(function(nombre) {
+      var evts = mapaActs[nombre]; // ya ordenados por ts
+      var pendiente = null;
+      evts.forEach(function(r) {
+        if (r.evento === 'INICIO') {
+          pendiente = r; // abre ciclo
+        } else if (r.evento === 'FIN' && pendiente) {
+          // Solo cerrar si este FIN es posterior al INICIO
+          if (r.ts > pendiente.ts) {
+            pendiente = null; // ciclo cerrado
+          }
+        }
+      });
+      // Si quedo un INICIO sin FIN posterior, es la actividad activa
+      if (pendiente) {
+        activa = {
+          id:    'act_sp_' + nombre.replace(/\s+/g, '_').toLowerCase(),
+          lbl:   nombre,
+          icon:  '!',
+          inicio: pendiente.ts ? pendiente.ts.substring(11,16) : '--',
+          ts:    pendiente.ts,
+        };
       }
     });
+
     if (activa && !activasVarias[op]) {
       activasVarias[op] = activa;
       console.log('Actividad recuperada desde SP:', activa.lbl, 'para', op);
+    } else if (!activa && activasVarias[op] && activasVarias[op].id.startsWith('act_sp_')) {
+      // Si habia una activa cargada desde SP pero ya tiene FIN, limpiarla
+      delete activasVarias[op];
+      console.log('Actividad SP ya finalizada, limpiada para:', op);
     }
   }).catch(function(e){ console.warn('refrescarActividadVaria:', e.message); });
 }
