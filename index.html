@@ -1394,10 +1394,19 @@ function refrescarActividadVaria() {
     var registros = data.value
       .filter(function(item){ return item.fields && item.fields.Operador === op; })
       .map(function(item){
+        var tsRaw = item.fields.TimestampEvento || '';
+        // Graph devuelve UTC — convertir a hora local para mostrar y comparar
+        var tsLocal = '';
+        if (tsRaw) {
+          var d = new Date(tsRaw);
+          var pad = function(n){ return String(n).padStart(2,'0'); };
+          tsLocal = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+
+                    ' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+        }
         return {
           actividad: item.fields.Actividad || '',
           evento:    item.fields.Evento    || '',
-          ts:        item.fields.TimestampEvento || '',
+          ts:        tsLocal,
         };
       })
       .sort(function(a,b){ return a.ts.localeCompare(b.ts); });
