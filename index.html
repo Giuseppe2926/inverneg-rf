@@ -1425,9 +1425,9 @@ function refrescarActividadVaria() {
       var evts = mapaActs[nombre]; // ya ordenados por ts
       var pendiente = null;
       evts.forEach(function(r) {
-        if (r.evento === 'INICIO') {
+        if (r.evento === 'Iniciada' || r.evento === 'INICIO') {
           pendiente = r; // abre ciclo
-        } else if (r.evento === 'FIN' && pendiente) {
+        } else if ((r.evento === 'Finalizada' || r.evento === 'FIN') && pendiente) {
           // Solo cerrar si este FIN es posterior al INICIO
           if (r.ts > pendiente.ts) {
             pendiente = null; // ciclo cerrado
@@ -1515,7 +1515,7 @@ function selActVaria(av,estaActiva) {
 function iniciarActividadVaria() {
   var op=estado.operadorActual, av=variaSeleccionada, t=ahora();
   activasVarias[op]={ id:av.id, lbl:av.lbl, icon:av.icon||'⚡', inicio:t.hora, ts:t.ts };
-  logearActVaria('INICIO',av.lbl,t,null);
+  logearActVaria('Iniciada',av.lbl,t,null);
   toast(av.lbl+' iniciada ✓','ok');
   mostrarVariaActiva();
 }
@@ -1535,7 +1535,7 @@ function finActividadVaria() {
   var op=estado.operadorActual, activa=activasVarias[op];
   if (!activa) return;
   var t=ahora(), dur=Math.round((new Date(t.ts.replace(' ','T'))-new Date(activa.ts.replace(' ','T')))/60000);
-  logearActVaria('FIN',activa.lbl,t,dur);
+  logearActVaria('Finalizada',activa.lbl,t,dur);
   document.getElementById('va-fin').textContent       =t.hora;
   document.getElementById('va-fin-row').style.display ='flex';
   document.getElementById('btn-va-fin').style.display ='none';
