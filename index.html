@@ -1534,12 +1534,15 @@ function mostrarVariaActiva() {
 function finActividadVaria() {
   var op=estado.operadorActual, activa=activasVarias[op];
   if (!activa) return;
+  // Deshabilitar boton inmediatamente para evitar doble tap
+  var btnFin = document.getElementById('btn-va-fin');
+  if (btnFin) { btnFin.disabled = true; btnFin.style.display = 'none'; }
   var t=ahora(), dur=Math.round((new Date(t.ts.replace(' ','T'))-new Date(activa.ts.replace(' ','T')))/60000);
+  // Borrar de memoria ANTES de loguear para evitar re-entradas
+  delete activasVarias[op];
   logearActVaria('Finalizada',activa.lbl,t,dur);
   document.getElementById('va-fin').textContent       =t.hora;
   document.getElementById('va-fin-row').style.display ='flex';
-  document.getElementById('btn-va-fin').style.display ='none';
-  delete activasVarias[op];
   toast(activa.lbl+' finalizada · '+dur+' min','ok');
   setTimeout(function(){ mostrar('s-tipo'); },1800);
 }
