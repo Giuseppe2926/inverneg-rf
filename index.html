@@ -957,47 +957,12 @@ function refrescoAutomatico() {
   });
 }
 
-// ============================================================
-// TIMEOUT DE INACTIVIDAD — 20 segundos
-// Si el operador no toca la pantalla, vuelve a seleccion de operador
-// sin cerrar sesion Microsoft
-// ============================================================
-var _inactividadTimer = null;
-var INACTIVIDAD_MS = 20 * 1000;
-
-function resetInactividad() {
-  if (!msalAccount || !estado.operadorActual) return;
-  clearTimeout(_inactividadTimer);
-  _inactividadTimer = setTimeout(function() {
-    console.log('[Inactividad] Timeout — volviendo a seleccion de operador');
-    // Resetear operador pero mantener sesion Microsoft
-    estado.operadorActual = '';
-    estado.ordenActual = '';
-    estado.accionPendiente = null;
-    document.getElementById('header-sub').textContent = 'Inverneg · CND';
-    document.getElementById('sel-operador').value = '';
-    // Cerrar modal override si estaba abierto
-    var modal = document.getElementById('modal-override');
-    if (modal) modal.style.display = 'none';
-    mostrar('s-login');
-  }, INACTIVIDAD_MS);
-}
-
-function iniciarMonitorInactividad() {
-  var eventos = ['touchstart','touchend','click','keydown','scroll'];
-  eventos.forEach(function(ev) {
-    document.addEventListener(ev, resetInactividad, true);
-  });
-  resetInactividad();
-}
-
 function init() {
   setInterval(reloj,1000); reloj();
   document.getElementById('fecha-hoy').textContent=fechaHoy();
   poblarOperadores('sel-operador');
   poblarOperadores('sel-op-accion');
   setInterval(refrescoAutomatico, 3 * 60 * 1000);
-  iniciarMonitorInactividad();
   intentarSesionSilenciosa();
 }
 function poblarOperadores(selId) {
