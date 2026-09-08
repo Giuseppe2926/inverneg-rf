@@ -4,101 +4,145 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>RF Conteo — Inverneg</title>
+<title>RF Recepción — Inverneg</title>
 <style>
 :root{
-  --bg:#0D1117;--surface:#161B22;--surface2:#1C2330;--border:#2A3340;
-  --text:#E6EDF3;--muted:#7D8590;--accent:#58A6FF;--accent2:#F85149;
-  --ok:#3FB950;--warn:#E3B341;--inv:#58A6FF;--rec:#F0883E;
+  --bg:#0D1117;--sur:#161B22;--sur2:#1C2330;--bor:#2A3340;
+  --txt:#E6EDF3;--mut:#7D8590;
+  --acc:#58A6FF;--ok:#3FB950;--warn:#E3B341;--dan:#F85149;--rec:#F0883E;
   --mono:'Courier New',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden}
+html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden}
 #app{display:flex;flex-direction:column;min-height:100vh}
-.hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.hdr-title{font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--accent)}
-.hdr-sub{font-size:10px;color:var(--muted);margin-top:1px}
-.hdr-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:11px;padding:5px 10px;border-radius:5px;cursor:pointer}
+
+/* HEADER */
+.hdr{background:var(--sur);border-bottom:1px solid var(--bor);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.hdr-brand{font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--rec)}
+.hdr-sub{font-size:10px;color:var(--mut);margin-top:1px}
+.hdr-btn{background:var(--sur2);border:1px solid var(--bor);color:var(--mut);font-size:11px;padding:5px 10px;border-radius:5px;cursor:pointer}
+
+/* SCREEN */
 #screen{flex:1;padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.ftr{background:var(--surface);border-top:1px solid var(--border);padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;min-height:44px}
-.ftr-op{font-size:11px;color:var(--muted)}
-.ftr-mode{font-size:10px;font-family:var(--mono);color:var(--warn);letter-spacing:.06em}
-/* Inputs */
-.lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;margin-top:10px}
-.inp{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:16px;padding:10px 12px;border-radius:6px;outline:none;font-family:inherit}
-.inp:focus{border-color:var(--accent)}
+
+/* FOOTER */
+.ftr{background:var(--sur);border-top:1px solid var(--bor);padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;min-height:44px}
+.ftr-op{font-size:11px;color:var(--mut)}
+.ftr-conn{display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--warn)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--warn)}
+.dot.ok{background:var(--ok)}.dot.err{background:var(--dan)}
+
+/* INPUTS */
+.lbl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;margin-top:10px}
+.inp{width:100%;background:var(--sur2);border:1px solid var(--bor);color:var(--txt);font-size:16px;padding:10px 12px;border-radius:6px;outline:none;font-family:inherit}
+.inp:focus{border-color:var(--acc)}
 .inp-sm{font-size:14px;padding:8px 10px}
 select.inp{appearance:none;-webkit-appearance:none}
-/* Botones */
+
+/* BUTTONS */
 .btn{border:none;border-radius:6px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .1s}
 .btn:active{opacity:.75}
-.btn-pri{background:var(--accent);color:#000}
-.btn-sec{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-pri{background:var(--acc);color:#000}
 .btn-ok{background:var(--ok);color:#000}
-.btn-warn{background:var(--accent2);color:#fff}
+.btn-warn{background:var(--dan);color:#fff}
+.btn-sec{background:var(--sur2);color:var(--txt);border:1px solid var(--bor)}
+.btn-rec{background:var(--rec);color:#000}
 .btn-big{width:100%;padding:13px;font-size:15px}
 .btn-row{display:flex;gap:8px}
 .btn-row .btn{flex:1}
-/* Cards de tipo */
-.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
-.type-card{background:var(--surface2);border:2px solid var(--border);border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;transition:border-color .15s}
-.type-card:active{border-color:var(--accent)}
-.type-card.sel{border-color:var(--accent);background:#1a2030}
-.type-card.rec.sel{border-color:var(--rec)}
-.type-card-icon{font-size:28px;margin-bottom:6px}
-.type-card-lbl{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--text)}
-/* Badges */
+
+/* TYPE CARDS */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.card-t{background:var(--sur2);border:2px solid var(--bor);border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;transition:border-color .15s}
+.card-t:active{border-color:var(--acc)}
+.card-t.sel{border-color:var(--acc);background:#1a2030}
+.card-t.sel-rec{border-color:var(--rec);background:#1e1a14}
+.card-t-icon{font-size:26px;margin-bottom:6px}
+.card-t-lbl{font-size:12px;font-weight:700;letter-spacing:.06em}
+
+/* BADGES */
 .badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;padding:3px 10px;border-radius:4px;margin-bottom:8px;text-transform:uppercase}
-.badge-inv{background:rgba(88,166,255,.15);color:var(--inv);border:1px solid rgba(88,166,255,.3)}
 .badge-rec{background:rgba(240,136,62,.15);color:var(--rec);border:1px solid rgba(240,136,62,.3)}
 .badge-sup{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.3)}
-/* Valores */
-.val{font-size:28px;font-weight:700;margin:6px 0;text-align:center}
-.val.ok{color:var(--ok)}.val.accent{color:var(--accent)}.val.warn{color:var(--warn)}.val.sm{font-size:16px}
-/* Progress */
-.prog-wrap{background:var(--surface2);border-radius:6px;padding:10px 12px;margin:6px 0}
-.prog-row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px}
-.prog-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
-.prog-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
-.prog-fill.rec{background:var(--rec)}
-/* Alert */
-.alert{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);color:var(--accent2);border-radius:6px;padding:8px 12px;font-size:12px;margin:6px 0}
-.alert-warn{background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);color:var(--warn)}
-/* Steps bar */
+.badge-ok{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.3)}
+
+/* STEPS */
 .steps{display:flex;gap:3px;margin-bottom:10px}
-.step{height:3px;border-radius:2px;flex:1;background:var(--border)}
-.step.on{background:var(--accent)}
-.step.on.rec{background:var(--rec)}
-/* Estado toggle */
-.estado-toggle{display:flex;gap:8px;margin:4px 0}
-.estado-opt{flex:1;padding:10px;border-radius:6px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;background:var(--surface2);border:2px solid var(--border);color:var(--muted)}
-.sel-ok{border-color:var(--ok);color:var(--ok);background:rgba(63,185,80,.1)}
-.sel-dan{border-color:var(--accent2);color:var(--accent2);background:rgba(248,81,73,.1)}
-/* Toast */
-.toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 16px;border-radius:8px;font-size:12px;z-index:999;white-space:nowrap;opacity:0;transition:opacity .2s}
+.step{height:3px;border-radius:2px;flex:1;background:var(--bor)}
+.step.on{background:var(--rec)}
+
+/* ALERTS */
+.alert{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);color:var(--dan);border-radius:6px;padding:8px 12px;font-size:12px;margin:6px 0}
+.alert-w{background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:12px;margin:6px 0}
+
+/* CARDS DE PEDIDO/CONTENEDOR */
+.card-item{background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;position:relative}
+.card-item:active{border-color:var(--acc)}
+.card-item-title{font-size:14px;font-weight:700;color:var(--txt);margin-bottom:3px}
+.card-item-sub{font-size:11px;color:var(--mut)}
+.card-item-badge{position:absolute;right:12px;top:12px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;text-transform:uppercase}
+.status-pend{background:rgba(227,179,65,.2);color:var(--warn)}
+.status-act{background:rgba(240,136,62,.2);color:var(--rec)}
+.status-ok{background:rgba(63,185,80,.2);color:var(--ok)}
+
+/* EVENTO CARD */
+.evt-card{background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.evt-icon{font-size:22px;flex-shrink:0}
+.evt-body{flex:1}
+.evt-title{font-size:13px;font-weight:700}
+.evt-time{font-size:12px;color:var(--ok);margin-top:2px}
+.evt-pend{font-size:12px;color:var(--mut);margin-top:2px}
+.evt-btn{flex-shrink:0}
+
+/* CALENDARIO */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
+.cal-day{padding:8px 4px;text-align:center;font-size:12px;border-radius:6px;cursor:pointer;background:var(--sur2);border:1px solid var(--bor)}
+.cal-day.hoy{border-color:var(--acc);color:var(--acc);font-weight:700}
+.cal-day.sel{background:var(--acc);color:#000;font-weight:700}
+.cal-day.has-data{border-color:var(--rec)}
+.cal-day.vacio{background:transparent;border-color:transparent;cursor:default;color:var(--mut)}
+.cal-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
+.cal-hdr-d{text-align:center;font-size:10px;color:var(--mut);font-weight:700;padding:4px}
+
+/* BUSQUEDA SKU */
+.sku-item{background:var(--sur2);border:1px solid var(--bor);border-radius:6px;padding:10px 12px;margin-bottom:6px;cursor:pointer}
+.sku-item:active{border-color:var(--acc)}
+.sku-cod{font-size:12px;color:var(--acc);font-weight:700;margin-bottom:2px}
+.sku-desc{font-size:13px;color:var(--txt)}
+
+/* TOAST */
+.toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--sur2);border:1px solid var(--bor);color:var(--txt);padding:8px 16px;border-radius:8px;font-size:12px;z-index:999;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
-/* Conexión indicator */
-.conn-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}
-.conn-ok{background:var(--ok)}.conn-warn{background:var(--warn)}.conn-err{background:var(--accent2)}
+
+/* LOADING */
+.loading{text-align:center;padding:40px 0}
+.loading-icon{font-size:32px;margin-bottom:12px}
+.loading-txt{font-size:13px;font-weight:700;color:var(--acc);margin-bottom:6px}
+.loading-sub{font-size:11px;color:var(--mut)}
+
+/* VAL */
+.val{font-size:28px;font-weight:700;margin:6px 0;text-align:center}
+.val.ok{color:var(--ok)}.val.rec{color:var(--rec)}
 </style>
 </head>
 <body>
 <div id="app">
   <div class="hdr">
     <div>
-      <div class="hdr-title">▸ RF CONTEO</div>
+      <div class="hdr-brand">▸ RF RECEPCIÓN</div>
       <div class="hdr-sub" id="hdr-sub">Inverneg · CND</div>
     </div>
     <button class="hdr-btn" onclick="window.goHome&&goHome()">⌂ Inicio</button>
   </div>
-  <div id="screen"><div style="text-align:center;padding:40px;color:var(--muted)">Iniciando...</div></div>
+  <div id="screen">
+    <div class="loading">
+      <div class="loading-icon">📦</div>
+      <div class="loading-txt">Iniciando...</div>
+    </div>
+  </div>
   <div class="ftr">
     <div class="ftr-op" id="ftr-op">—</div>
-    <div style="display:flex;align-items:center">
-      <span class="conn-dot conn-warn" id="conn-dot"></span>
-      <span class="ftr-mode" id="ftr-mode">CONECTANDO</span>
-    </div>
+    <div class="ftr-conn"><div class="dot" id="conn-dot"></div><span id="conn-lbl">CONECTANDO</span></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -108,50 +152,49 @@ select.inp{appearance:none;-webkit-appearance:none}
 'use strict';
 
 // ═══════════════════════════════════════════════════════════════════
-// 1. UTILIDADES PURAS
+// 1. UTILIDADES
 // ═══════════════════════════════════════════════════════════════════
-function pad(n){ return String(n).padStart(2,'0'); }
-
+function pad(n){return String(n).padStart(2,'0');}
 function ahora(){
   var d=new Date();
   var fecha=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
   var hora=pad(d.getHours())+':'+pad(d.getMinutes());
-  return {fecha:fecha,hora:hora,ts:fecha+' '+hora+':'+pad(d.getSeconds()),raw:d};
+  return{fecha:fecha,hora:hora,ts:fecha+' '+hora+':'+pad(d.getSeconds()),raw:d};
 }
-
-function sid(){
+function horaActual(){var t=ahora();return t.hora;}
+function generarRecId(){
   var t=ahora();
-  return 'CNT-'+t.fecha.replace(/-/g,'')+'-'+pad(Math.floor(Math.random()*100));
+  return 'REC-'+t.fecha.replace(/-/g,'')+'-'+String(Math.floor(Math.random()*900)+100);
 }
-
+function render(html){document.getElementById('screen').innerHTML=html;}
 function toast(msg,dur){
   var el=document.getElementById('toast');
   el.textContent=msg;el.classList.add('show');
   setTimeout(function(){el.classList.remove('show');},dur||2200);
 }
-
-function render(html){ document.getElementById('screen').innerHTML=html; }
-
-function stepsBar(cur,tot,tipo){
-  var cls=tipo==='rec'?'on rec':'on';
-  var html='<div class="steps">';
-  for(var i=0;i<tot;i++) html+='<div class="step'+(i<cur?' '+cls:'')+'"></div>';
-  return html+'</div>';
-}
-
-function setConn(estado){
+function setConn(s){
   var dot=document.getElementById('conn-dot');
-  var lbl=document.getElementById('ftr-mode');
-  dot.className='conn-dot';
-  if(estado==='ok'){dot.classList.add('conn-ok');lbl.textContent='LIVE';}
-  else if(estado==='warn'){dot.classList.add('conn-warn');lbl.textContent='CONECTANDO';}
-  else{dot.classList.add('conn-err');lbl.textContent='SIN CONEXIÓN';}
+  var lbl=document.getElementById('conn-lbl');
+  dot.className='dot';
+  if(s==='ok'){dot.classList.add('ok');lbl.textContent='LIVE';}
+  else if(s==='err'){dot.classList.add('err');lbl.textContent='SIN CONEXIÓN';}
+  else lbl.textContent='CONECTANDO';
 }
-
-function updateFooter(){
+function updateFtr(){
   var op=S.operario||'—';
   var rol=S.rol?(' · '+(S.rol==='supervisor'?'SUP':'OP')):'';
   document.getElementById('ftr-op').textContent=op+rol;
+}
+function stepsBar(cur,tot){
+  var h='<div class="steps">';
+  for(var i=0;i<tot;i++) h+='<div class="step'+(i<cur?' on':'')+'"></div>';
+  return h+'</div>';
+}
+function normStr(s){return s?s.trim().toUpperCase():'';}
+function fechaDisplay(iso){
+  if(!iso) return '';
+  var p=iso.split('-');
+  return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:iso;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -162,16 +205,47 @@ var CFG={
   tenantId:   '5e008bd3-17b6-4f83-8d23-019691a40609',
   siteId:     'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
   catalogoNombre: 'Inverneg_ConteoRF_Base_Live.xlsx',
-  listaConteos:     'RF_PRecepciones_LConteos',
-  listaRecepciones: 'RF_PRecepciones_LRecepciones',
+  listas:{
+    recepciones: 'RF_PRecepciones_LRecepciones',
+    eventos:     'RF_PRecepciones_LEventos',
+    asignaciones:'RF_PRecepciones_LAsignaciones',
+  },
+};
+var GRAPH='https://graph.microsoft.com/v1.0';
+
+// ═══════════════════════════════════════════════════════════════════
+// 3. DB
+// ═══════════════════════════════════════════════════════════════════
+var DB={
+  operadores:[],supervisores:[],
+  pedidos:[],contenedores:[],
+  compra:[],importaciones:[],
+  codigosBarra:[],
+  listIds:{recepciones:null,eventos:null,asignaciones:null},
+  catalogoDriveId:null,catalogoItemId:null,
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// 3. MSAL
+// 4. ESTADO DE SESIÓN
 // ═══════════════════════════════════════════════════════════════════
-var msalInstance, msalAccount;
-var GRAPH_SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
+var S={
+  rol:'',operario:'',
+  // Recepción activa
+  recId:'',pedido:'',contenedor:'',sello:'',pallets:0,subtipo:'',
+  eventos:{llegada:null,apertura:null,cierre:null,salida:null},
+  skusRegistrados:[],
+  step:'home',
+  // Calendario
+  calFecha:'',
+  // SKU scan
+  skuActual:null,
+};
 
+// ═══════════════════════════════════════════════════════════════════
+// 5. MSAL
+// ═══════════════════════════════════════════════════════════════════
+var msalInst,msalAcc;
+var SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
 var msalCfg={
   auth:{
     clientId:CFG.clientId,
@@ -183,1569 +257,1133 @@ var msalCfg={
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// 4. DB EN MEMORIA
-// ═══════════════════════════════════════════════════════════════════
-var DB={
-  // Catálogos — se sobreescriben desde Excel
-  operarios:[
-    'ALAVA LUIS','ALBAN FERNANDO','BACILIO WILLIAN','BRIONES JOHNNY',
-    'CAMPOVERDE ERWIN','CORDERO JOEL','GARCIA JAVIER','JUMBO JONATHAN',
-    'LEDEZMA CRISTIAN','LUCAS DAVE','MENDOZA HENRY','COBOS CRISTHIAN',
-    'RIVERO BRYAN','MORA KEVIN','MUDUMBA ISAAC','MURILLO JOSE',
-    'VERA OMAR','RODRIGUEZ PETER','SALDAÑA JHON','TOALA ERICK',
-    'ZAMBRANO ANDRES','LOPEZ KEVIN','MONTEVERDE LONDRES','JUNCO GIUSEPPE'
-  ],
-  supervisores:['JUNCO GIUSEPPE','LOPEZ KEVIN','MONTEVERDE LONDRES','F. SUAREZ'],
-  solicitantes:['JUNCO GIUSEPPE','LOPEZ KEVIN','MONTEVERDE LONDRES','F. SUAREZ'],
-  marcas:[
-    '76','ALGAEX','BLASTER','EQUIPOS','FletGuard','Freezetone','Gorilla',
-    'HE-BAT','HE-LF','Hasting','Hengst','Kendal','Kuality','Luber / LF-LD',
-    'MATMARK','MERCHDS','MIGHTY','Mann Filter','NGK','NOCO','OSRAM',
-    'P66','P66IND','Permatex','Prestone','Quickfreez','Racor','SAKURA',
-    'SHOGUN','SP2000','TECFIL','Topdon','Universe','VARIOS'
-  ],
-  zonas:[
-    'Muelle','Mezzanine',
-    'N101','N102','N103','N104','N105','N106','N107','N108','N109',
-    'N110','N111','N112','N113','N114','N115','N116','N117',
-    'N201','N202','N203','N204','N205','N206','N207','N208','N209',
-    'N210','N211','N212','N213','N214','N215',
-    'N301','N302','N303','N304','N305','N306','N307','N308','N309',
-    'N310','N311','N312','N313'
-  ],
-  // Datos maestros — se cargan desde Excel
-  d365:[],
-  asignaciones:[],
-  pedidos:[],       // [{pedido,tipo,contsTotal,status}]
-  contenedores:[],  // [{pedido,contenedor,sello,pallets,status}]
-  compra:[],        // [{pedido,sku,descripcion,cantidad}]
-  // IDs internos SP — se descubren automáticamente
-  listIds:{conteos:null,recepciones:null},
-  catalogoDriveId:null,
-  catalogoItemId:null,
-};
-
-// ═══════════════════════════════════════════════════════════════════
-// 5. ESTADO DE SESIÓN
-// ═══════════════════════════════════════════════════════════════════
-var S={
-  operario:'',rol:'',solicitante:'',tipo:'',sesionId:'',
-  supervisor:'',
-  // Inventario
-  invAsignacion:null,invItems:[],invGrupos:[],
-  invUbicIdx:0,invSkuIdx:0,invConteos:{},_logCount:{},
-  modalidad:'',
-  // Recepción
-  recSubtipo:'',recPedido:'',recContenedor:'',recSello:'',recPallets:'',
-  recHoraLlegada:'',recHoraApertura:'',recHoraCierre:'',recHoraSalida:'',
-  recNovedades:'',recPersonas:'',
-  lpn:'',itemsLPN:[],lpnCount:0,
-  lpnsEsperados:[],lpnMismatch:false,
-  unxcaja:'',unxcajaOtro:false,numCajas:'',
-  estadoSku:'OK',
-  // Compartido
-  conteoActual:[],
-  step:'home',
-};
-
-// ═══════════════════════════════════════════════════════════════════
 // 6. GRAPH HELPERS
 // ═══════════════════════════════════════════════════════════════════
 function getToken(){
-  if(!msalAccount) return Promise.reject(new Error('Sin sesión'));
-  var req={scopes:GRAPH_SCOPES,account:msalAccount};
-  return msalInstance.acquireTokenSilent(req).catch(function(){
-    return msalInstance.acquireTokenRedirect(req);
+  if(!msalAcc) return Promise.reject(new Error('Sin sesión'));
+  var req={scopes:SCOPES,account:msalAcc};
+  return msalInst.acquireTokenSilent(req).catch(function(){
+    return msalInst.acquireTokenRedirect(req);
   });
 }
-
-function graphGet(url){
+function gGet(url){
   return getToken().then(function(r){
-    return fetch(url,{headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'}});
+    return fetch(url,{headers:{'Authorization':'Bearer '+r.accessToken}});
   }).then(function(r){
-    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+': '+t.substring(0,120));});
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
     return r.json();
   });
 }
-
-function graphPost(url,body){
+function gPost(url,body){
   return getToken().then(function(r){
     return fetch(url,{method:'POST',
       headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
       body:JSON.stringify(body)});
   }).then(function(r){
-    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+': '+t.substring(0,120));});
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
     return r.json();
   });
 }
-
-function graphPatch(url,body){
+function gPatch(url,body){
   return getToken().then(function(r){
     return fetch(url,{method:'PATCH',
       headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
       body:JSON.stringify(body)});
   }).then(function(r){
-    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+': '+t.substring(0,120));});
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
     return r.status===204?{}:r.json();
   });
 }
-
-function urlLista(listId){
-  return 'https://graph.microsoft.com/v1.0/sites/'+CFG.siteId+'/lists/'+listId;
-}
-
-function urlWorkbook(hoja){
-  return 'https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
-    '/items/'+DB.catalogoItemId+
+function urlLista(id){return GRAPH+'/sites/'+CFG.siteId+'/lists/'+id;}
+function urlWB(hoja){
+  return GRAPH+'/drives/'+DB.catalogoDriveId+'/items/'+DB.catalogoItemId+
     "/workbook/worksheets('"+hoja+"')/usedRange";
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 7. DESCUBRIMIENTO AUTOMÁTICO DE LISTAS SP
+// 7. DESCUBRIMIENTO AUTOMÁTICO
 // ═══════════════════════════════════════════════════════════════════
 function descubrirListas(){
-  console.log('[INIT] descubrirListas — buscando en siteId:',CFG.siteId);
-  var url='https://graph.microsoft.com/v1.0/sites/'+CFG.siteId+
-    '/lists?$select=id,displayName&$top=200';
-  return graphGet(url).then(function(data){
-    if(!data.value){
-      console.error('[INIT] descubrirListas — respuesta vacía de SP');
-      return false;
-    }
-    console.log('[INIT] Listas encontradas en SP ('+data.value.length+'):',
-      data.value.map(function(l){return l.displayName;}).join(', '));
-    data.value.forEach(function(lst){
-      if(lst.displayName===CFG.listaConteos){
-        DB.listIds.conteos=lst.id;
-        console.log('[INIT] ✓ '+CFG.listaConteos+' → id:'+lst.id);
-      }
-      if(lst.displayName===CFG.listaRecepciones){
-        DB.listIds.recepciones=lst.id;
-        console.log('[INIT] ✓ '+CFG.listaRecepciones+' → id:'+lst.id);
-      }
+  var url=GRAPH+'/sites/'+CFG.siteId+'/lists?$select=id,displayName&$top=200';
+  return gGet(url).then(function(d){
+    if(!d.value) return false;
+    d.value.forEach(function(l){
+      Object.keys(CFG.listas).forEach(function(k){
+        if(l.displayName===CFG.listas[k]) DB.listIds[k]=l.id;
+      });
     });
-    if(!DB.listIds.conteos)
-      console.error('[INIT] ✗ No encontrada: "'+CFG.listaConteos+'" — verifica el nombre exacto en SP');
-    if(!DB.listIds.recepciones)
-      console.error('[INIT] ✗ No encontrada: "'+CFG.listaRecepciones+'" — verifica el nombre exacto en SP');
-    var ok=!!(DB.listIds.conteos&&DB.listIds.recepciones);
-    console.log('[INIT] descubrirListas resultado:',ok?'OK':'FALLÓ');
+    var ok=DB.listIds.recepciones&&DB.listIds.eventos&&DB.listIds.asignaciones;
+    console.log('[INIT] Listas:',JSON.stringify(DB.listIds));
+    if(!ok) console.warn('[INIT] Alguna lista no encontrada');
     return ok;
-  }).catch(function(e){
-    console.error('[INIT] descubrirListas error:',e.message);
-    return false;
-  });
+  }).catch(function(e){console.error('[INIT] descubrirListas:',e.message);return false;});
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// 8. DESCUBRIMIENTO AUTOMÁTICO DEL EXCEL
-// ═══════════════════════════════════════════════════════════════════
-function descubrirCatalogoExcel(){
-  var nombre=CFG.catalogoNombre;
-  console.log('[INIT] descubrirCatalogoExcel — buscando:',nombre);
-  var url='https://graph.microsoft.com/v1.0/me/drive/root/search(q='+
-    encodeURIComponent("'"+nombre+"'")+')';
-  return graphGet(url).then(function(data){
-    if(!data.value||data.value.length===0){
-      console.error('[INIT] ✗ Excel no encontrado:',nombre,
-        '— verifica que el archivo existe en OneDrive/SharePoint y el nombre es exacto');
-      return false;
-    }
-    console.log('[INIT] Resultados búsqueda Excel ('+data.value.length+'):',
-      data.value.map(function(f){return f.name+'@'+f.parentReference.path;}).join(' | '));
-    var archivo=null;
-    for(var i=0;i<data.value.length;i++){
-      if(data.value[i].name===nombre){archivo=data.value[i];break;}
-    }
-    if(!archivo){
-      console.error('[INIT] ✗ Sin coincidencia exacta para:',nombre,
-        '— los resultados tienen nombres similares pero no exactos');
-      return false;
-    }
-    DB.catalogoDriveId=archivo.parentReference&&archivo.parentReference.driveId
-      ?archivo.parentReference.driveId:null;
-    DB.catalogoItemId=archivo.id;
-    console.log('[INIT] ✓ Excel descubierto:',nombre);
-    console.log('[INIT]   driveId:',DB.catalogoDriveId);
-    console.log('[INIT]   itemId: ',DB.catalogoItemId);
-    console.log('[INIT]   ruta:   ',archivo.parentReference&&archivo.parentReference.path);
+function descubrirExcel(){
+  var nom=CFG.catalogoNombre;
+  var url=GRAPH+'/me/drive/root/search(q='+encodeURIComponent("'"+nom+"'")+')';
+  return gGet(url).then(function(d){
+    if(!d.value||!d.value.length){console.warn('[INIT] Excel no encontrado:',nom);return false;}
+    var f=d.value.find(function(x){return x.name===nom;});
+    if(!f){console.warn('[INIT] Sin coincidencia exacta:',nom);return false;}
+    DB.catalogoDriveId=f.parentReference&&f.parentReference.driveId?f.parentReference.driveId:null;
+    DB.catalogoItemId=f.id;
+    console.log('[INIT] Excel:',nom,'| webUrl:',f.webUrl);
+    console.log('[INIT]   driveType:',f.parentReference&&f.parentReference.driveType);
+    console.log('[INIT]   path:',f.parentReference&&f.parentReference.path);
     return true;
-  }).catch(function(e){
-    console.error('[INIT] descubrirCatalogoExcel error:',e.message);
-    return false;
-  });
+  }).catch(function(e){console.error('[INIT] descubrirExcel:',e.message);return false;});
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 9. LECTURA DE CATÁLOGOS DESDE EXCEL (Workbook API)
+// 8. LECTURA DE CATÁLOGOS DESDE EXCEL
 // ═══════════════════════════════════════════════════════════════════
+var NOISE=/^[\u2191\*\-\#]/;
+function filaValida(v,maxLen){
+  if(!v) return false;
+  var s=v.toString().trim();
+  return s.length>0&&s.length<=(maxLen||80)&&!NOISE.test(s);
+}
+
 function leerCatalogos(){
-  return descubrirCatalogoExcel().then(function(ok){
+  return descubrirExcel().then(function(ok){
     if(!ok||!DB.catalogoDriveId||!DB.catalogoItemId){
-      console.warn('[INIT] Excel no disponible — usando operadores de respaldo ('+DB.operarios.length+')');
-      console.warn('[INIT] Catálogos D365/Pedidos/Contenedores/Compra/Asignaciones vacíos');
+      console.warn('[INIT] Excel no disponible');
+      render('<div class="loading"><div class="loading-icon">⚠️</div>'+
+        '<div class="loading-txt" style="color:var(--dan)">Excel no encontrado</div>'+
+        '<div class="loading-sub">Verifica que "'+CFG.catalogoNombre+'" está en OneDrive/SharePoint.<br>'+
+        'Revisa consola (F12) para más detalle.</div>'+
+        '<button class="btn btn-sec btn-big" style="margin-top:16px" onclick="location.reload()">↻ Reintentar</button></div>');
       return;
     }
-    console.log('[INIT] Leyendo hojas Excel: Asignaciones, D365, Pedidos, Contenedores, Compra');
-    return Promise.all([
-      graphGet(urlWorkbook('Asignaciones')).then(function(r){
-        console.log('[INIT] Hoja Asignaciones — filas:'+(r&&r.values?r.values.length-1:0));return r;
-      }).catch(function(e){console.error('[INIT] Hoja Asignaciones error:',e.message);return null;}),
-      graphGet(urlWorkbook('D365')).then(function(r){
-        console.log('[INIT] Hoja D365 — filas:'+(r&&r.values?r.values.length-1:0));return r;
-      }).catch(function(e){console.error('[INIT] Hoja D365 error:',e.message);return null;}),
-      graphGet(urlWorkbook('Pedidos')).then(function(r){
-        console.log('[INIT] Hoja Pedidos — filas:'+(r&&r.values?r.values.length-1:0));return r;
-      }).catch(function(e){console.error('[INIT] Hoja Pedidos error:',e.message);return null;}),
-      graphGet(urlWorkbook('Contenedores')).then(function(r){
-        console.log('[INIT] Hoja Contenedores — filas:'+(r&&r.values?r.values.length-1:0));return r;
-      }).catch(function(e){console.error('[INIT] Hoja Contenedores error:',e.message);return null;}),
-      graphGet(urlWorkbook('Compra')).then(function(r){
-        console.log('[INIT] Hoja Compra — filas:'+(r&&r.values?r.values.length-1:0));return r;
-      }).catch(function(e){console.error('[INIT] Hoja Compra error:',e.message);return null;}),
-    ]).then(function(res){
-      if(res[0]) _parsearAsignaciones(res[0]);
-      if(res[1]) _parsearD365(res[1]);
-      if(res[2]) _parsearPedidos(res[2]);
-      if(res[3]) _parsearContenedores(res[3]);
-      if(res[4]) _parsearCompra(res[4]);
-      console.log('[INIT] Catálogos cargados — resumen:');
-      console.log('[INIT]   Asignaciones activas:',DB.asignaciones.length);
-      console.log('[INIT]   Items D365:          ',DB.d365.length);
-      console.log('[INIT]   Pedidos:             ',DB.pedidos.length);
-      console.log('[INIT]   Contenedores:        ',DB.contenedores.length);
-      console.log('[INIT]   Items Compra:        ',DB.compra.length);
-    }).catch(function(e){
-      console.error('[INIT] Error general leyendo Excel:',e.message,'— usando respaldo');
-    });
-  });
-}
-
-function _parsearAsignaciones(data){
-  if(!data||!data.values||data.values.length<2){
-    console.warn('[INIT] _parsearAsignaciones vacía'); return;
-  }
-  // Cols: FechaAsignacion(A),Supervisor(B),Operario(C),Tipo(D),Valor(E),Modalidad(F),Status(G),FechaInventario(H)
-  var raw=data.values.slice(1);
-  console.log('[INIT] Asignaciones filas brutas:',raw.length);
-  var NOISE=/^[\u2191\*\-\#]/;
-  DB.asignaciones=raw.filter(function(r){
-    if(!r[2]) return false;
-    var s=r[6]?r[6].toString().trim().toLowerCase():'';
-    if(s!=='activo') return false;
-    var a=r[0]?r[0].toString().trim():'';
-    return a.length<=60&&!NOISE.test(a);
-  }).map(function(r){return{
-    fechaAsignacion:r[0]?r[0].toString():'',
-    supervisor:     r[1]?r[1].toString().trim():'',
-    operario:       r[2]?r[2].toString().trim():'',
-    tipo:           r[3]?r[3].toString().trim():'',
-    valor:          r[4]?r[4].toString().trim():'',
-    modalidad:      r[5]&&r[5].toString().toLowerCase().indexOf('ciega')>-1?'ciegas':'datos',
-    status:         r[6]?r[6].toString().trim():'',
-    fechaInventario:r[7]?r[7].toString():'',
-  };});
-  // Log detallado para diagnosticar por qué filtra 0
-  if(DB.asignaciones.length===0){
-    var statusValores=raw.filter(function(r){return r[2];})
-      .map(function(r){return r[6]?'"'+r[6].toString().trim()+'"':'(vacío)';});
-    console.error('[INIT] ✗ Asignaciones activas: 0');
-    console.error('[INIT]   Valores de Status encontrados en col G:',statusValores.join(', '));
-    console.error('[INIT]   Se esperaba exactamente "Activo" (con A mayúscula)');
-    console.error('[INIT]   Filas con Operario (col C) no vacío:',
-      raw.filter(function(r){return r[2];}).length);
-  } else {
-    console.log('[INIT] ✓ Asignaciones activas:',DB.asignaciones.length);
-  }
-}
-
-function _parsearD365(data){
-  if(!data||!data.values||data.values.length<2){
-    console.warn('[INIT] _parsearD365 vacía'); return;
-  }
-  var raw=data.values.slice(1);
-  console.log('[INIT] D365 filas brutas:',raw.length);
-  var NOISE=/^[\u2191\*\-\#]/;
-  DB.d365=raw.filter(function(r){
-    if(!r[0]||!r[4]) return false;
-    var v=r[0].toString().trim();
-    return v.length<=60&&!NOISE.test(v);
-  }).map(function(r){return{
-    sku:      r[0]?r[0].toString().trim():'',
-    desc:     r[1]?r[1].toString().trim():'',
-    almacen:  r[3]?r[3].toString().trim():'',
-    ubicacion:r[4]?r[4].toString().trim():'',
-    inv:      r[6]?Number(r[6]):0,
-    marca:    r[9]?r[9].toString().trim():'',
-  };});
-  console.log('[INIT] ✓ D365 items:',DB.d365.length);
-  if(DB.d365.length===0)
-    console.warn('[INIT]   → Sin ítems D365 — verifica hoja D365 desde fila 2');
-}
-
-function _parsearPedidos(data){
-  if(!data||!data.values||data.values.length<2){console.warn('[INIT] _parsearPedidos vacía');return;}
-  var raw=data.values.slice(1);
-  console.log('[INIT] Pedidos filas brutas:',raw.length);
-  var NOISE=/^[\u2191\*\-\#]/;
-  DB.pedidos=raw.filter(function(r){
-    if(!r[0]) return false;
-    var v=r[0].toString().trim(); return v.length<=60&&!NOISE.test(v);
-  }).map(function(r){return{
-    pedido:    r[0]?r[0].toString().trim():'',
-    tipo:      r[1]?r[1].toString().trim().toLowerCase():'local',
-    contsTotal:r[2]?Number(r[2]):1,
-    status:    r[3]?r[3].toString().trim():'Pendiente',
-  };});
-  console.log('[INIT] ✓ Pedidos:',DB.pedidos.length);
-}
-
-function _parsearContenedores(data){
-  if(!data||!data.values||data.values.length<2){console.warn('[INIT] _parsearContenedores vacía');return;}
-  var raw=data.values.slice(1);
-  console.log('[INIT] Contenedores filas brutas:',raw.length);
-  var NOISE=/^[\u2191\*\-\#]/;
-  DB.contenedores=raw.filter(function(r){
-    if(!r[0]||!r[1]) return false;
-    var v=r[0].toString().trim(); return v.length<=60&&!NOISE.test(v);
-  }).map(function(r){return{
-    pedido:    r[0]?r[0].toString().trim():'',
-    contenedor:r[1]?r[1].toString().trim():'',
-    sello:     r[2]?r[2].toString().trim():'',
-    pallets:   r[3]?Number(r[3]):0,
-    status:    r[4]?r[4].toString().trim():'Pendiente',
-  };});
-  console.log('[INIT] ✓ Contenedores:',DB.contenedores.length);
-}
-
-function _parsearCompra(data){
-  if(!data||!data.values||data.values.length<2){console.warn('[INIT] _parsearCompra vacía');return;}
-  var raw=data.values.slice(1);
-  console.log('[INIT] Compra filas brutas:',raw.length);
-  var NOISE=/^[\u2191\*\-\#]/;
-  DB.compra=raw.filter(function(r){
-    if(!r[0]||!r[1]) return false;
-    var v=r[0].toString().trim(); return v.length<=60&&!NOISE.test(v);
-  }).map(function(r){return{
-    pedido:  r[0]?r[0].toString().trim():'',
-    sku:     r[1]?r[1].toString().trim():'',
-    desc:    r[2]?r[2].toString().trim():'',
-    cantidad:r[3]?Number(r[3]):0,
-  };});
-  console.log('[INIT] ✓ Compra items:',DB.compra.length);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 10. ESCRITURA EN SHAREPOINT LISTS
-// ═══════════════════════════════════════════════════════════════════
-
-// ── RF_PRecepciones_LConteos ───────────────────────────────────────
-// CAMPOS: se completarán con nombres internos SP cuando los entregues
-// Estructura conceptual basada en Log_Conteos:
-// Fecha_Inventario, Fecha_Registro, Hora_Registro, Sesion, Supervisor,
-// Operario, Tipo_Asignacion, Asignacion, Modalidad, Almacen, Ubicacion,
-// SKU, Descripcion, Marca, Inv_D365, Conteo, Diferencia, Num_Registro
-function escribirConteo(reg){
-  if(!DB.listIds.conteos){
-    console.warn('Lista Conteos no disponible — registro solo en memoria');
-    return Promise.resolve();
-  }
-  // Campos exactos de RF_PRecepciones_LConteos (sin tildes, sin espacios)
-  // Numéricos: Inv_D365, Conteo, Diferencia, Num_Registro
-  // Title obligatorio en SP — usamos Sesion+SKU+Ubicacion como identificador
-  var fields={
-    'Title':           (reg.sesion||'')+'-'+(reg.ubicacion||'')+'-'+(reg.sku||''),
-    'Sesion':          reg.sesion||'',
-    'Supervisor':      reg.supervisor||'',
-    'Operario':        reg.operario||'',
-    'Tipo_Asignacion': reg.tipo_asignacion||'',
-    'Asignacion':      reg.asignacion||'',
-    'Modalidad':       reg.modalidad||'',
-    'Almacen':         reg.almacen||'',
-    'Ubicacion':       reg.ubicacion||'',
-    'SKU':             reg.sku||'',
-    'Marca':           reg.marca||'',
-    'Descripcion':     reg.descripcion||'',
-    'Inv_D365':        Number(reg.inv_d365)||0,
-    'Conteo':          Number(reg.conteo)||0,
-    'Diferencia':      Number(reg.diferencia)||0,
-    'Fecha_Inventario':reg.fecha_inventario||'',
-    'Fecha_Registro':  reg.fecha_registro||'',
-    'Hora_Registro':   reg.hora_registro||'',
-    'Num_Registro':    Number(reg.num_registro)||1,
-  };
-  return graphPost(urlLista(DB.listIds.conteos)+'/items',{fields:fields})
-    .then(function(){console.log('Conteo escrito SP OK — SKU:'+reg.sku+' Ubic:'+reg.ubicacion);})
-    .catch(function(e){
-      console.error('Error escribirConteo:',e.message);
-      // No relanzar — escritura no crítica, operario sigue trabajando
-    });
-}
-
-// ── RF_PRecepciones_LRecepciones ───────────────────────────────────
-// CAMPOS: se completarán con nombres internos SP cuando los entregues
-// Estructura conceptual basada en Rec_Detallado:
-// Fecha, Hora, Sesion, Operario, Solicitante, Subtipo, Pedido,
-// Contenedor, Sello, Pallets, H_Llegada, H_Apertura, H_Cierre, H_Salida,
-// LPN, LPN_OK, CodProducto, CodInterno, Nombre, UnXCaja, NumCajas,
-// Cantidad, Estado, Novedades, Personas, AlertaProducto
-function escribirRecepcion(reg){
-  if(!DB.listIds.recepciones){
-    console.warn('Lista Recepciones no disponible — registro solo en memoria');
-    return Promise.resolve();
-  }
-  // Campos exactos de RF_PRecepciones_LRecepciones (sin tildes, sin espacios)
-  // Booleanos: LPN_OK, AlertaProducto → true/false (string da error 500)
-  // Numéricos: Pallets, UnXCaja, NumCajas, Cantidad, Personas
-  // Title obligatorio en SP — usamos Sesion+LPN+CodProducto
-  var fields={
-    'Title':          (reg.sesion||'')+'-'+(reg.lpn||'')+'-'+(reg.cod_producto||''),
-    'Sesion':         reg.sesion||'',
-    'Operario':       reg.operario||'',
-    'Solicitante':    reg.solicitante||'',
-    'Subtipo':        reg.subtipo||'',
-    'Pedido':         reg.pedido||'',
-    'Contenedor':     reg.contenedor||'',
-    'Sello':          reg.sello||'',
-    'Pallets':        Number(reg.pallets)||0,
-    'H_Llegada':      reg.hora_llegada||'',
-    'H_Apertura':     reg.hora_apertura||'',
-    'H_Cierre':       reg.hora_cierre||'',
-    'H_Salida':       reg.hora_salida||'',
-    'LPN':            reg.lpn||'',
-    'LPN_OK':         reg.lpn_ok==='SI'?true:false,   // booleano obligatorio
-    'CodProducto':    reg.cod_producto||'',
-    'CodInterno':     reg.cod_interno||'',
-    'Nombre':         reg.nombre||'',
-    'UnXCaja':        Number(reg.unxcaja)||0,
-    'NumCajas':       Number(reg.numcajas)||0,
-    'Cantidad':       Number(reg.cantidad)||0,
-    'Estado':         reg.estado||'OK',
-    'Novedades':      reg.novedades||'',
-    'Personas':       Number(reg.personas)||0,
-    'AlertaProducto': reg.alerta_producto==='SI'?true:false,  // booleano obligatorio
-    'Fecha':          reg.fecha||'',
-    'Hora':           reg.hora||'',
-  };
-  return graphPost(urlLista(DB.listIds.recepciones)+'/items',{fields:fields})
-    .then(function(r){
-      console.log('Recepcion escrita SP OK — LPN:'+reg.lpn+' SKU:'+reg.cod_producto);
-      return r; // retorna para capturar _spItemId
-    })
-    .catch(function(e){
-      console.error('Error escribirRecepcion:',e.message);
-      // No relanzar — escritura no crítica, operario sigue trabajando
-    });
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 11. HELPERS DE NEGOCIO
-// ═══════════════════════════════════════════════════════════════════
-function getAsignacion(operario){
-  var opNorm=operario?operario.trim().toUpperCase():'';
-  console.log('[INV] getAsignacion buscando:"'+operario+'" (norm:"'+opNorm+'")');
-  console.log('[INV] DB.asignaciones('+DB.asignaciones.length+'):',
-    DB.asignaciones.map(function(a){return '"'+a.operario+'"→"'+a.operario.trim().toUpperCase()+'"';}).join('|')||'vacío');
-  var found=DB.asignaciones.find(function(a){
-    return a.operario.trim().toUpperCase()===opNorm;
-  })||null;
-  if(found) console.log('[INV] ✓ Asignación:',JSON.stringify(found));
-  else {
-    console.warn('[INV] ✗ Sin asignación para "'+operario+'"');
-    if(DB.asignaciones.length===0)
-      console.error('[INV]   → DB.asignaciones vacío — hoja Asignaciones no cargó');
-  }
-  return found;
-}
-
-function getItemsAsignados(asig){
-  if(!asig) return [];
-  console.log('[INV] getItemsAsignados tipo:"'+asig.tipo+'" valor:"'+asig.valor+'"');
-  console.log('[INV] DB.d365:',DB.d365.length);
-  if(DB.d365.length===0){
-    console.error('[INV] ✗ DB.d365 vacío — hoja D365 no cargó');
-    return [];
-  }
-  var resultado;
-  if(asig.tipo==='Marca'){
-    var marcaNorm=asig.valor.trim().toUpperCase();
-    var marcasU=[];
-    DB.d365.forEach(function(r){if(marcasU.indexOf(r.marca)<0)marcasU.push(r.marca);});
-    console.log('[INV] Marcas D365('+marcasU.length+'):',marcasU.sort().join(','));
-    resultado=DB.d365.filter(function(r){return r.marca.trim().toUpperCase()===marcaNorm;});
-    if(resultado.length===0) console.warn('[INV] ✗ Marca "'+asig.valor+'" no encontrada');
-    else console.log('[INV] ✓ Items marca "'+asig.valor+'":',resultado.length);
-  } else {
-    var val=asig.valor.trim();
-    console.log('[INV] Muestra ubicaciones D365:',DB.d365.slice(0,5).map(function(r){return r.ubicacion;}).join(','));
-    // Normalizar a mayúsculas para comparación case-insensitive
-    var valUp=val.toUpperCase();
-    if(valUp.indexOf(',')>-1){
-      var pasillos=valUp.split(',').map(function(s){return s.trim();});
-      console.log('[INV] Pasillos (norm):',pasillos.join(','));
-      resultado=DB.d365.filter(function(r){
-        var uUp=r.ubicacion.toUpperCase();
-        return pasillos.some(function(p){return uUp.startsWith(p);});
+    var hojas=['Operadores','Supervisores','Pedidos','Contenedores','Compra','Importaciones','C.Barra'];
+    return Promise.all(hojas.map(function(h){
+      return gGet(urlWB(h)).then(function(r){
+        console.log('[INIT] Hoja '+h+': '+(r&&r.values?r.values.length-1:0)+' filas');
+        return{hoja:h,data:r};
+      }).catch(function(e){
+        console.warn('[INIT] Hoja '+h+' error:',e.message);
+        return{hoja:h,data:null};
       });
-    } else if(valUp.indexOf('-')>-1){
-      var pts=valUp.split('-');
-      var base=pts[0].replace(/[0-9]+$/,'');
-      var n1=parseInt(pts[0].replace(base,''));
-      var n2=parseInt(pts[1].replace(base,''));
-      console.log('[INV] Rango (norm): base:"'+base+'" n1:'+n1+' n2:'+n2);
-      resultado=DB.d365.filter(function(r){
-        var mx=r.ubicacion.toUpperCase().match(/^([A-Z]+)([0-9]+)/);
-        if(!mx||mx[1]!==base) return false;
-        var n=parseInt(mx[2]); return n>=n1&&n<=n2;
-      });
-    } else {
-      console.log('[INV] Prefijo (norm):"'+valUp+'"');
-      resultado=DB.d365.filter(function(r){return r.ubicacion.toUpperCase().startsWith(valUp);});
-    }
-    if(resultado.length===0) console.warn('[INV] ✗ Sin items para "'+asig.valor+'"');
-    else console.log('[INV] ✓ Items "'+asig.valor+'":',resultado.length);
+    })).then(function(res){
+      res.forEach(function(r){parsear(r.hoja,r.data);});
+      console.log('[INIT] Catálogos: ops='+DB.operadores.length+
+        ' sups='+DB.supervisores.length+' pedidos='+DB.pedidos.length+
+        ' conts='+DB.contenedores.length+' cbarra='+DB.codigosBarra.length);
+      if(!DB.operadores.length&&!DB.supervisores.length){
+        console.error('[INIT] Sin operadores ni supervisores — verifica hojas Operadores/Supervisores');
+      }
+    });
+  });
+}
+
+function parsear(hoja,data){
+  if(!data||!data.values||data.values.length<2) return;
+  var raw=data.values.slice(1);
+  if(hoja==='Operadores'){
+    DB.operadores=raw.filter(function(r){return filaValida(r[0]);})
+      .map(function(r){return r[0].toString().trim();});
+  } else if(hoja==='Supervisores'){
+    DB.supervisores=raw.filter(function(r){return filaValida(r[0]);})
+      .map(function(r){return r[0].toString().trim();});
+  } else if(hoja==='Pedidos'){
+    // Cols: Pedido(A),Tipo(B),ContenedoresTotal(C),Status(D),Observaciones(E)
+    DB.pedidos=raw.filter(function(r){return filaValida(r[0],50);})
+      .map(function(r){return{
+        pedido:r[0].toString().trim(),
+        tipo:r[1]?r[1].toString().trim():'',
+        contsTotal:r[2]?Number(r[2]):1,
+        status:r[3]?r[3].toString().trim():'Pendiente',
+        obs:r[4]?r[4].toString().trim():'',
+      };});
+  } else if(hoja==='Contenedores'){
+    // Cols: Pedido(A),FechaProgramada(B),#Contenedor(C),#Sello(D),PalletsReportados(E),Status(F),FechaRecepcion(G),Observaciones(H)
+    DB.contenedores=raw.filter(function(r){return filaValida(r[0],50);})
+      .map(function(r){return{
+        pedido:r[0].toString().trim(),
+        fechaProg:r[1]?r[1].toString().trim():'',
+        contenedor:r[2]?r[2].toString().trim():'',
+        sello:r[3]?r[3].toString().trim():'',
+        pallets:r[4]?Number(r[4]):0,
+        status:r[5]?r[5].toString().trim():'Pendiente',
+        fechaRec:r[6]?r[6].toString().trim():'',
+      };});
+  } else if(hoja==='Compra'){
+    // Cols: Pedido(A),SKU(B),Descripcion(C),Cantidad(D)
+    DB.compra=raw.filter(function(r){return filaValida(r[0],50)&&r[1];})
+      .map(function(r){return{
+        pedido:r[0].toString().trim(),
+        sku:r[1].toString().trim(),
+        desc:r[2]?r[2].toString().trim():'',
+        cantidad:r[3]?Number(r[3]):0,
+      };});
+  } else if(hoja==='Importaciones'){
+    DB.importaciones=raw.filter(function(r){return filaValida(r[0],50)&&r[1];})
+      .map(function(r){return{
+        pedido:r[0].toString().trim(),
+        sku:r[1].toString().trim(),
+        desc:r[2]?r[2].toString().trim():'',
+        cantidad:r[3]?Number(r[3]):0,
+      };});
+  } else if(hoja==='C.Barra'){
+    // Cols: SKU(A),Descripcion(B),Un(C),Cód.BarrasUnidad(D),Un/CJ(E),Cód.BarrasCaja(F)
+    DB.codigosBarra=[];
+    raw.filter(function(r){return filaValida(r[0],50);}).forEach(function(r){
+      var sku=r[0]?r[0].toString().trim():'';
+      var desc=r[1]?r[1].toString().trim():'';
+      var cbUnd=r[3]?r[3].toString().trim():'';
+      var uncj=r[4]?Number(r[4]):1;
+      var cbCaj=r[5]?r[5].toString().trim():'';
+      if(cbUnd) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbUnd,tipo:'Unidad',factor:1});
+      if(cbCaj) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbCaj,tipo:'Caja',factor:uncj||1});
+    });
   }
-  console.log('[INV] Ubicaciones:',agruparPorUbicacion(resultado).length);
-  return resultado;
-}
-function agruparPorUbicacion(items){
-  var map={};
-  items.forEach(function(it){
-    if(!map[it.ubicacion]) map[it.ubicacion]=[];
-    map[it.ubicacion].push(it);
-  });
-  return Object.entries(map).sort(function(a,b){return a[0].localeCompare(b[0]);});
-}
-
-function getPedidoInfo(pedido){
-  return DB.pedidos.find(function(p){return p.pedido===pedido;})||null;
-}
-
-function getContenedoresDePedido(pedido){
-  return DB.contenedores.filter(function(c){return c.pedido===pedido;});
-}
-
-function calcDiferenciasPedido(pedido){
-  var compra=DB.compra.filter(function(c){return c.pedido===pedido;});
-  var recibido={};
-  S.conteoActual.forEach(function(r){
-    if(r.pedido===pedido&&r.tipo==='RECEPCION'){
-      var sku=r.cod_interno||r.cod_producto;
-      recibido[sku]=(recibido[sku]||0)+Number(r.cantidad);
-    }
-  });
-  var diffs=[];
-  compra.forEach(function(c){
-    var rec=recibido[c.sku]||0;
-    if(rec!==c.cantidad) diffs.push({sku:c.sku,desc:c.desc,esperado:c.cantidad,recibido:rec,diff:rec-c.cantidad});
-  });
-  Object.keys(recibido).forEach(function(sku){
-    if(!compra.find(function(c){return c.sku===sku;}))
-      diffs.push({sku:sku,desc:'',esperado:0,recibido:recibido[sku],diff:recibido[sku]});
-  });
-  return diffs;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 12. LÓGICA DE PANTALLAS — INICIO Y ROL
+// 9. ESCRITURA EN SP LISTS
+// ═══════════════════════════════════════════════════════════════════
+function escribirEvento(tipo,hora,contenedor){
+  if(!DB.listIds.eventos) return Promise.resolve();
+  var t=ahora();
+  var fields={
+    Title:       S.recId+'-'+tipo,
+    RecepcionId: S.recId,
+    Pedido:      S.pedido,
+    Contenedor:  contenedor||S.contenedor||'',
+    TipoEvento:  tipo,
+    Operario:    S.operario,
+    Hora:        hora||t.hora,
+    Fecha:       t.fecha,
+    Timestamp:   t.ts,
+  };
+  return gPost(urlLista(DB.listIds.eventos)+'/items',{fields:fields})
+    .then(function(r){console.log('[SP] Evento '+tipo+' OK');return r;})
+    .catch(function(e){console.error('[SP] Evento '+tipo+' error:',e.message);});
+}
+
+function escribirSKU(reg){
+  if(!DB.listIds.recepciones) return Promise.resolve();
+  var fields={
+    Title:          S.recId+'-'+reg.sku+'-'+Date.now(),
+    Sesion:         S.recId,
+    Operario:       S.operario,
+    Solicitante:    S.operario,
+    Subtipo:        S.subtipo,
+    Pedido:         S.pedido,
+    Contenedor:     S.contenedor,
+    Sello:          S.sello||'',
+    Pallets:        Number(S.pallets)||0,
+    H_Llegada:      S.eventos.llegada||'',
+    H_Apertura:     S.eventos.apertura||'',
+    H_Cierre:       '',
+    H_Salida:       '',
+    LPN:            '',
+    LPN_OK:         true,
+    CodProducto:    reg.sku,
+    CodInterno:     reg.sku,
+    Nombre:         reg.desc,
+    UnXCaja:        Number(reg.factor)||1,
+    NumCajas:       Number(reg.numCajas)||1,
+    Cantidad:       Number(reg.cantidad)||0,
+    Estado:         reg.estado||'OK',
+    Novedades:      reg.novedad||'',
+    Personas:       0,
+    AlertaProducto: false,
+    Fecha:          ahora().fecha,
+    Hora:           ahora().hora,
+  };
+  return gPost(urlLista(DB.listIds.recepciones)+'/items',{fields:fields})
+    .then(function(r){console.log('[SP] SKU '+reg.sku+' OK');return r;})
+    .catch(function(e){console.error('[SP] SKU error:',e.message);});
+}
+
+function escribirAsignacion(pedido,tipo,operario){
+  if(!DB.listIds.asignaciones) return Promise.resolve();
+  var t=ahora();
+  var fields={
+    Title:          pedido+'-'+tipo,
+    Pedido:         pedido,
+    TipoAsignacion: tipo,
+    Operario:       operario,
+    Supervisor:     S.operario,
+    FechaAsignacion:t.fecha,
+    Status:         'Activo',
+  };
+  return gPost(urlLista(DB.listIds.asignaciones)+'/items',{fields:fields})
+    .then(function(r){console.log('[SP] Asignación OK');return r;})
+    .catch(function(e){console.error('[SP] Asignación error:',e.message);});
+}
+
+function cargarAsignacionesSP(){
+  if(!DB.listIds.asignaciones) return Promise.resolve([]);
+  return gGet(urlLista(DB.listIds.asignaciones)+'/items?$expand=fields&$top=500')
+    .then(function(d){return(d.value||[]).map(function(i){return i.fields;});})
+    .catch(function(){return[];});
+}
+function cargarEventosSP(pedido){
+  if(!DB.listIds.eventos) return Promise.resolve([]);
+  return gGet(urlLista(DB.listIds.eventos)+'/items?$expand=fields&$top=500')
+    .then(function(d){
+      return(d.value||[])
+        .map(function(i){return i.fields;})
+        .filter(function(f){return f.Pedido===pedido;});
+    }).catch(function(){return[];});
+}
+function cargarSKUsSP(pedido,contenedor){
+  if(!DB.listIds.recepciones) return Promise.resolve([]);
+  return gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500')
+    .then(function(d){
+      return(d.value||[])
+        .map(function(i){return i.fields;})
+        .filter(function(f){return f.Pedido===pedido&&(!contenedor||f.Contenedor===contenedor);});
+    }).catch(function(){return[];});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 10. BÚSQUEDA DE CÓDIGO DE BARRAS
+// ═══════════════════════════════════════════════════════════════════
+function buscarCodigo(cb){
+  var norm=cb.trim().toUpperCase();
+  return DB.codigosBarra.filter(function(r){
+    return r.cb.trim().toUpperCase()===norm;
+  });
+}
+function getPacingList(pedido,subtipo){
+  var lista=subtipo==='IMPORTACION'?DB.importaciones:DB.compra;
+  return lista.filter(function(r){return r.pedido===pedido;});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 11. PANTALLAS — HOME Y ROL
 // ═══════════════════════════════════════════════════════════════════
 function showHome(){
   S.step='home';
-  var ops=S.rol==='supervisor'?DB.supervisores:DB.operarios;
+  var lista=S.rol==='supervisor'?DB.supervisores:DB.operadores;
   render(
     '<div class="lbl">¿con qué rol ingresas?</div>'+
-    '<div class="type-grid">'+
-      '<div class="type-card'+(S.rol==='supervisor'?' sel':'')+'" onclick="window.setRol(\'supervisor\')">'+
-        '<div class="type-card-icon">👔</div><div class="type-card-lbl">SUPERVISOR</div></div>'+
-      '<div class="type-card'+(S.rol==='operario'?' sel':'')+'" onclick="window.setRol(\'operario\')">'+
-        '<div class="type-card-icon">👷</div><div class="type-card-lbl">OPERARIO</div></div>'+
+    '<div class="grid2">'+
+      '<div class="card-t'+(S.rol==='supervisor'?' sel':'')+'" onclick="S.rol=\'supervisor\';S.operario=\'\';showHome()">'+
+        '<div class="card-t-icon">👔</div><div class="card-t-lbl">SUPERVISOR</div></div>'+
+      '<div class="card-t'+(S.rol==='operario'?' sel':'')+'" onclick="S.rol=\'operario\';S.operario=\'\';showHome()">'+
+        '<div class="card-t-icon">👷</div><div class="card-t-lbl">OPERARIO</div></div>'+
     '</div>'+
     '<div class="lbl" style="margin-top:10px">'+(S.rol==='supervisor'?'supervisor':'operario')+'</div>'+
-    '<select class="inp" id="sel-quien" onchange="S.operario=this.value;updateFooter()">'+
+    '<select class="inp" id="sel-quien" onchange="S.operario=this.value;updateFtr()">'+
       '<option value="">— seleccionar —</option>'+
-      ops.map(function(o){return '<option'+(S.operario===o?' selected':'')+'>'+o+'</option>';}).join('')+
+      lista.map(function(o){return'<option'+(S.operario===o?' selected':'')+'>'+o+'</option>';}).join('')+
     '</select>'+
-    '<div class="lbl" style="margin-top:10px">módulo</div>'+
-    '<div class="type-grid">'+
-      '<div class="type-card'+(S.tipo==='inv'?' sel':'')+'" onclick="S.tipo=\'inv\';showHome()">'+
-        '<div class="type-card-icon">📦</div><div class="type-card-lbl">INVENTARIO</div></div>'+
-      '<div class="type-card rec'+(S.tipo==='rec'?' sel':'')+'" onclick="S.tipo=\'rec\';showHome()">'+
-        '<div class="type-card-icon">🚚</div><div class="type-card-lbl">RECEPCIÓN</div></div>'+
-    '</div>'+
     '<div class="btn-row" style="margin-top:12px">'+
-      '<button class="btn btn-pri btn-big" onclick="window.iniciarSesion()">ENT → INICIAR</button>'+
+      '<button class="btn btn-rec btn-big" onclick="iniciarSesion()">ENT → INGRESAR</button>'+
     '</div>'
   );
-}
-
-function setRol(rol){
-  S.rol=rol;S.operario='';updateFooter();showHome();
 }
 
 function iniciarSesion(){
   S.operario=document.getElementById('sel-quien').value;
   if(!S.rol){toast('Selecciona tu rol');return;}
   if(!S.operario){toast('Selecciona '+(S.rol==='supervisor'?'el supervisor':'el operario'));return;}
-  if(!S.tipo){toast('Selecciona el módulo');return;}
-  S.sesionId=sid();S.conteoActual=[];S.lpnCount=0;
-  if(S.rol==='supervisor') S.supervisor=S.operario;
-  updateFooter();
-  if(S.tipo==='inv'){
-    if(S.rol==='supervisor') showSupAsignaciones();
-    else showInvOperario();
-  } else {
-    showRecSubtipo();
-  }
+  updateFtr();
+  if(S.rol==='supervisor') showMenuSup();
+  else showMenuOp();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 13. PANTALLAS — SUPERVISOR INVENTARIO
+// 12. MENÚ SUPERVISOR
 // ═══════════════════════════════════════════════════════════════════
-var _tipoAsig='';
+function showMenuSup(){
+  S.step='menu-sup';
+  render(
+    '<div class="badge badge-sup">👔 '+S.operario+'</div>'+
+    '<div class="lbl" style="margin-top:4px">¿qué deseas hacer?</div>'+
+    '<div class="grid2" style="margin-top:8px">'+
+      '<div class="card-t" onclick="showCalendario()">'+
+        '<div class="card-t-icon">📅</div><div class="card-t-lbl">CALENDARIO</div></div>'+
+      '<div class="card-t" onclick="showPedidosSup()">'+
+        '<div class="card-t-icon">📦</div><div class="card-t-lbl">PEDIDOS</div></div>'+
+    '</div>'+
+    '<div class="grid2" style="margin-top:8px">'+
+      '<div class="card-t" onclick="showAsignarSup()">'+
+        '<div class="card-t-icon">👤</div><div class="card-t-lbl">ASIGNAR</div></div>'+
+      '<div class="card-t" onclick="showEstadoPedidos()">'+
+        '<div class="card-t-icon">📊</div><div class="card-t-lbl">ESTADO</div></div>'+
+    '</div>'
+  );
+}
 
-function showSupAsignaciones(){
-  S.step='sup-asig';
-  var asigs=DB.asignaciones;
-  var rows=asigs.length===0
-    ?'<div style="color:var(--muted);font-size:12px;padding:12px 0">Sin asignaciones activas.</div>'
-    :asigs.map(function(a,i){
-      return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">'+
-        '<div style="flex:1">'+
-          '<div style="font-size:13px;font-weight:700;color:var(--text)">'+a.operario+'</div>'+
-          '<div style="font-size:11px;color:var(--muted)">'+(a.tipo==='Marca'?'🏷 ':'📍 ')+a.valor+' · '+(a.modalidad==='datos'?'Con datos':'A ciegas')+'</div>'+
-          '<div style="font-size:10px;color:var(--warn);margin-top:2px">📅 '+( a.fechaInventario||'sin fecha')+'</div>'+
-        '</div>'+
-        '<button class="btn btn-sec" style="font-size:11px;padding:4px 10px" onclick="window.eliminarAsignacion('+i+')">✕</button>'+
+// ═══════════════════════════════════════════════════════════════════
+// 13. MENÚ OPERARIO
+// ═══════════════════════════════════════════════════════════════════
+function showMenuOp(){
+  S.step='menu-op';
+  render('<div class="loading"><div class="loading-icon">⏳</div>'+
+    '<div class="loading-txt">Cargando pedidos...</div></div>');
+  cargarAsignacionesSP().then(function(asigs){
+    var misAsigs=asigs.filter(function(a){
+      return normStr(a.Operario)===normStr(S.operario)&&
+             normStr(a.Status)==='ACTIVO';
+    });
+    var html='<div class="badge badge-rec">👷 '+S.operario+'</div>'+
+      '<div class="grid2" style="margin-bottom:10px">'+
+        '<div class="card-t" onclick="showCalendario()">'+
+          '<div class="card-t-icon">📅</div><div class="card-t-lbl">CALENDARIO</div></div>'+
+        '<div class="card-t" onclick="showMenuOp()">'+
+          '<div class="card-t-icon">🔄</div><div class="card-t-lbl">ACTUALIZAR</div></div>'+
       '</div>';
-    }).join('');
-  render(
-    '<div class="badge badge-sup">👔 SUPERVISOR — '+S.operario+'</div>'+
-    '<div class="lbl">asignaciones activas</div>'+rows+
-    '<button class="btn btn-pri btn-big" style="margin-top:8px" onclick="window.showSupNuevaAsig()">+ Nueva asignación</button>'+
-    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="window.goHome()">← Inicio</button>'
-  );
-}
-
-function eliminarAsignacion(idx){
-  if(!confirm('¿Eliminar la asignación de '+DB.asignaciones[idx].operario+'?')) return;
-  DB.asignaciones.splice(idx,1);
-  showSupAsignaciones();
-}
-
-function showSupNuevaAsig(){
-  S.step='sup-nueva-asig';
-  _tipoAsig='';
-  render(
-    '<div class="badge badge-sup">NUEVA ASIGNACIÓN</div>'+
-    '<div class="lbl">operario a asignar</div>'+
-    '<select class="inp inp-sm" id="asig-op">'+
-      '<option value="">— seleccionar —</option>'+
-      DB.operarios.map(function(o){return '<option>'+o+'</option>';}).join('')+
-    '</select>'+
-    '<div class="lbl" style="margin-top:8px">tipo de asignación</div>'+
-    '<div class="type-grid">'+
-      '<div class="type-card" id="tc-marca" onclick="window.selTipoAsig(\'Marca\')">'+
-        '<div class="type-card-icon">🏷</div><div class="type-card-lbl">POR MARCA</div></div>'+
-      '<div class="type-card" id="tc-ubic" onclick="window.selTipoAsig(\'Ubicaciones\')">'+
-        '<div class="type-card-icon">📍</div><div class="type-card-lbl">POR UBICACIONES</div></div>'+
-    '</div>'+
-    '<div id="asig-valor-wrap" style="display:none;margin-top:8px">'+
-      '<div class="lbl" id="asig-valor-lbl">valor</div>'+
-      '<div id="asig-valor-input"></div>'+
-      '<div class="lbl" style="margin-top:8px">modalidad</div>'+
-      '<select class="inp inp-sm" id="asig-mod">'+
-        '<option value="datos">Con datos (muestra stock D365)</option>'+
-        '<option value="ciegas">A ciegas</option>'+
-      '</select>'+
-      '<div class="lbl" style="margin-top:8px">inventario correspondiente a</div>'+
-      '<input class="inp inp-sm" id="asig-fecha-inv" type="date" style="font-size:14px">'+
-      '<div style="font-size:10px;color:var(--muted);margin-top:3px">Fecha del inventario programado</div>'+
-    '</div>'+
-    '<div class="btn-row" style="margin-top:12px">'+
-      '<button class="btn btn-sec" onclick="window.showSupAsignaciones()">← ATR</button>'+
-      '<button class="btn btn-pri" onclick="window.confNuevaAsig()">✓ GUARDAR</button>'+
-    '</div>'
-  );
-}
-
-function selTipoAsig(tipo){
-  _tipoAsig=tipo;
-  document.getElementById('tc-marca').className='type-card'+(tipo==='Marca'?' sel':'');
-  document.getElementById('tc-ubic').className='type-card'+(tipo==='Ubicaciones'?' sel':'');
-  document.getElementById('asig-valor-wrap').style.display='block';
-  document.getElementById('asig-valor-lbl').textContent=tipo==='Marca'?'marca a contar':'rango de ubicaciones (ej: N301-N313)';
-  document.getElementById('asig-valor-input').innerHTML=tipo==='Marca'
-    ?'<select class="inp inp-sm" id="asig-val"><option value="">— seleccionar —</option>'+
-      DB.marcas.map(function(m){return '<option>'+m+'</option>';}).join('')+'</select>'
-    :'<input class="inp inp-sm" id="asig-val" type="text" placeholder="N301-N313" autocomplete="off">'+
-     '<div style="font-size:10px;color:var(--muted);margin-top:3px">Rango: N301-N313 · Múltiples: N101,N201</div>';
-}
-
-function confNuevaAsig(){
-  var op=document.getElementById('asig-op').value;
-  var valEl=document.getElementById('asig-val');
-  var val=valEl?valEl.value.trim():'';
-  var mod=document.getElementById('asig-mod')?document.getElementById('asig-mod').value:'datos';
-  var fechaInv=document.getElementById('asig-fecha-inv')?document.getElementById('asig-fecha-inv').value:'';
-  if(!op){toast('Selecciona el operario');return;}
-  if(!_tipoAsig){toast('Selecciona el tipo');return;}
-  if(!val){toast('Ingresa el valor de la asignación');return;}
-  if(!fechaInv){toast('Ingresa la fecha del inventario');return;}
-  var existe=DB.asignaciones.find(function(a){return a.operario===op;});
-  if(existe){
-    if(!confirm('El operario '+op+' ya tiene una asignación ('+existe.valor+'). ¿Reemplazar?')) return;
-    DB.asignaciones=DB.asignaciones.filter(function(a){return a.operario!==op;});
-  }
-  DB.asignaciones.push({operario:op,tipo:_tipoAsig,valor:val,modalidad:mod,fechaInventario:fechaInv});
-  _tipoAsig='';
-  toast('Asignación guardada');
-  showSupAsignaciones();
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 14. PANTALLAS — OPERARIO INVENTARIO
-// ═══════════════════════════════════════════════════════════════════
-function showInvOperario(){
-  S.step='inv-operario';
-  console.log('[INV] ══════════════════════════');
-  console.log('[INV] operario:"'+S.operario+'" asigs:'+DB.asignaciones.length+' d365:'+DB.d365.length);
-  var asig=getAsignacion(S.operario);
-  if(!asig){
-    var msg=DB.asignaciones.length===0
-      ?'DB.asignaciones vacío — hoja Asignaciones no cargó. Revisa consola [INIT].'
-      :'Sin asignación para "'+S.operario+'". Activos: '+DB.asignaciones.map(function(a){return a.operario;}).join(', ');
-    render('<div class="badge badge-inv">📦 INVENTARIO</div>'+
-      '<div style="text-align:center;padding:16px 0"><div style="font-size:32px">⚠️</div>'+
-      '<div style="font-size:14px;font-weight:700;color:var(--accent2);margin:8px 0">Sin asignación</div>'+
-      '<div style="font-size:12px;color:var(--muted)">Consulta con tu supervisor.</div></div>'+
-      '<div class="alert" style="font-size:11px;margin-top:6px">'+msg+'</div>'+
-      '<button class="btn btn-sec btn-big" style="margin-top:12px" onclick="goHome()">← Volver</button>');
-    return;
-  }
-  S.invAsignacion=asig; S.modalidad=asig.modalidad;
-  S.invItems=getItemsAsignados(asig);
-  S.invGrupos=agruparPorUbicacion(S.invItems);
-  S.invUbicIdx=0; S.invSkuIdx=0; S.invConteos={}; S._logCount={};
-  console.log('[INV] invItems:'+S.invItems.length+' invGrupos:'+S.invGrupos.length);
-  if(S.invItems.length===0){
-    var mds=[]; DB.d365.forEach(function(r){if(mds.indexOf(r.marca)<0)mds.push(r.marca);});
-    var prefijosObj={}; DB.d365.forEach(function(r){var mx=r.ubicacion.match(/^([A-Za-z]+[0-9]+)/);if(mx)prefijosObj[mx[1].toUpperCase()]=1;});
-    var ubicPrefijos=Object.keys(prefijosObj).sort().slice(0,30).join(', ')+(Object.keys(prefijosObj).length>30?' ...':'');
-    render('<div class="badge badge-inv">📦 INVENTARIO</div>'+
-      '<div class="alert" style="margin-top:8px;font-size:12px">'+
-        '✗ Sin ítems para '+asig.tipo+': "'+asig.valor+'"<br><br>'+
-        (asig.tipo==='Marca'
-          ?'Marcas en D365:<br><span style="font-size:10px;color:var(--text)">'+mds.sort().join(', ')+'</span>'
-          :'Prefijos de ubicación en D365:<br><span style="font-size:10px;color:var(--text)">'+ubicPrefijos+'</span>')+
-      '</div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-top:6px">Revisa consola (F12) → [INV].</div>'+
-      '<button class="btn btn-sec btn-big" style="margin-top:12px" onclick="goHome()">← Volver</button>');
-    return;
-  }
-  showInvResumenTarea();
-}
-function showInvResumenTarea(){
-  var asig=S.invAsignacion, total=S.invItems.length;
-  render('<div class="badge badge-inv">📦 TU TAREA HOY</div>'+
-    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">'+
-      '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">'+(asig.tipo==='Marca'?'🏷 MARCA':'📍 UBICACIONES')+'</div>'+
-      '<div style="font-size:18px;font-weight:700;color:var(--accent)">'+asig.valor+'</div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-top:4px">'+S.invGrupos.length+' ubicaciones · '+total+' SKUs · '+(asig.modalidad==='datos'?'Con datos':'A ciegas')+'</div>'+
-      '<div style="font-size:11px;color:var(--warn);margin-top:3px">📅 '+(asig.fechaInventario||'sin fecha')+'</div>'+
-    '</div>'+
-    '<div style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:6px;margin-bottom:10px">'+
-      S.invGrupos.slice(0,8).map(function(g){
-        return '<div style="display:flex;justify-content:space-between;padding:3px 6px;font-size:11px;border-bottom:1px solid var(--border)">'+
-          '<span style="color:var(--accent);font-weight:600">'+g[0]+'</span>'+
-          '<span style="color:var(--muted)">'+g[1].length+' SKU'+(g[1].length>1?'s':'')+'</span></div>';
-      }).join('')+
-      (S.invGrupos.length>8?'<div style="padding:3px 6px;font-size:10px;color:var(--muted)">...y '+(S.invGrupos.length-8)+' más</div>':'')+
-    '</div>'+
-    '<button class="btn btn-pri btn-big" onclick="showInvUbicacion()">▶ INICIAR CONTEO</button>'+
-    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="goHome()">← Volver</button>');
-}
-function showInvUbicacion(){
-  S.step='inv-ubic';
-  console.log('[INV] showInvUbicacion idx:'+S.invUbicIdx+'/'+S.invGrupos.length);
-  if(S.invGrupos.length===0){console.error('[INV] ✗ invGrupos vacío');showInvFin();return;}
-  if(S.invUbicIdx>=S.invGrupos.length){console.log('[INV] ✓ Todas procesadas');showInvFin();return;}
-  var ubic=S.invGrupos[S.invUbicIdx][0];
-  var items=S.invGrupos[S.invUbicIdx][1];
-  var contadas=Object.keys(S.invConteos).filter(function(k){return k.startsWith(ubic+'|');}).length;
-  var pct=Math.round((S.invUbicIdx/S.invGrupos.length)*100);
-  render(
-    stepsBar(S.invUbicIdx,S.invGrupos.length,'inv')+
-    '<div class="badge badge-inv">'+S.invAsignacion.valor+'</div>'+
-    '<div class="prog-wrap" style="margin-bottom:8px">'+
-      '<div class="prog-row"><span>Progreso</span><span>'+S.invUbicIdx+'/'+S.invGrupos.length+' ubic.</span></div>'+
-      '<div class="prog-bar"><div class="prog-fill" style="width:'+pct+'%"></div></div>'+
-    '</div>'+
-    '<div style="background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:10px">'+
-      '<div style="font-size:11px;color:var(--muted)">UBICACIÓN ACTUAL</div>'+
-      '<div style="font-size:22px;font-weight:700;color:var(--accent);letter-spacing:.05em">'+ubic+'</div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-top:2px">'+items.length+' SKU(s) · '+contadas+' contados</div>'+
-    '</div>'+
-    '<div class="btn-row">'+
-      '<button class="btn btn-sec" onclick="S.invUbicIdx=Math.max(0,S.invUbicIdx-1);S.invSkuIdx=0;window.showInvUbicacion()">← ATR</button>'+
-      '<button class="btn btn-pri" onclick="S.invSkuIdx=0;window.showInvSku()">CONTAR →</button>'+
-    '</div>'+
-    '<button class="btn btn-sec btn-big" style="margin-top:8px;font-size:11px" onclick="window.saltarUbicacion()">⏭ Saltar esta ubicación</button>'
-  );
-}
-
-function saltarUbicacion(){
-  if(!confirm('¿Saltar '+S.invGrupos[S.invUbicIdx][0]+'?')) return;
-  S.invUbicIdx++;S.invSkuIdx=0;showInvUbicacion();
-}
-
-function showInvSku(){
-  S.step='inv-sku';
-  var ubic=S.invGrupos[S.invUbicIdx][0];
-  var items=S.invGrupos[S.invUbicIdx][1];
-  if(S.invSkuIdx>=items.length){showInvUbicConfirmada(ubic,items);return;}
-  var item=items[S.invSkuIdx];
-  var key=ubic+'|'+item.sku;
-  var yaContado=S.invConteos[key];
-  render(
-    stepsBar(S.invSkuIdx,items.length,'inv')+
-    '<div class="badge badge-inv">'+ubic+'</div>'+
-    '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">SKU '+(S.invSkuIdx+1)+' de '+items.length+'</div>'+
-    '<div class="lbl">producto</div>'+
-    '<div class="val sm accent" style="font-size:13px;text-align:left">'+item.desc+'</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-top:-4px;margin-bottom:8px">'+
-      'SKU: <span style="color:var(--text);font-weight:600">'+item.sku+'</span> · '+item.marca+
-    '</div>'+
-    (S.modalidad==='datos'
-      ?'<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">'+
-        '<span style="font-size:11px;color:var(--muted)">Stock D365</span>'+
-        '<span style="font-size:18px;font-weight:700;color:var(--text)">'+item.inv+'</span></div>'
-      :'')+
-    '<div class="lbl">tu conteo</div>'+
-    '<input class="inp" id="inp-cant-inv" type="number" min="0" placeholder="0"'+
-      (yaContado!==undefined?' value="'+yaContado+'"':'')+
-      ' style="font-size:24px;font-weight:700;text-align:center" autocomplete="off">'+
-    '<div class="btn-row" style="margin-top:8px">'+
-      '<button class="btn btn-sec" onclick="S.invSkuIdx=Math.max(0,S.invSkuIdx-1);window.showInvSku()">← ATR</button>'+
-      '<button class="btn btn-ok" onclick="window.confConteoSku()">✓ CONFIRMAR</button>'+
-    '</div>'
-  );
-  setTimeout(function(){var el=document.getElementById('inp-cant-inv');if(el){el.focus();el.select();}},100);
-}
-
-function confConteoSku(){
-  var cant=parseInt(document.getElementById('inp-cant-inv').value);
-  if(isNaN(cant)||cant<0){toast('Ingresa una cantidad válida');return;}
-  var ubic=S.invGrupos[S.invUbicIdx][0];
-  var items=S.invGrupos[S.invUbicIdx][1];
-  var item=items[S.invSkuIdx];
-  var key=ubic+'|'+item.sku;
-  S.invConteos[key]=cant;
-  if(!S._logCount) S._logCount={};
-  S._logCount[key]=(S._logCount[key]||0)+1;
-  var t=ahora();
-  var asig=S.invAsignacion||{};
-  var reg={
-    // Para SP List RF_PRecepciones_LConteos
-    tipo:'CONTEO',
-    fecha_inventario:  asig.fechaInventario||'',
-    fecha_registro:    t.fecha,
-    hora_registro:     t.hora+':'+pad(t.raw.getSeconds()),
-    sesion:            S.sesionId,
-    supervisor:        S.supervisor||S.operario,
-    operario:          S.operario,
-    tipo_asignacion:   asig.tipo||'',
-    asignacion:        asig.valor||'',
-    modalidad:         S.modalidad==='datos'?'Con datos':'A ciegas',
-    almacen:           item.almacen,
-    ubicacion:         ubic,
-    sku:               item.sku,
-    descripcion:       item.desc,
-    marca:             item.marca,
-    inv_d365:          item.inv,
-    conteo:            cant,
-    diferencia:        cant-item.inv,
-    num_registro:      S._logCount[key],
-  };
-  S.conteoActual.push(reg);
-  // Escritura asíncrona a SP — no bloquea la UI
-  escribirConteo(reg).catch(function(e){console.warn('escribirConteo falló:',e.message);});
-  S.invSkuIdx++;
-  showInvSku();
-}
-
-function showInvUbicConfirmada(ubic,items){
-  S.step='inv-ubic-ok';
-  var contados=items.filter(function(it){return S.invConteos[ubic+'|'+it.sku]!==undefined;}).length;
-  var diffs=items.filter(function(it){
-    var c=S.invConteos[ubic+'|'+it.sku];
-    return c!==undefined&&c!==it.inv;
+    if(!misAsigs.length){
+      html+='<div class="alert-w">No tienes pedidos asignados hoy.<br>Consulta con tu supervisor.</div>';
+    } else {
+      html+='<div class="lbl">tus pedidos asignados</div>';
+      misAsigs.forEach(function(a){
+        var ped=DB.pedidos.find(function(p){return normStr(p.pedido)===normStr(a.Pedido);})||{};
+        html+='<div class="card-item" onclick="iniciarFlujo(\''+a.Pedido+'\',\''+a.TipoAsignacion+'\')">'+
+          '<div class="card-item-title">'+a.Pedido+'</div>'+
+          '<div class="card-item-sub">'+(ped.tipo||a.TipoAsignacion)+' · '+a.TipoAsignacion+'</div>'+
+          '<div class="card-item-badge status-act">'+a.TipoAsignacion+'</div>'+
+        '</div>';
+      });
+    }
+    render(html);
   });
-  render(
-    '<div class="badge badge-inv">'+ubic+' ✓</div>'+
-    '<div class="val ok">✓ UBICACIÓN LISTA</div>'+
-    '<div style="font-size:12px;color:var(--muted);margin:8px 0">'+
-      contados+' SKUs contados'+
-      (diffs.length>0?' · <span style="color:var(--accent2)">'+diffs.length+' con diferencia</span>':' · sin diferencias')+
-    '</div>'+
-    (diffs.length>0
-      ?'<div style="background:var(--surface2);border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px">'+
-        diffs.map(function(it){
-          var c=S.invConteos[ubic+'|'+it.sku];
-          return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border)">'+
-            '<span style="color:var(--muted)">'+it.sku+'</span>'+
-            '<span>D365: '+it.inv+' → <span style="color:'+(c>it.inv?'var(--ok)':'var(--accent2)')+';font-weight:700">'+c+'</span></span></div>';
-        }).join('')+'</div>'
-      :'')+
-    '<div class="btn-row" style="margin-top:10px">'+
-      '<button class="btn btn-sec" onclick="S.invSkuIdx=0;window.showInvSku()">↩ Repasar</button>'+
-      '<button class="btn btn-pri" onclick="S.invUbicIdx++;S.invSkuIdx=0;window.showInvUbicacion()">sig. ubic. →</button>'+
-    '</div>'
-  );
-}
-
-function showInvFin(){
-  S.step='inv-fin';
-  var total=S.conteoActual.length;
-  var diffs=S.conteoActual.filter(function(r){return r.diferencia!==0;}).length;
-  render(
-    '<div class="badge badge-inv">INVENTARIO COMPLETADO</div>'+
-    '<div class="val ok" style="font-size:20px">✓ FINALIZADO</div>'+
-    '<div style="background:var(--surface2);border-radius:8px;padding:12px;margin:10px 0">'+
-      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
-        '<span style="font-size:12px;color:var(--muted)">Registros enviados</span>'+
-        '<span style="font-size:14px;font-weight:700">'+total+'</span></div>'+
-      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
-        '<span style="font-size:12px;color:var(--muted)">Ubicaciones</span>'+
-        '<span style="font-size:14px;font-weight:700">'+S.invGrupos.length+'</span></div>'+
-      '<div style="display:flex;justify-content:space-between">'+
-        '<span style="font-size:12px;color:var(--muted)">Con diferencia</span>'+
-        '<span style="font-size:14px;font-weight:700;color:'+(diffs>0?'var(--accent2)':'var(--ok)')+'">'+diffs+'</span></div>'+
-    '</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Registros escritos en RF_PRecepciones_LConteos.</div>'+
-    '<button class="btn btn-pri btn-big" onclick="window.goHome()">✓ Cerrar sesión</button>'
-  );
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 15. PANTALLAS — RECEPCIÓN
+// 14. CALENDARIO
 // ═══════════════════════════════════════════════════════════════════
-function showRecSubtipo(){
-  S.step='rec-subtipo';
-  render(
-    stepsBar(0,6,'rec')+
-    '<div class="badge badge-rec">🚚 RECEPCIÓN</div>'+
-    '<div class="lbl">tipo de recepción</div>'+
-    '<div class="type-grid">'+
-      '<div class="type-card rec'+(S.recSubtipo==='importacion'?' sel':'')+'" onclick="S.recSubtipo=\'importacion\';window.showRecSubtipo()">'+
-        '<div class="type-card-icon">🌍</div><div class="type-card-lbl">IMPORTACIÓN</div></div>'+
-      '<div class="type-card rec'+(S.recSubtipo==='local'?' sel':'')+'" onclick="S.recSubtipo=\'local\';window.showRecSubtipo()">'+
-        '<div class="type-card-icon">🏭</div><div class="type-card-lbl">COMPRA LOCAL</div></div>'+
-    '</div>'+
-    '<div class="lbl">solicitante</div>'+
-    '<select class="inp inp-sm" id="sel-sol" onchange="S.solicitante=this.value">'+
-      '<option value="">— seleccionar —</option>'+
-      DB.solicitantes.map(function(o){return '<option'+(S.solicitante===o?' selected':'')+'>'+o+'</option>';}).join('')+
-    '</select>'+
-    '<div class="btn-row" style="margin-top:12px">'+
-      '<button class="btn btn-sec" onclick="window.goHome()">← ATR</button>'+
-      '<button class="btn btn-pri" onclick="window.confRecSubtipo()">ENT →</button>'+
-    '</div>'
-  );
-}
+function showCalendario(){
+  S.step='calendario';
+  var hoy=ahora().raw;
+  var anio=hoy.getFullYear();
+  var mes=hoy.getMonth();
+  var fechaHoy=ahora().fecha;
+  if(!S.calFecha) S.calFecha=fechaHoy;
 
-function confRecSubtipo(){
-  S.solicitante=document.getElementById('sel-sol').value;
-  if(!S.recSubtipo){toast('Selecciona el tipo');return;}
-  if(!S.solicitante){toast('Selecciona el solicitante');return;}
-  showRecCabecera();
-}
+  // Generar grid del mes
+  var primerDia=new Date(anio,mes,1).getDay();
+  var diasMes=new Date(anio,mes+1,0).getDate();
+  var meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-function showRecCabecera(){
-  S.step='rec-cabecera';
-  var pedidosFiltrados=DB.pedidos.filter(function(p){
-    var tipo=p.tipo||'local';
-    if(S.recSubtipo==='importacion') return tipo.indexOf('import')>-1||tipo.indexOf('mport')>-1;
-    return tipo.indexOf('local')>-1;
+  // Contenedores del mes con fecha programada
+  var contsMes=DB.contenedores.filter(function(c){
+    if(!c.fechaProg) return false;
+    var fp=c.fechaProg.substring(0,7); // YYYY-MM
+    return fp===anio+'-'+pad(mes+1);
   });
-  var conts=S.recPedido?getContenedoresDePedido(S.recPedido):[];
-  render(
-    stepsBar(1,6,'rec')+
-    '<div class="badge badge-rec">'+(S.recSubtipo==='importacion'?'🌍 IMPORTACIÓN':'🏭 COMPRA LOCAL')+'</div>'+
-    '<div class="lbl">pedido</div>'+
-    '<select class="inp inp-sm" id="rec-pedido" onchange="window.onPedidoChange()">'+
-      '<option value="">— seleccionar —</option>'+
-      pedidosFiltrados.map(function(p){
-        return '<option'+(S.recPedido===p.pedido?' selected':'')+'>'+p.pedido+'</option>';
-      }).join('')+
-    '</select>'+
-    '<div class="lbl" style="margin-top:6px"># contenedor</div>'+
-    '<select class="inp inp-sm" id="rec-cont" onchange="window.onContenedorChange()"'+(S.recPedido?'':' disabled')+'>'+
-      '<option value="">— seleccionar —</option>'+
-      conts.map(function(c){
-        return '<option value="'+c.contenedor+'"'+(S.recContenedor===c.contenedor?' selected':'')+'>'+c.contenedor+'</option>';
-      }).join('')+
-    '</select>'+
-    '<div class="lbl" style="margin-top:6px"># sello</div>'+
-    '<input class="inp inp-sm" id="rec-sello" type="text" placeholder="Auto al elegir contenedor" value="'+S.recSello+'" readonly style="background:var(--surface);color:'+(S.recSello?'var(--accent)':'var(--muted)')+'">'+
-    '<div class="lbl" style="margin-top:6px"># pallets recibidos</div>'+
-    '<input class="inp inp-sm" id="rec-pallets" type="number" min="0" placeholder="0" value="'+S.recPallets+'" autocomplete="off">'+
-    '<div class="btn-row" style="margin-top:8px">'+
-      '<button class="btn btn-sec" onclick="window.showRecSubtipo()">← ATR</button>'+
-      '<button class="btn btn-pri" onclick="window.confRecCabecera()">ENT →</button>'+
-    '</div>'
-  );
-}
+  var diasConData={};
+  contsMes.forEach(function(c){
+    var d=c.fechaProg.substring(8,10);
+    if(!diasConData[d]) diasConData[d]=0;
+    diasConData[d]++;
+  });
 
-function onPedidoChange(){
-  S.recPedido=document.getElementById('rec-pedido').value;
-  S.recContenedor='';S.recSello='';S.recPallets='';
-  showRecCabecera();
-}
+  var html='<div class="badge badge-sup">📅 CALENDARIO DE RECEPCIÓN</div>'+
+    '<div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:8px;text-align:center">'+
+      meses[mes]+' '+anio+'</div>'+
+    '<div class="cal-hdr"><div class="cal-hdr-d">Do</div><div class="cal-hdr-d">Lu</div>'+
+    '<div class="cal-hdr-d">Ma</div><div class="cal-hdr-d">Mi</div>'+
+    '<div class="cal-hdr-d">Ju</div><div class="cal-hdr-d">Vi</div><div class="cal-hdr-d">Sa</div></div>'+
+    '<div class="cal-grid">';
 
-function onContenedorChange(){
-  var cont=document.getElementById('rec-cont').value;
-  S.recContenedor=cont;
-  var found=DB.contenedores.find(function(c){return c.pedido===S.recPedido&&c.contenedor===cont;});
-  if(found){
-    S.recSello=found.sello||'';
-    if(!S.recPallets) S.recPallets=String(found.pallets||'');
+  // Celdas vacías antes del primer día
+  for(var i=0;i<primerDia;i++) html+='<div class="cal-day vacio"></div>';
+
+  for(var d=1;d<=diasMes;d++){
+    var dStr=pad(d);
+    var fechaD=anio+'-'+pad(mes+1)+'-'+dStr;
+    var cls='cal-day';
+    if(fechaD===fechaHoy) cls+=' hoy';
+    if(fechaD===S.calFecha) cls+=' sel';
+    if(diasConData[dStr]) cls+=' has-data';
+    html+='<div class="'+cls+'" onclick="selCalDia(\''+fechaD+'\')">'+d+
+      (diasConData[dStr]?'<div style="font-size:8px;color:var(--rec)">'+diasConData[dStr]+'</div>':'')+'</div>';
   }
-  document.getElementById('rec-sello').value=S.recSello;
-  document.getElementById('rec-sello').style.color=S.recSello?'var(--accent)':'var(--muted)';
-  document.getElementById('rec-pallets').value=S.recPallets;
-}
+  html+='</div>';
 
-function confRecCabecera(){
-  S.recPedido=document.getElementById('rec-pedido').value;
-  S.recContenedor=document.getElementById('rec-cont').value;
-  S.recSello=document.getElementById('rec-sello').value;
-  S.recPallets=document.getElementById('rec-pallets').value;
-  if(!S.recPedido){toast('Selecciona un pedido');return;}
-  if(!S.recContenedor){toast('Selecciona un contenedor');return;}
-  var nPallets=parseInt(S.recPallets)||0;
-  var base=S.recSubtipo==='importacion'?S.recContenedor:S.recPedido;
-  S.lpnsEsperados=nPallets>0?Array.from({length:nPallets},function(_,i){
-    return base+'-'+pad(i+1);
-  }):[];
-  showRecHoras();
-}
+  // Contenedores del día seleccionado
+  var diaConts=DB.contenedores.filter(function(c){return c.fechaProg===S.calFecha;});
+  html+='<div class="lbl" style="margin-top:12px">'+fechaDisplay(S.calFecha)+
+    ' · '+diaConts.length+' contenedor'+(diaConts.length!==1?'es':'')+'</div>';
 
-function showRecHoras(){
-  S.step='rec-horas';
-  render(
-    stepsBar(2,6,'rec')+
-    '<div class="badge badge-rec">'+S.recContenedor+' · '+S.recPedido+'</div>'+
-    '<div class="lbl">hora llegada</div>'+
-    '<input class="inp inp-sm" id="rec-hlleg" type="time" value="'+S.recHoraLlegada+'">'+
-    '<div class="lbl" style="margin-top:6px">hora apertura</div>'+
-    '<input class="inp inp-sm" id="rec-haper" type="time" value="'+S.recHoraApertura+'">'+
-    '<div class="lbl" style="margin-top:6px">hora cierre</div>'+
-    '<input class="inp inp-sm" id="rec-hcier" type="time" value="'+S.recHoraCierre+'">'+
-    '<div class="lbl" style="margin-top:6px">hora salida</div>'+
-    '<input class="inp inp-sm" id="rec-hsal" type="time" value="'+S.recHoraSalida+'">'+
-    '<div class="btn-row" style="margin-top:8px">'+
-      '<button class="btn btn-sec" onclick="window.showRecCabecera()">← ATR</button>'+
-      '<button class="btn btn-pri" onclick="window.confRecHoras()">ENT →</button>'+
-    '</div>'
-  );
-}
-
-function confRecHoras(){
-  S.recHoraLlegada =document.getElementById('rec-hlleg').value;
-  S.recHoraApertura=document.getElementById('rec-haper').value;
-  S.recHoraCierre  =document.getElementById('rec-hcier').value;
-  S.recHoraSalida  =document.getElementById('rec-hsal').value;
-  S.lpnCount=0;S.lpn='';S.itemsLPN=[];
-  showRecLPN();
-}
-
-function showRecLPN(){
-  S.step='rec-lpn';
-  var siguiente=S.lpnsEsperados[S.lpnCount]||'';
-  render(
-    stepsBar(3,6,'rec')+
-    '<div class="badge badge-rec">'+S.recContenedor+' · '+S.recPedido+'</div>'+
-    '<div class="lbl">escanea LPN del pallet</div>'+
-    '<input class="inp" id="inp-lpn" type="text" placeholder="'+(siguiente||'LPN-0001')+'" value="'+S.lpn+'" autocomplete="off" autocorrect="off" spellcheck="false" style="font-size:18px;font-weight:700;letter-spacing:.05em">'+
-    (siguiente?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Esperado: <span style="color:var(--accent)">'+siguiente+'</span> ('+(S.lpnCount+1)+' de '+S.lpnsEsperados.length+')</div>':'')+
-    (S.lpnCount>0?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+S.lpnCount+' pallets contados</div>':'')+
-    '<div class="btn-row" style="margin-top:8px">'+
-      '<button class="btn btn-sec" onclick="window.showRecHoras()">← ATR</button>'+
-      '<button class="btn btn-pri" onclick="window.confLPN()">ENT →</button>'+
-    '</div>'
-  );
-  setTimeout(function(){var el=document.getElementById('inp-lpn');if(el)el.focus();},100);
-}
-
-function confLPN(){
-  var v=document.getElementById('inp-lpn').value.trim().toUpperCase();
-  if(!v){toast('Escanea o ingresa el LPN');return;}
-  S.lpnMismatch=S.lpnsEsperados.length>0&&S.lpnsEsperados.indexOf(v)<0;
-  if(S.lpnMismatch){
-    var esp=S.lpnsEsperados.slice(0,3).join(', ')+(S.lpnsEsperados.length>3?'...':'');
-    if(!confirm('⚠ LPN "'+v+'" no coincide con el secuencial del contenedor '+S.recContenedor+'.\nEsperados: '+esp+'\n\n¿Continuar?')) return;
-  }
-  S.lpn=v;S.itemsLPN=[];S.unxcaja='';S.unxcajaOtro=false;S.numCajas='';S.estadoSku='OK';
-  showRecProducto();
-}
-
-function showRecProducto(){
-  S.step='rec-prod';
-  render(
-    stepsBar(4,6,'rec')+
-    '<div class="badge badge-rec">'+S.lpn+' · '+S.itemsLPN.length+' ítems</div>'+
-    '<div class="lbl">escanea o ingresa código del producto</div>'+
-    '<input class="inp" id="inp-prod-rec" type="text" placeholder="Cód. barras o interno" autocomplete="off" autocorrect="off" spellcheck="false">'+
-    '<div class="btn-row" style="margin-top:8px">'+
-      '<button class="btn btn-sec" onclick="window.showRecLPN()">← ATR</button>'+
-      '<button class="btn btn-pri" onclick="window.confProductoRec()">ENT →</button>'+
-    '</div>'+
-    (S.itemsLPN.length>0
-      ?'<div style="margin-top:10px;font-size:11px;color:var(--muted)">Ítems en este LPN:</div>'+
-        '<div style="background:var(--surface2);border-radius:6px;padding:6px;font-size:11px">'+
-          S.itemsLPN.map(function(r){
-            return '<div style="padding:2px 0;border-bottom:1px solid var(--border)">'+
-              r.cod_producto+' · '+r.unxcaja+'×'+r.numcajas+'='+r.cantidad+' · '+r.estado+'</div>';
-          }).join('')+'</div>'
-      :'')
-  );
-  setTimeout(function(){var el=document.getElementById('inp-prod-rec');if(el)el.focus();},100);
-}
-
-function confProductoRec(){
-  var v=document.getElementById('inp-prod-rec').value.trim();
-  if(!v){toast('Ingresa o escanea el código');return;}
-  S.codProducto=v;
-  // Buscar en compra para autocompletar
-  var enCompra=DB.compra.find(function(c){return c.pedido===S.recPedido&&(c.sku===v);});
-  S.productoInfo=enCompra||null;
-  S.productoAlerta=!enCompra;
-  S.unxcaja='';S.unxcajaOtro=false;S.numCajas='';S.estadoSku='OK';
-  showRecCantidad();
-}
-
-function showRecCantidad(){
-  S.step='rec-cant';
-  var p=S.productoInfo;
-  render(
-    stepsBar(4,6,'rec')+
-    '<div class="badge badge-rec">'+S.lpn+'</div>'+
-    (S.productoAlerta?'<div class="alert">⚠ CÓD "'+S.codProducto+'" no encontrado en packing list. Puedes continuar.</div>':'')+
-    '<div class="lbl">producto</div>'+
-    '<div class="val sm accent" style="font-size:13px;text-align:left">'+(p?p.desc:S.codProducto)+'</div>'+
-    '<div class="lbl" style="margin-top:8px">unidades por caja (Un/Cj)</div>'+
-    '<input class="inp" id="inp-unxcaja" type="number" min="1" placeholder="0" value="'+(S.unxcaja||'')+'" style="font-size:18px;font-weight:700" autocomplete="off">'+
-    '<div class="lbl" style="margin-top:8px"># de cajas</div>'+
-    '<input class="inp" id="inp-numcajas" type="number" min="0" placeholder="0" value="'+(S.numCajas||'')+'" style="font-size:20px;font-weight:700" autocomplete="off" oninput="window.updateTotalUds()">'+
-    '<div class="lbl" style="margin-top:6px">total (unidades)</div>'+
-    '<div class="val accent" id="lbl-total-uds" style="font-size:22px">'+calcTotalUds()+'</div>'+
-    '<div class="lbl" style="margin-top:4px">estado</div>'+
-    '<div class="estado-toggle">'+
-      '<div class="estado-opt'+(S.estadoSku==='OK'?' sel-ok':'')+'" id="est-ok" onclick="S.estadoSku=\'OK\';document.getElementById(\'est-ok\').className=\'estado-opt sel-ok\';document.getElementById(\'est-dan\').className=\'estado-opt\'">✓ OK</div>'+
-      '<div class="estado-opt'+(S.estadoSku==='DAÑADO'?' sel-dan':'')+'" id="est-dan" onclick="S.estadoSku=\'DAÑADO\';document.getElementById(\'est-dan\').className=\'estado-opt sel-dan\';document.getElementById(\'est-ok\').className=\'estado-opt\'">⚠ DAÑADO</div>'+
-    '</div>'+
-    '<div class="btn-row" style="margin-top:8px">'+
-      '<button class="btn btn-sec" onclick="window.showRecProducto()">← ATR</button>'+
-      '<button class="btn btn-ok" onclick="window.confCantidadRec()">ENT ✓</button>'+
-    '</div>'
-  );
-  setTimeout(function(){
-    var elU=document.getElementById('inp-unxcaja');
-    if(elU) elU.addEventListener('input',function(){window.updateTotalUds();});
-    var elN=document.getElementById('inp-numcajas');
-    if(elN){elN.addEventListener('input',function(){window.updateTotalUds();});elN.focus();}
-  },100);
-}
-
-function calcTotalUds(){
-  var uxc=parseFloat(document.getElementById('inp-unxcaja')?document.getElementById('inp-unxcaja').value:S.unxcaja||0);
-  var cajas=parseFloat(document.getElementById('inp-numcajas')?document.getElementById('inp-numcajas').value:S.numCajas||0);
-  if(isNaN(uxc))uxc=0;if(isNaN(cajas))cajas=0;
-  return (uxc*cajas)||0;
-}
-
-function updateTotalUds(){
-  var el=document.getElementById('lbl-total-uds');
-  if(el)el.textContent=calcTotalUds();
-}
-
-function confCantidadRec(){
-  var uxc=parseFloat(document.getElementById('inp-unxcaja').value);
-  var cajas=parseFloat(document.getElementById('inp-numcajas').value);
-  if(isNaN(uxc)||uxc<=0){toast('Ingresa las unidades por caja');return;}
-  if(isNaN(cajas)||cajas<0){toast('Ingresa el número de cajas');return;}
-  S.unxcaja=uxc;S.numCajas=cajas;
-  var cant=uxc*cajas;
-  var t=ahora();
-  var reg={
-    // Para SP List RF_PRecepciones_LRecepciones
-    tipo:'RECEPCION',
-    fecha:           t.fecha,
-    hora:            t.hora,
-    sesion:          S.sesionId,
-    operario:        S.operario,
-    solicitante:     S.solicitante,
-    subtipo:         S.recSubtipo==='importacion'?'IMPORTACION':'COMPRA LOCAL',
-    pedido:          S.recPedido,
-    contenedor:      S.recContenedor,
-    sello:           S.recSello,
-    pallets:         parseInt(S.recPallets)||0,
-    hora_llegada:    S.recHoraLlegada,
-    hora_apertura:   S.recHoraApertura,
-    hora_cierre:     S.recHoraCierre,
-    hora_salida:     S.recHoraSalida,
-    lpn:             S.lpn,
-    lpn_ok:          S.lpnMismatch?'NO':'SI',
-    cod_producto:    S.codProducto,
-    cod_interno:     S.productoInfo?S.productoInfo.sku:'',
-    nombre:          S.productoInfo?S.productoInfo.desc:'NO ENCONTRADO',
-    unxcaja:         uxc,
-    numcajas:        cajas,
-    cantidad:        cant,
-    estado:          S.estadoSku,
-    alerta_producto: S.productoAlerta?'SI':'NO',
-  };
-  S.conteoActual.push(reg);S.itemsLPN.push(reg);
-  // Escritura asíncrona a SP — guardamos _spItemId para poder parchear con novedades al cerrar
-  escribirRecepcion(reg).then(function(spResult){
-    if(spResult&&spResult.id) reg._spItemId=spResult.id;
-  }).catch(function(e){console.warn('escribirRecepcion falló:',e.message);});
-  showRecConfirmado(reg);
-}
-
-function showRecConfirmado(reg){
-  S.step='rec-ok';
-  render(
-    stepsBar(4,6,'rec')+
-    '<div class="badge badge-rec">'+S.lpn+' · '+S.itemsLPN.length+' ítems</div>'+
-    '<div class="lbl">registrado</div>'+
-    '<div class="val ok">✓ OK</div>'+
-    '<div class="lbl">'+(reg.cod_producto||'')+' · '+reg.unxcaja+'×'+reg.numcajas+'=<strong>'+reg.cantidad+'</strong> uds · <span style="color:'+(reg.estado==='DAÑADO'?'var(--accent2)':'var(--accent)')+'">'+reg.estado+'</span></div>'+
-    '<div class="btn-row" style="margin-top:10px">'+
-      '<button class="btn btn-sec" onclick="window.showRecProducto()">+ ítem mismo LPN</button>'+
-      '<button class="btn btn-pri" onclick="window.nextLPN()">nuevo pallet →</button>'+
-    '</div>'+
-    '<button class="btn btn-warn btn-big" style="margin-top:8px" onclick="window.showRecCierre()">⏹ CERRAR RECEPCIÓN</button>'
-  );
-}
-
-function nextLPN(){
-  S.lpnCount++;S.lpn='';S.itemsLPN=[];S.lpnMismatch=false;
-  S.unxcaja='';S.unxcajaOtro=false;S.numCajas='';
-  showRecLPN();
-}
-
-function showRecCierre(){
-  S.step='rec-cierre';
-  render(
-    stepsBar(5,6,'rec')+
-    '<div class="badge badge-rec">CIERRE DE RECEPCIÓN</div>'+
-    '<div class="lbl">novedades (opcional)</div>'+
-    '<textarea class="inp" id="rec-novedades" rows="3" style="font-size:14px;resize:none">'+(S.recNovedades||'')+'</textarea>'+
-    '<div class="lbl" style="margin-top:8px"># personas en cuadrilla</div>'+
-    '<input class="inp inp-sm" id="rec-personas" type="number" min="0" placeholder="0" value="'+(S.recPersonas||'')+'">'+
-    '<div class="btn-row" style="margin-top:10px">'+
-      '<button class="btn btn-sec" onclick="window.showRecConfirmado(S.conteoActual[S.conteoActual.length-1]||{})">← ATR</button>'+
-      '<button class="btn btn-ok btn-big" onclick="window.confRecCierre()">✓ FINALIZAR</button>'+
-    '</div>'
-  );
-}
-
-function confRecCierre(){
-  S.recNovedades =document.getElementById('rec-novedades').value.trim();
-  S.recPersonas  =Number(document.getElementById('rec-personas').value)||0;
-  // Parchar los registros SP de este contenedor con novedades y personas
-  // (se escribieron sin estos datos — se agregan al cerrar)
-  var regsContedor=S.itemsLPN.concat(
-    S.conteoActual.filter(function(r){
-      return r.tipo==='RECEPCION'&&r.contenedor===S.recContenedor&&r._spItemId;
-    })
-  );
-  if(S.recNovedades||S.recPersonas){
-    regsContedor.forEach(function(reg){
-      if(reg._spItemId&&DB.listIds.recepciones){
-        graphPatch(
-          urlLista(DB.listIds.recepciones)+'/items/'+reg._spItemId,
-          {fields:{
-            'Novedades': S.recNovedades||'',
-            'Personas':  S.recPersonas,
-          }}
-        ).catch(function(e){console.warn('patch novedades:',e.message);});
-      }
+  if(!diaConts.length){
+    html+='<div class="alert-w" style="margin-top:6px">Sin contenedores programados para este día.</div>';
+  } else {
+    diaConts.forEach(function(c){
+      var statusCls=c.status==='Recibido'?'status-ok':c.status==='En proceso'?'status-act':'status-pend';
+      html+='<div class="card-item">'+
+        '<div class="card-item-title">'+c.pedido+' · '+c.contenedor+'</div>'+
+        '<div class="card-item-sub">'+c.pallets+' pallets'+(c.sello?' · Sello: '+c.sello:'')+'</div>'+
+        '<div class="card-item-badge '+statusCls+'">'+c.status+'</div>'+
+      '</div>';
     });
   }
-  // Verificar si es el último contenedor del pedido
-  var pedInfo=getPedidoInfo(S.recPedido);
-  var totalConts=pedInfo?pedInfo.contsTotal:null;
-  var recibidos=S.conteoActual.filter(function(r){
-    return r.tipo==='RECEPCION'&&r.pedido===S.recPedido;
-  }).map(function(r){return r.contenedor;});
-  var recibidosUnicos=[...new Set(recibidos)].length;
-  if(totalConts&&recibidosUnicos>=totalConts){
-    var diffs=calcDiferenciasPedido(S.recPedido);
-    if(diffs.length>0){
-      showModalDiferencias(diffs,function(){showRecNuevaOpcion();});
-      return;
-    }
+
+  html+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver</button>';
+  render(html);
+}
+
+function selCalDia(fecha){
+  S.calFecha=fecha;
+  showCalendario();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 15. SUPERVISOR — PEDIDOS Y ESTADO
+// ═══════════════════════════════════════════════════════════════════
+function showPedidosSup(){
+  S.step='pedidos-sup';
+  var html='<div class="badge badge-sup">📦 PEDIDOS</div>';
+  if(!DB.pedidos.length){
+    html+='<div class="alert-w">Sin pedidos en el Excel. Verifica la hoja Pedidos.</div>';
+  } else {
+    DB.pedidos.forEach(function(p){
+      var sc=p.status==='Cerrado'?'status-ok':'status-pend';
+      var conts=DB.contenedores.filter(function(c){return c.pedido===p.pedido;});
+      html+='<div class="card-item">'+
+        '<div class="card-item-title">'+p.pedido+'</div>'+
+        '<div class="card-item-sub">'+p.tipo+' · '+conts.length+'/'+p.contsTotal+' contenedores'+
+          (p.obs?' · '+p.obs:'')+'</div>'+
+        '<div class="card-item-badge '+sc+'">'+p.status+'</div>'+
+      '</div>';
+    });
   }
-  showRecNuevaOpcion();
+  html+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showMenuSup()">← Volver</button>';
+  render(html);
 }
 
-function showModalDiferencias(diffs,onContinuar){
-  var rows=diffs.map(function(d){
-    var icon,cls;
-    if(d.esperado===0){icon='🆕';cls='warn';}
-    else if(d.recibido===0){icon='❌';cls='danger';}
-    else if(d.diff<0){icon='↓';cls='danger';}
-    else{icon='↑';cls='warn';}
-    return '<tr>'+
-      '<td style="padding:4px 6px;font-size:11px;font-weight:600">'+d.sku+'</td>'+
-      '<td style="padding:4px 6px;text-align:center;font-size:11px">'+(d.esperado||'—')+'</td>'+
-      '<td style="padding:4px 6px;text-align:center;font-size:11px">'+(d.recibido||'0')+'</td>'+
-      '<td style="padding:4px 6px;text-align:center;font-size:11px;color:'+(cls==='danger'?'var(--accent2)':'var(--warn)')+'">'+icon+' '+(d.diff>0?'+':'')+d.diff+'</td>'+
-    '</tr>';
-  }).join('');
-  document.getElementById('screen').innerHTML=
-    '<div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:8px">'+
-      '<div style="font-size:13px;font-weight:700;color:var(--accent2);margin-bottom:8px">⚠ PEDIDO '+S.recPedido+' — DIFERENCIAS</div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Último contenedor del pedido. Diferencias vs packing list:</div>'+
-      '<table style="width:100%;border-collapse:collapse">'+
-        '<thead><tr style="border-bottom:1px solid var(--border)">'+
-          '<th style="padding:4px 6px;font-size:11px;text-align:left;color:var(--muted)">SKU</th>'+
-          '<th style="padding:4px 6px;font-size:11px;color:var(--muted)">Esperado</th>'+
-          '<th style="padding:4px 6px;font-size:11px;color:var(--muted)">Recibido</th>'+
-          '<th style="padding:4px 6px;font-size:11px;color:var(--muted)">Dif.</th>'+
-        '</tr></thead>'+
-        '<tbody>'+rows+'</tbody>'+
-      '</table>'+
-    '</div>'+
-    '<div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">'+
-      '<button class="btn btn-warn btn-big" onclick="('+onContinuar.toString()+')()">Cerrar de todas formas</button>'+
-      '<button class="btn btn-sec btn-big" onclick="window.showRecCierre()">← Volver a revisar</button>'+
-    '</div>';
+function showEstadoPedidos(){
+  S.step='estado-pedidos';
+  render('<div class="loading"><div class="loading-icon">⏳</div>'+
+    '<div class="loading-txt">Cargando estado...</div></div>');
+  cargarAsignacionesSP().then(function(asigs){
+    var html='<div class="badge badge-sup">📊 ESTADO DE PEDIDOS</div>';
+    if(!DB.pedidos.length){
+      html+='<div class="alert-w">Sin pedidos en el Excel.</div>';
+    } else {
+      DB.pedidos.forEach(function(p){
+        var asigRec=asigs.find(function(a){return a.Pedido===p.pedido&&a.TipoAsignacion==='RECEPCION';});
+        var asigPerch=asigs.find(function(a){return a.Pedido===p.pedido&&a.TipoAsignacion==='PERCHADO';});
+        var contsRec=DB.contenedores.filter(function(c){return c.pedido===p.pedido&&c.status==='Recibido';}).length;
+        var sc=p.status==='Cerrado'?'status-ok':'status-pend';
+        html+='<div class="card-item">'+
+          '<div class="card-item-title">'+p.pedido+'</div>'+
+          '<div class="card-item-sub">'+p.tipo+
+            ' · Contenedores: '+contsRec+'/'+p.contsTotal+
+            '<br>Recepción: '+(asigRec?asigRec.Operario:'Sin asignar')+
+            ' · Perchado: '+(asigPerch?asigPerch.Operario:'Sin asignar')+'</div>'+
+          '<div class="card-item-badge '+sc+'">'+p.status+'</div>'+
+        '</div>';
+      });
+    }
+    html+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showMenuSup()">← Volver</button>';
+    render(html);
+  });
 }
 
-function showRecNuevaOpcion(){
-  S.step='rec-nueva';
-  var pedInfo=getPedidoInfo(S.recPedido);
-  var totalConts=pedInfo?pedInfo.contsTotal:'?';
-  var recibidos=S.conteoActual.filter(function(r){
-    return r.tipo==='RECEPCION'&&r.pedido===S.recPedido;
-  }).map(function(r){return r.contenedor;});
-  var recibidosUnicos=[...new Set(recibidos)].length;
-  var esUltimo=totalConts&&recibidosUnicos>=totalConts;
+// ═══════════════════════════════════════════════════════════════════
+// 16. SUPERVISOR — ASIGNAR
+// ═══════════════════════════════════════════════════════════════════
+var _asigPedido='',_asigTipo='',_asigOp='';
+function showAsignarSup(){
+  S.step='asignar';
+  _asigPedido='';_asigTipo='';_asigOp='';
+  var pedOps=DB.pedidos.filter(function(p){return p.status!=='Cerrado';});
   render(
-    stepsBar(6,6,'rec')+
-    '<div class="badge badge-rec">RECEPCIÓN COMPLETADA</div>'+
-    '<div class="val ok">✓ OK</div>'+
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:4px">'+S.recContenedor+' · '+S.recPedido+'<br>'+S.conteoActual.filter(function(r){return r.tipo==='RECEPCION';}).length+' ítems · '+(S.lpnCount+1)+' pallets</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Contenedores: <span style="color:'+(esUltimo?'var(--ok)':'var(--accent)')+'">'+recibidosUnicos+' / '+totalConts+'</span>'+(esUltimo?' ✓ PEDIDO COMPLETO':'')+
+    '<div class="badge badge-sup">👤 ASIGNAR PEDIDO</div>'+
+    '<div class="lbl">pedido</div>'+
+    '<select class="inp inp-sm" id="asig-ped" onchange="_asigPedido=this.value">'+
+      '<option value="">— seleccionar —</option>'+
+      pedOps.map(function(p){return'<option>'+p.pedido+'</option>';}).join('')+
+    '</select>'+
+    '<div class="lbl" style="margin-top:8px">tipo de asignación</div>'+
+    '<div class="grid2">'+
+      '<div class="card-t" id="at-rec" onclick="selTipoAsig(\'RECEPCION\')">'+
+        '<div class="card-t-icon">📦</div><div class="card-t-lbl">RECEPCIÓN</div></div>'+
+      '<div class="card-t" id="at-per" onclick="selTipoAsig(\'PERCHADO\')">'+
+        '<div class="card-t-icon">🗄️</div><div class="card-t-lbl">PERCHADO</div></div>'+
     '</div>'+
-    '<div style="display:flex;flex-direction:column;gap:8px">'+
-      '<button class="btn btn-sec btn-big" onclick="window.nuevaRecepcionMismoPedido()">🔄 Mismo pedido</button>'+
-      '<button class="btn btn-sec btn-big" onclick="window.nuevaRecepcionDiferentePedido()">📦 Diferente pedido</button>'+
-      '<button class="btn btn-warn btn-big" onclick="window.cerrarSesion()">⏹ Cerrar sesión</button>'+
+    '<div class="lbl" style="margin-top:8px">operario</div>'+
+    '<select class="inp inp-sm" id="asig-op" onchange="_asigOp=this.value">'+
+      '<option value="">— seleccionar —</option>'+
+      DB.operadores.map(function(o){return'<option>'+o+'</option>';}).join('')+
+    '</select>'+
+    '<div class="btn-row" style="margin-top:12px">'+
+      '<button class="btn btn-sec" onclick="showMenuSup()">← ATR</button>'+
+      '<button class="btn btn-ok btn-big" onclick="confAsignar()">✓ ASIGNAR</button>'+
+    '</div>'
+  );
+}
+function selTipoAsig(t){
+  _asigTipo=t;
+  document.getElementById('at-rec').className='card-t'+(t==='RECEPCION'?' sel':'');
+  document.getElementById('at-per').className='card-t'+(t==='PERCHADO'?' sel':'');
+}
+function confAsignar(){
+  _asigPedido=document.getElementById('asig-ped').value;
+  _asigOp=document.getElementById('asig-op').value;
+  if(!_asigPedido){toast('Selecciona el pedido');return;}
+  if(!_asigTipo){toast('Selecciona el tipo');return;}
+  if(!_asigOp){toast('Selecciona el operario');return;}
+  render('<div class="loading"><div class="loading-icon">⏳</div>'+
+    '<div class="loading-txt">Guardando asignación...</div></div>');
+  escribirAsignacion(_asigPedido,_asigTipo,_asigOp).then(function(){
+    toast('✓ Asignado: '+_asigOp+' → '+_asigPedido+' ('+_asigTipo+')');
+    showMenuSup();
+  }).catch(function(){
+    toast('Error al guardar asignación');showMenuSup();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 17. FLUJO PRINCIPAL — RECEPCIÓN O PERCHADO
+// ═══════════════════════════════════════════════════════════════════
+function iniciarFlujo(pedido,tipo){
+  S.pedido=pedido;
+  var pedInfo=DB.pedidos.find(function(p){return normStr(p.pedido)===normStr(pedido);})||{};
+  S.subtipo=pedInfo.tipo&&pedInfo.tipo.toLowerCase().indexOf('import')>-1?'IMPORTACION':'COMPRA LOCAL';
+  if(tipo==='PERCHADO') showFlujoPerchado();
+  else showSeleccionarContenedor();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 18. RECEPCIÓN — SELECCIONAR CONTENEDOR
+// ═══════════════════════════════════════════════════════════════════
+function showSeleccionarContenedor(){
+  S.step='sel-cont';
+  var contsPend=DB.contenedores.filter(function(c){
+    return normStr(c.pedido)===normStr(S.pedido)&&
+           normStr(c.status)!=='RECIBIDO';
+  });
+  var html=stepsBar(1,6)+
+    '<div class="badge badge-rec">'+S.pedido+' · '+S.subtipo+'</div>'+
+    '<div class="lbl">selecciona el contenedor</div>';
+
+  if(contsPend.length){
+    contsPend.forEach(function(c){
+      html+='<div class="card-item" onclick="selContRow(\''+c.contenedor+'\',\''+c.sello+'\','+c.pallets+')">'+
+        '<div class="card-item-title">'+c.contenedor+'</div>'+
+        '<div class="card-item-sub">'+
+          (c.fechaProg?'Prog: '+fechaDisplay(c.fechaProg)+' · ':'')+'Pallets: '+c.pallets+
+          (c.sello?' · Sello: '+c.sello:'')+'</div>'+
+        '<div class="card-item-badge status-pend">PENDIENTE</div>'+
+      '</div>';
+    });
+  } else {
+    html+='<div class="alert-w">No hay contenedores pendientes para este pedido.</div>';
+  }
+
+  html+='<div class="lbl" style="margin-top:4px">¿contenedor no listado?</div>'+
+    '<div class="card-item" onclick="showNuevoContenedor()">'+
+      '<div class="card-item-title">+ Registrar nuevo contenedor</div>'+
+      '<div class="card-item-sub">Para contenedores no programados</div>'+
+    '</div>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:8px" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver</button>';
+  render(html);
+}
+
+function selContRow(cont,sello,pallets){
+  S.contenedor=cont;S.sello=sello;S.pallets=pallets;
+  S.recId=generarRecId();
+  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+  S.skusRegistrados=[];
+  showEventoLlegada();
+}
+
+function showNuevoContenedor(){
+  S.step='nuevo-cont';
+  render(
+    stepsBar(1,6)+
+    '<div class="badge badge-rec">'+S.pedido+' · NUEVO CONTENEDOR</div>'+
+    '<div class="lbl">número de contenedor</div>'+
+    '<input class="inp" id="nc-cont" type="text" placeholder="Ej: TCNU1234567" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase">'+
+    '<div class="lbl" style="margin-top:6px"># pallets</div>'+
+    '<input class="inp inp-sm" id="nc-pall" type="number" min="0" placeholder="0" autocomplete="off">'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showSeleccionarContenedor()">← ATR</button>'+
+      '<button class="btn btn-rec" onclick="confNuevoContenedor()">ENT →</button>'+
+    '</div>'
+  );
+  setTimeout(function(){var el=document.getElementById('nc-cont');if(el)el.focus();},100);
+}
+function confNuevoContenedor(){
+  var cont=document.getElementById('nc-cont').value.trim().toUpperCase();
+  var pall=parseInt(document.getElementById('nc-pall').value)||0;
+  if(!cont){toast('Ingresa el número de contenedor');return;}
+  S.contenedor=cont;S.sello='';S.pallets=pall;
+  S.recId=generarRecId();
+  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+  S.skusRegistrados=[];
+  showEventoLlegada();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 19. RECEPCIÓN — EVENTOS
+// ═══════════════════════════════════════════════════════════════════
+function showEventoLlegada(){
+  S.step='ev-llegada';
+  render(
+    stepsBar(2,6)+
+    '<div class="badge badge-rec">'+S.contenedor+' · '+S.pedido+'</div>'+
+    '<div class="evt-card">'+
+      '<div class="evt-icon">🚛</div>'+
+      '<div class="evt-body">'+
+        '<div class="evt-title">LLEGADA DEL CONTENEDOR</div>'+
+        '<div class="evt-pend">Registra la hora de llegada</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="lbl"># sello del contenedor</div>'+
+    '<input class="inp inp-sm" id="ev-sello" type="text" placeholder="Ej: SL-98765" value="'+S.sello+'" autocomplete="off" autocorrect="off" spellcheck="false">'+
+    '<div class="lbl" style="margin-top:6px">hora de llegada</div>'+
+    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showSeleccionarContenedor()">← ATR</button>'+
+      '<button class="btn btn-rec btn-big" onclick="confEvento(\'llegada\',\'ev-hora\',showEventoApertura)">✓ REGISTRAR LLEGADA</button>'+
+    '</div>'
+  );
+}
+function confEvento(tipo,inputId,nextFn){
+  var hora=document.getElementById(inputId).value;
+  if(!hora){toast('Ingresa la hora');return;}
+  // Capturar sello si está en pantalla
+  var selEl=document.getElementById('ev-sello');
+  if(selEl) S.sello=selEl.value.trim();
+  S.eventos[tipo]=hora;
+  escribirEvento(tipo.toUpperCase(),hora);
+  if(nextFn) nextFn();
+}
+
+function showEventoApertura(){
+  S.step='ev-apertura';
+  render(
+    stepsBar(3,6)+
+    '<div class="badge badge-rec">'+S.contenedor+' · '+S.pedido+'</div>'+
+    '<div class="evt-card">'+
+      '<div class="evt-icon">🔓</div>'+
+      '<div class="evt-body">'+
+        '<div class="evt-title">APERTURA DEL CONTENEDOR</div>'+
+        '<div class="evt-pend">Registra la hora de apertura</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="lbl">hora de apertura</div>'+
+    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showEventoLlegada()">← ATR</button>'+
+      '<button class="btn btn-rec btn-big" onclick="confEvento(\'apertura\',\'ev-hora\',showEscaneo)">✓ REGISTRAR APERTURA</button>'+
+    '</div>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="showEscaneo()">Registrar después →</button>'
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 20. RECEPCIÓN — ESCANEO DE SKUs
+// ═══════════════════════════════════════════════════════════════════
+function showEscaneo(){
+  S.step='escaneo';
+  var nSkus=S.skusRegistrados.length;
+  var html=stepsBar(4,6)+
+    '<div class="badge badge-rec">'+S.contenedor+' · '+nSkus+' SKUs</div>'+
+    '<div class="lbl">escanea o ingresa código</div>'+
+    '<input class="inp" id="inp-scan" type="text" placeholder="Código de barras o SKU" autocomplete="off" autocorrect="off" spellcheck="false">'+
+    '<div class="btn-row" style="margin-top:8px">'+
+      '<button class="btn btn-rec btn-big" onclick="confScan()">🔍 BUSCAR</button>'+
+    '</div>';
+
+  if(nSkus>0){
+    html+='<div class="lbl" style="margin-top:12px">registrados en este contenedor</div>'+
+      '<div style="max-height:200px;overflow-y:auto">';
+    S.skusRegistrados.slice(-5).reverse().forEach(function(r){
+      html+='<div style="background:var(--sur2);border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:11px;display:flex;justify-content:space-between">'+
+        '<span style="color:var(--acc)">'+r.sku+'</span>'+
+        '<span style="color:var(--txt)">'+r.cantidad+' un</span>'+
+        '<span style="color:'+(r.estado==='DAÑADO'?'var(--dan)':'var(--ok)')+'">'+r.estado+'</span>'+
+      '</div>';
+    });
+    html+='</div>';
+  }
+
+  html+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
+    '<button class="btn btn-sec btn-big" onclick="showEventoCierre()">🔒 CERRAR CONTENEDOR</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">💾 Guardar y salir</button>'+
+  '</div>';
+
+  render(html);
+  setTimeout(function(){var el=document.getElementById('inp-scan');if(el)el.focus();},100);
+}
+
+function confScan(){
+  var v=document.getElementById('inp-scan').value.trim();
+  if(!v){toast('Ingresa un código');return;}
+  var hits=buscarCodigo(v);
+  if(hits.length===0){
+    // No encontrado — continuar con ingreso manual
+    S.skuActual={sku:v,desc:'No encontrado en catálogo',factor:1,tipo:'Unidad',noEncontrado:true};
+    showIngresoCantidad();
+  } else if(hits.length===1){
+    S.skuActual=hits[0];
+    showIngresoCantidad();
+  } else {
+    showSeleccionSKU(hits);
+  }
+}
+
+function showSeleccionSKU(hits){
+  S.step='sel-sku';
+  var html=stepsBar(4,6)+
+    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
+    '<div class="lbl">múltiples coincidencias — selecciona el SKU</div>';
+  hits.forEach(function(h,i){
+    html+='<div class="sku-item" onclick="selSKU('+i+')">'+
+      '<div class="sku-cod">'+h.sku+' · '+h.tipo+'</div>'+
+      '<div class="sku-desc">'+h.desc+'</div>'+
+    '</div>';
+  });
+  html+='<button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">← Volver</button>';
+  render(html);
+  // guardar hits para selección
+  window._hitsTemp=hits;
+}
+function selSKU(i){
+  S.skuActual=window._hitsTemp[i];
+  showIngresoCantidad();
+}
+
+function showIngresoCantidad(){
+  S.step='cant-sku';
+  var sk=S.skuActual;
+  var html=stepsBar(4,6)+
+    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
+    (sk.noEncontrado?'<div class="alert">⚠ SKU no encontrado en catálogo C.Barra. Puedes continuar.</div>':'')+
+    '<div class="lbl">producto</div>'+
+    '<div style="background:var(--sur2);border-radius:6px;padding:10px 12px;margin-bottom:8px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--acc)">'+sk.sku+'</div>'+
+      '<div style="font-size:12px;color:var(--txt);margin-top:2px">'+sk.desc+'</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-top:2px">Tipo: '+sk.tipo+'</div>'+
+    '</div>'+
+    '<div class="lbl">cantidad (unidades)</div>'+
+    '<input class="inp" id="inp-cant" type="number" min="0" placeholder="0" style="font-size:24px;font-weight:700;text-align:center" autocomplete="off">'+
+    '<div class="lbl" style="margin-top:8px">estado</div>'+
+    '<div class="grid2">'+
+      '<div class="card-t sel" id="est-ok" onclick="selEstado(\'OK\')">✓ OK</div>'+
+      '<div class="card-t" id="est-dan" onclick="selEstado(\'DAÑADO\')">⚠ DAÑADO</div>'+
+    '</div>'+
+    '<div id="novedad-wrap" style="display:none">'+
+      '<div class="lbl" style="margin-top:8px">descripción de la novedad</div>'+
+      '<textarea class="inp" id="inp-novedad" rows="2" style="font-size:13px;resize:none" placeholder="Ej: Cajas aplastadas, producto mojado..."></textarea>'+
+    '</div>'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showEscaneo()">← ATR</button>'+
+      '<button class="btn btn-ok btn-big" onclick="confCantidad()">✓ CONFIRMAR</button>'+
+    '</div>';
+  render(html);
+  setTimeout(function(){var el=document.getElementById('inp-cant');if(el)el.focus();},100);
+  window._estadoActual='OK';
+}
+function selEstado(e){
+  window._estadoActual=e;
+  document.getElementById('est-ok').className='card-t'+(e==='OK'?' sel':'');
+  document.getElementById('est-dan').className='card-t'+(e==='DAÑADO'?' sel':'');
+  var nw=document.getElementById('novedad-wrap');
+  if(nw) nw.style.display=e==='DAÑADO'?'block':'none';
+}
+function confCantidad(){
+  var cant=parseInt(document.getElementById('inp-cant').value);
+  if(isNaN(cant)||cant<0){toast('Ingresa una cantidad válida');return;}
+  var novEl=document.getElementById('inp-novedad');
+  var nov=novEl?novEl.value.trim():'';
+  var sk=S.skuActual;
+  var reg={
+    sku:sk.sku,desc:sk.desc,factor:sk.factor||1,
+    numCajas:1,cantidad:cant,
+    estado:window._estadoActual||'OK',
+    novedad:nov,
+  };
+  S.skusRegistrados.push(reg);
+  escribirSKU(reg).catch(function(e){console.warn('[SP] SKU async:',e.message);});
+  toast('✓ '+sk.sku+' — '+cant+' un registradas');
+  showEscaneo();
+}
+
+function guardarYSalir(){
+  toast('Sesión guardada. Puedes retomar desde Mis Pedidos.');
+  if(S.rol==='supervisor') showMenuSup();
+  else showMenuOp();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 21. RECEPCIÓN — CIERRE Y SALIDA
+// ═══════════════════════════════════════════════════════════════════
+function showEventoCierre(){
+  S.step='ev-cierre';
+  render(
+    stepsBar(5,6)+
+    '<div class="badge badge-rec">'+S.contenedor+' · '+S.skusRegistrados.length+' SKUs</div>'+
+    '<div class="evt-card">'+
+      '<div class="evt-icon">🔒</div>'+
+      '<div class="evt-body">'+
+        '<div class="evt-title">CIERRE DEL CONTENEDOR</div>'+
+        '<div class="evt-pend">Registra la hora de cierre</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="lbl">hora de cierre</div>'+
+    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showEscaneo()">← Volver</button>'+
+      '<button class="btn btn-rec btn-big" onclick="confEvento(\'cierre\',\'ev-hora\',showEventoSalida)">✓ REGISTRAR CIERRE</button>'+
     '</div>'
   );
 }
 
-function nuevaRecepcionMismoPedido(){
-  S.recContenedor='';S.recSello='';S.recPallets='';
-  S.recHoraLlegada='';S.recHoraApertura='';S.recHoraCierre='';S.recHoraSalida='';
-  S.recNovedades='';S.recPersonas='';
-  S.lpn='';S.itemsLPN=[];S.lpnCount=0;S.lpnsEsperados=[];S.lpnMismatch=false;
-  S.unxcaja='';S.unxcajaOtro=false;S.numCajas='';
-  showRecCabecera();
+function showEventoSalida(){
+  S.step='ev-salida';
+  render(
+    stepsBar(6,6)+
+    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
+    '<div class="evt-card">'+
+      '<div class="evt-icon">🚛</div>'+
+      '<div class="evt-body">'+
+        '<div class="evt-title">SALIDA DEL CONTENEDOR</div>'+
+        '<div class="evt-pend">Registra la hora de salida</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="lbl">hora de salida</div>'+
+    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+    '<div class="lbl" style="margin-top:8px">novedades generales (opcional)</div>'+
+    '<textarea class="inp inp-sm" id="ev-nov" rows="2" style="resize:none" placeholder="Observaciones del contenedor..."></textarea>'+
+    '<div class="lbl" style="margin-top:6px"># personas en cuadrilla</div>'+
+    '<input class="inp inp-sm" id="ev-pers" type="number" min="0" placeholder="0">'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showEventoCierre()">← ATR</button>'+
+      '<button class="btn btn-ok btn-big" onclick="confSalida()">✓ FINALIZAR RECEPCIÓN</button>'+
+    '</div>'
+  );
+}
+function confSalida(){
+  var hora=document.getElementById('ev-hora').value;
+  if(!hora){toast('Ingresa la hora de salida');return;}
+  S.eventos.salida=hora;
+  var nov=document.getElementById('ev-nov').value.trim();
+  var pers=parseInt(document.getElementById('ev-pers').value)||0;
+  escribirEvento('SALIDA',hora);
+  // Mostrar resumen + opción cerrar pedido
+  showResumenContenedor(nov,pers);
 }
 
-function nuevaRecepcionDiferentePedido(){
-  S.recSubtipo='';S.recPedido='';S.recContenedor='';S.recSello='';S.recPallets='';
-  S.recHoraLlegada='';S.recHoraApertura='';S.recHoraCierre='';S.recHoraSalida='';
-  S.recNovedades='';S.recPersonas='';
-  S.lpn='';S.itemsLPN=[];S.lpnCount=0;S.lpnsEsperados=[];S.lpnMismatch=false;
-  S.unxcaja='';S.unxcajaOtro=false;S.numCajas='';
-  showRecSubtipo();
+function showResumenContenedor(nov,pers){
+  S.step='resumen-cont';
+  var totalPend=DB.contenedores.filter(function(c){
+    return normStr(c.pedido)===normStr(S.pedido)&&normStr(c.status)!=='RECIBIDO';
+  }).length;
+  var esUltimo=totalPend<=1; // este contenedor es el último pendiente
+
+  render(
+    '<div class="badge badge-ok">✓ CONTENEDOR COMPLETADO</div>'+
+    '<div class="val ok">✓ OK</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin:10px 0">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
+        '<span style="font-size:12px;color:var(--mut)">Contenedor</span>'+
+        '<span style="font-size:13px;font-weight:700">'+S.contenedor+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
+        '<span style="font-size:12px;color:var(--mut)">SKUs registrados</span>'+
+        '<span style="font-size:13px;font-weight:700">'+S.skusRegistrados.length+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
+        '<span style="font-size:12px;color:var(--mut)">Dañados</span>'+
+        '<span style="font-size:13px;font-weight:700;color:'+(S.skusRegistrados.filter(function(r){return r.estado==='DAÑADO';}).length>0?'var(--dan)':'var(--ok)')+'">'+
+          S.skusRegistrados.filter(function(r){return r.estado==='DAÑADO';}).length+'</span></div>'+
+      (nov?'<div style="font-size:11px;color:var(--mut);margin-top:4px">Novedades: '+nov+'</div>':'')+
+    '</div>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+      '<button class="btn btn-rec btn-big" onclick="nuevoContenedorMismoPedido()">🔄 Siguiente contenedor</button>'+
+      (esUltimo
+        ?'<button class="btn btn-warn btn-big" onclick="cerrarPedido()">🔐 CERRAR PEDIDO</button>'
+        :'<button class="btn btn-sec btn-big" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver al menú</button>')+
+    '</div>'
+  );
+}
+
+function nuevoContenedorMismoPedido(){
+  S.contenedor='';S.sello='';S.pallets=0;
+  S.recId=generarRecId();
+  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+  S.skusRegistrados=[];
+  showSeleccionarContenedor();
+}
+
+function cerrarPedido(){
+  if(!confirm('¿Cerrar el pedido '+S.pedido+'? Esta acción marca el pedido como completado.')) return;
+  // En live: se actualizaría el status en SP / Excel
+  toast('Pedido '+S.pedido+' cerrado');
+  S.pedido='';S.contenedor='';
+  if(S.rol==='supervisor') showMenuSup();
+  else showMenuOp();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 16. RESET GENERAL
+// 22. PERCHADO
 // ═══════════════════════════════════════════════════════════════════
-function resetState(){
-  S.operario='';S.rol='';S.solicitante='';S.tipo='';S.sesionId='';S.supervisor='';
-  S.invAsignacion=null;S.invItems=[];S.invGrupos=[];
-  S.invUbicIdx=0;S.invSkuIdx=0;S.invConteos={};S._logCount={};S.modalidad='';
-  S.recSubtipo='';S.recPedido='';S.recContenedor='';S.recSello='';S.recPallets='';
-  S.recHoraLlegada='';S.recHoraApertura='';S.recHoraCierre='';S.recHoraSalida='';
-  S.recNovedades='';S.recPersonas='';
-  S.lpn='';S.itemsLPN=[];S.lpnCount=0;
-  S.lpnsEsperados=[];S.lpnMismatch=false;
-  S.unxcaja='';S.unxcajaOtro=false;S.numCajas='';S.estadoSku='OK';
-  S.conteoActual=[];S.step='home';
+function showFlujoPerchado(){
+  S.step='perchado';
+  S.recId=generarRecId();
+  render(
+    '<div class="badge badge-rec">🗄️ PERCHADO — '+S.pedido+'</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin-bottom:10px">'+
+      '<div style="font-size:11px;color:var(--mut);margin-bottom:4px">PEDIDO ASIGNADO</div>'+
+      '<div style="font-size:18px;font-weight:700;color:var(--rec)">'+S.pedido+'</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-top:4px">'+S.subtipo+'</div>'+
+    '</div>'+
+    '<div class="lbl">hora de inicio de perchado</div>'+
+    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+    '<button class="btn btn-rec btn-big" style="margin-top:10px" onclick="confPerchadoInicio()">▶ INICIAR PERCHADO</button>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver</button>'
+  );
+}
+function confPerchadoInicio(){
+  var hora=document.getElementById('ev-hora').value;
+  if(!hora){toast('Ingresa la hora');return;}
+  S.eventos.llegada=hora;
+  escribirEvento('PERCHADO_INICIO',hora);
+  showPerchadoActivo();
+}
+function showPerchadoActivo(){
+  S.step='perchado-activo';
+  render(
+    '<div class="badge badge-rec">🗄️ PERCHADO EN CURSO</div>'+
+    '<div class="val rec">▶ ACTIVO</div>'+
+    '<div style="font-size:13px;color:var(--mut);text-align:center;margin-bottom:16px">'+S.pedido+' · inicio: '+S.eventos.llegada+'</div>'+
+    '<div class="lbl">hora de fin de perchado</div>'+
+    '<input class="inp inp-sm" id="ev-hora-fin" type="time" value="'+horaActual()+'">'+
+    '<button class="btn btn-ok btn-big" style="margin-top:10px" onclick="confPerchadoFin()">✓ FINALIZAR PERCHADO</button>'
+  );
+}
+function confPerchadoFin(){
+  var hora=document.getElementById('ev-hora-fin').value;
+  if(!hora){toast('Ingresa la hora de fin');return;}
+  escribirEvento('PERCHADO_FIN',hora);
+  toast('✓ Perchado completado: '+S.pedido);
+  if(S.rol==='supervisor') showMenuSup();
+  else showMenuOp();
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// 23. RESET
+// ═══════════════════════════════════════════════════════════════════
 function goHome(){
-  if(S.sesionId&&S.conteoActual.length>0){
-    if(!confirm('¿Salir? Hay '+S.conteoActual.length+' registros en sesión.')) return;
+  if(S.skusRegistrados&&S.skusRegistrados.length>0){
+    if(!confirm('¿Salir? Hay '+S.skusRegistrados.length+' SKUs en sesión activa.')) return;
   }
-  resetState();updateFooter();showHome();
-}
-
-function cerrarSesion(){
-  if(!confirm('¿Cerrar sesión?\nRegistros: '+S.conteoActual.length)) return;
-  resetState();updateFooter();showHome();
+  S.rol='';S.operario='';S.pedido='';S.contenedor='';S.sello='';
+  S.pallets=0;S.subtipo='';S.recId='';S.step='home';
+  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+  S.skusRegistrados=[];S.skuActual=null;
+  updateFtr();showHome();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 17. MSAL — LOGIN / INIT
+// 24. MSAL — LOGIN / INIT
 // ═══════════════════════════════════════════════════════════════════
-function msalLogin(){
-  msalInstance.loginRedirect({scopes:GRAPH_SCOPES});
-}
+function msalLogin(){msalInst.loginRedirect({scopes:SCOPES});}
 
 function postLogin(){
-  setConn('warn');
-  document.getElementById('hdr-sub').textContent='Conectando con SharePoint...';
-  console.log('[INIT] ══════════════════════════════════════');
-  console.log('[INIT] RF Conteo — inicio de carga');
-  console.log('[INIT] Cuenta:', msalAccount?msalAccount.username:'desconocida');
-  console.log('[INIT] ══════════════════════════════════════');
-
-  // Mostrar pantalla de carga — NO mostrar Home hasta que catálogos estén listos
-  // Evita race condition donde supervisor crea asignación antes de que Excel cargue
-  render('<div style="text-align:center;padding:40px 0">'+
-    '<div style="font-size:32px;margin-bottom:12px">⏳</div>'+
-    '<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px">Cargando catálogos...</div>'+
-    '<div style="font-size:11px;color:var(--muted)">Conectando con SharePoint y Excel</div>'+
+  render('<div class="loading">'+
+    '<div class="loading-icon">⏳</div>'+
+    '<div class="loading-txt">Conectando con SharePoint...</div>'+
+    '<div class="loading-sub">Cargando catálogos desde Excel</div>'+
   '</div>');
-
-  console.log('[INIT] Paso 1: descubrirListas...');
-  var promListas = descubrirListas().then(function(ok){
-    if(ok){
-      setConn('ok');
-      console.log('[INIT] ✓ Listas SP listas para escritura');
-    } else {
-      setConn('warn');
-      console.warn('[INIT] ✗ Sin listas SP — registros solo en memoria');
-    }
-    return ok;
-  });
-
-  console.log('[INIT] Paso 2: leerCatalogos Excel (en background)...');
-  var promExcel = leerCatalogos().then(function(){
-    console.log('[INIT] ✓ Catálogos Excel cargados');
-    // Refrescar el home si el usuario ya está en esa pantalla
-    if(S.step==='home') showHome();
-  }).catch(function(e){
-    console.warn('[INIT] Catálogos Excel no disponibles — usando respaldo');
-    if(S.step==='home') showHome();
-  });
-
-  // Mostrar Home solo cuando ambos terminan — catálogos ya disponibles
-  Promise.all([promListas,promExcel]).then(function(resultados){
-    var listasOk=resultados[0];
-    var listasStr=listasOk?'✓ SP OK':'✗ SP sin listas';
-    console.log('[INIT] ══════════════════════════════════════');
-    console.log('[INIT] Carga completada:');
-    console.log('[INIT]   Listas SP:    ',listasStr);
-    console.log('[INIT]   Conteos id:  ',DB.listIds.conteos||'null');
-    console.log('[INIT]   Recepciones id:',DB.listIds.recepciones||'null');
-    console.log('[INIT]   D365 items:  ',DB.d365.length);
-    console.log('[INIT]   Pedidos:     ',DB.pedidos.length);
-    console.log('[INIT]   Contenedores:',DB.contenedores.length);
-    console.log('[INIT]   Asignaciones:',DB.asignaciones.length);
-    console.log('[INIT] ══════════════════════════════════════');
+  console.log('[INIT] RF Recepción — cuenta:',msalAcc?msalAcc.username:'?');
+  Promise.all([
+    descubrirListas(),
+    leerCatalogos(),
+  ]).then(function(res){
+    var listasOk=res[0];
+    setConn(listasOk?'ok':'err');
     document.getElementById('hdr-sub').textContent=
       'Inverneg · CND'+(listasOk?'':' · sin SP');
-    showHome(); // Mostrar Home solo cuando catálogos están listos
+    console.log('[INIT] Listo — ops:'+DB.operadores.length+' sups:'+DB.supervisores.length+
+      ' pedidos:'+DB.pedidos.length+' conts:'+DB.contenedores.length);
+    showHome();
   }).catch(function(e){
-    console.error('[INIT] Error en carga background:',e.message);
+    console.error('[INIT] postLogin error:',e.message);
+    setConn('err');
+    showHome();
   });
 }
 
 function showPantallaLogin(){
   render(
-    '<div style="text-align:center;padding:30px 0">'+
-      '<div style="font-size:48px;margin-bottom:16px">📦</div>'+
-      '<div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:8px">RF Conteo</div>'+
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:24px">Inverneg · Centro de Distribución Nacional</div>'+
-      '<button class="btn btn-pri btn-big" onclick="window.msalLogin()">🔐 Iniciar sesión Microsoft</button>'+
+    '<div class="loading">'+
+      '<div class="loading-icon">📦</div>'+
+      '<div style="font-size:16px;font-weight:700;color:var(--rec);margin-bottom:8px">RF Recepción</div>'+
+      '<div style="font-size:12px;color:var(--mut);margin-bottom:24px">Inverneg · Centro de Distribución Nacional</div>'+
+      '<button class="btn btn-rec btn-big" onclick="msalLogin()">🔐 Iniciar sesión Microsoft</button>'+
     '</div>'
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 18. EXPONER AL SCOPE GLOBAL
+// 25. EXPONER AL SCOPE GLOBAL
 // ═══════════════════════════════════════════════════════════════════
-window.S             = S;
-window.DB            = DB;
-window.goHome        = goHome;
-window.setRol        = setRol;
-window.iniciarSesion = iniciarSesion;
-window.msalLogin     = msalLogin;
-window.updateFooter  = updateFooter;
-window.updateTotalUds= updateTotalUds;
-// Supervisor inventario
-window.showSupAsignaciones = showSupAsignaciones;
-window.eliminarAsignacion  = eliminarAsignacion;
-window.showSupNuevaAsig    = showSupNuevaAsig;
-window.selTipoAsig         = selTipoAsig;
-window.confNuevaAsig       = confNuevaAsig;
-// Operario inventario
-window.showInvOperario      = showInvOperario;
-window.showInvUbicacion     = showInvUbicacion;
-window.saltarUbicacion      = saltarUbicacion;
-window.showInvSku           = showInvSku;
-window.confConteoSku        = confConteoSku;
-window.showInvFin           = showInvFin;
-// Recepción
-window.showRecSubtipo          = showRecSubtipo;
-window.confRecSubtipo          = confRecSubtipo;
-window.showRecCabecera         = showRecCabecera;
-window.onPedidoChange          = onPedidoChange;
-window.onContenedorChange      = onContenedorChange;
-window.confRecCabecera         = confRecCabecera;
-window.showRecHoras            = showRecHoras;
-window.confRecHoras            = confRecHoras;
-window.showRecLPN              = showRecLPN;
-window.confLPN                 = confLPN;
-window.showRecProducto         = showRecProducto;
-window.confProductoRec         = confProductoRec;
-window.showRecCantidad         = showRecCantidad;
-window.confCantidadRec         = confCantidadRec;
-window.showRecConfirmado       = showRecConfirmado;
-window.nextLPN                 = nextLPN;
-window.showRecCierre           = showRecCierre;
-window.confRecCierre           = confRecCierre;
-window.showRecNuevaOpcion      = showRecNuevaOpcion;
-window.nuevaRecepcionMismoPedido      = nuevaRecepcionMismoPedido;
-window.nuevaRecepcionDiferentePedido  = nuevaRecepcionDiferentePedido;
-window.cerrarSesion            = cerrarSesion;
+window.S=S;window.DB=DB;
+window.goHome=goHome;
+window.showHome=showHome;
+window.iniciarSesion=iniciarSesion;
+window.msalLogin=msalLogin;
+window.updateFtr=updateFtr;
+window.selCalDia=selCalDia;
+window.selTipoAsig=selTipoAsig;
+window.confAsignar=confAsignar;
+window.selContRow=selContRow;
+window.selSKU=selSKU;
+window.selEstado=selEstado;
+window.confScan=confScan;
+window.confCantidad=confCantidad;
+window.confEvento=confEvento;
+window.confSalida=confSalida;
+window.confNuevoContenedor=confNuevoContenedor;
+window.confPerchadoInicio=confPerchadoInicio;
+window.confPerchadoFin=confPerchadoFin;
+window.guardarYSalir=guardarYSalir;
+window.cerrarPedido=cerrarPedido;
+window.nuevoContenedorMismoPedido=nuevoContenedorMismoPedido;
+window.iniciarFlujo=iniciarFlujo;
+window.showMenuSup=showMenuSup;
+window.showMenuOp=showMenuOp;
+window.showCalendario=showCalendario;
+window.showPedidosSup=showPedidosSup;
+window.showEstadoPedidos=showEstadoPedidos;
+window.showAsignarSup=showAsignarSup;
+window.showSeleccionarContenedor=showSeleccionarContenedor;
+window.showNuevoContenedor=showNuevoContenedor;
+window.showEventoLlegada=showEventoLlegada;
+window.showEventoApertura=showEventoApertura;
+window.showEscaneo=showEscaneo;
+window.showSeleccionSKU=showSeleccionSKU;
+window.showIngresoCantidad=showIngresoCantidad;
+window.showEventoCierre=showEventoCierre;
+window.showEventoSalida=showEventoSalida;
+window.showFlujoPerchado=showFlujoPerchado;
+window.showPerchadoActivo=showPerchadoActivo;
 
 // ═══════════════════════════════════════════════════════════════════
-// 19. INIT — carga MSAL y arranca
+// 26. ARRANCAR — CARGAR MSAL Y EJECUTAR
 // ═══════════════════════════════════════════════════════════════════
-var script=document.createElement('script');
-script.src='https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
-script.onload=function(){
-  msalInstance=new msal.PublicClientApplication(msalCfg);
-  msalInstance.handleRedirectPromise().then(function(result){
+var s=document.createElement('script');
+s.src='https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
+s.onload=function(){
+  msalInst=new msal.PublicClientApplication(msalCfg);
+  msalInst.handleRedirectPromise().then(function(result){
     if(result&&result.account){
-      msalAccount=result.account;
-      postLogin();
+      msalAcc=result.account;postLogin();
     } else {
-      var accounts=msalInstance.getAllAccounts();
-      if(accounts.length>0){msalAccount=accounts[0];postLogin();}
+      var acc=msalInst.getAllAccounts();
+      if(acc.length>0){msalAcc=acc[0];postLogin();}
       else showPantallaLogin();
     }
   }).catch(function(e){
-    console.error('handleRedirectPromise:',e.message);
-    showPantallaLogin();
+    console.error('[MSAL]',e.message);showPantallaLogin();
   });
 };
-script.onerror=function(){
-  render('<div class="alert">Error cargando MSAL. Verifica tu conexión.</div>');
+s.onerror=function(){
+  render('<div class="alert" style="margin-top:20px">Error cargando MSAL. Verifica tu conexión.</div>');
 };
-document.head.appendChild(script);
+document.head.appendChild(s);
 
 })();
 </script>
