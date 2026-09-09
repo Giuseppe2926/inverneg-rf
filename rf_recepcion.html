@@ -467,13 +467,21 @@ function parsear(hoja,data){
           obs:       r[7]?r[7].toString().trim():'',
         };
       });
-    console.log('[INIT] Contenedores cargados:',DB.contenedores.length);
-    if(DB.contenedores.length>0){
-      var c0=DB.contenedores[0];
-      console.log('[INIT] Primer contenedor: pedido='+c0.pedido+
-        ' fp='+c0.fechaProg+' cont='+c0.contenedor+
-        ' sello='+c0.sello+' pallets='+c0.pallets+' status='+c0.status);
-    }
+    console.log('[CONT] Total cargados:',DB.contenedores.length);
+    console.log('[CONT] ── PRIMERAS 10 FILAS PARSEADAS ──────────────────');
+    DB.contenedores.slice(0,10).forEach(function(c,i){
+      console.log('[CONT] Fila '+(i+1)+':'+
+        ' Pedido="'+c.pedido+'"'+
+        ' | FechaProg="'+c.fechaProg+'"'+
+        ' | Contenedor="'+c.contenedor+'"'+
+        ' | Sello="'+c.sello+'"'+
+        ' | Pallets='+c.pallets+
+        ' | Status="'+c.status+'"');
+    });
+    console.log('[CONT] ── RAW PRIMERAS 5 FILAS (índices exactos) ────────');
+    raw.slice(0,5).forEach(function(r,i){
+      console.log('[CONT] raw['+i+']: col0="'+(r[0]||'')+'" col1="'+(r[1]||'')+'" col2="'+(r[2]||'')+'" col3="'+(r[3]||'')+'" col4="'+(r[4]||'')+'" col5="'+(r[5]||'')+'"]');
+    });
   } else if(hoja==='Compra'){
     // Cols: Pedido(A),SKU(B),Descripcion(C),Cantidad(D)
     DB.compra=raw.filter(function(r){return filaValida(r[0],50)&&r[1];})
