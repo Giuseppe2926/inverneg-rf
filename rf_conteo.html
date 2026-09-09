@@ -447,35 +447,23 @@ function parsear(hoja,data){
     }
     DB.contenedores=raw.filter(function(r){return filaValida(r[0],50);})
       .map(function(r){
-        // Mapeo robusto: buscar contenedor por patrón (4+ letras mayúsculas + dígitos)
-        // y sello por patrón (SL-, LC-, etc.) para no depender del índice exacto
-        var fp=normalizarFecha(r[1]);
-        // Identificar qué columna es el contenedor vs sello
-        var _cont='', _sello='', _pall=0, _status='Pendiente', _fechaRec='';
-        var CONT_PAT=/^[A-Z]{2,4}[0-9]{5,}/;
-        var SELLO_PAT=/^[A-Z]{1,3}[-_][0-9]/;
-        // Revisar cols 2,3 para identificar cuál es contenedor y cuál sello
-        var c2=r[2]?r[2].toString().trim():'';
-        var c3=r[3]?r[3].toString().trim():'';
-        if(CONT_PAT.test(c2)&&!SELLO_PAT.test(c2)){
-          _cont=c2; _sello=c3;
-        } else if(CONT_PAT.test(c3)&&!SELLO_PAT.test(c3)){
-          _cont=c3; _sello=c2;
-        } else {
-          _cont=c2; _sello=c3; // fallback: orden por índice
-        }
-        var _pallRaw=r[4];
-        _pall=(_pallRaw!==null&&_pallRaw!==''&&_pallRaw!==undefined)?Number(_pallRaw):0;
-        _status=r[5]?r[5].toString().trim():'Pendiente';
-        _fechaRec=normalizarFecha(r[6]);
+        // Mapeo fijo por índice confirmado desde Excel:
+        // col0=Pedido | col1=FechaProg | col2=#Contenedor | col3=#Sello | col4=Pallets | col5=Status | col6=FechaRec
+        var _fp   = normalizarFecha(r[1]);
+        var _cont = r[2]!==null&&r[2]!==undefined&&r[2]!==''?r[2].toString().trim():'';
+        var _sell = r[3]!==null&&r[3]!==undefined&&r[3]!==''?r[3].toString().trim():'';
+        var _pallV= r[4];
+        var _pall = (_pallV!==null&&_pallV!==undefined&&_pallV!=='')?(isNaN(Number(_pallV))?0:Number(_pallV)):0;
+        var _stat = r[5]?r[5].toString().trim():'Pendiente';
+        var _frec = normalizarFecha(r[6]);
         return{
           pedido:    r[0]?r[0].toString().trim():'',
-          fechaProg: fp,
+          fechaProg: _fp,
           contenedor:_cont,
-          sello:     _sello,
-          pallets:   isNaN(_pall)?0:_pall,
-          status:    _status,
-          fechaRec:  _fechaRec,
+          sello:     _sell,
+          pallets:   _pall,
+          status:    _stat,
+          fechaRec:  _frec,
           obs:       r[7]?r[7].toString().trim():'',
         };
       });
@@ -965,11 +953,42 @@ function showSeleccionarContenedor(){
 }
 
 function selContRow(cont,sello,pallets){
-  S.contenedor=cont;S.sello=sello;S.pallets=pallets;
-  S.recId=generarRecId();
-  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+  S.contenedor=cont;S.sello=sello||'';S.pallets=pallets||0;
   S.skusRegistrados=[];
-  showEventoLlegada();
+  // Consultar SP si ya hay eventos para este contenedor+pedido
+  render('<div class="loading"><div class="loading-icon">⏳</div>'+
+    '<div class="loading-txt">Verificando estado...</div></div>');
+  cargarEventosSP(S.pedido).then(function(evts){
+    // Filtrar por contenedor
+    var evtsCont=evts.filter(function(e){return e.Contenedor===cont;});
+    // Reconstituir eventos registrados
+    S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+    var tieneId=false;
+    evtsCont.forEach(function(e){
+      var t=e.TipoEvento?e.TipoEvento.toLowerCase():'';
+      if(t==='llegada')   {S.eventos.llegada=e.Hora;if(e.RecepcionId){S.recId=e.RecepcionId;tieneId=true;}}
+      if(t==='apertura')  S.eventos.apertura=e.Hora;
+      if(t==='cierre')    S.eventos.cierre=e.Hora;
+      if(t==='salida')    S.eventos.salida=e.Hora;
+    });
+    if(!tieneId) S.recId=generarRecId();
+    // Cargar SKUs ya registrados para este contenedor
+    cargarSKUsSP(S.pedido,cont).then(function(skus){
+      S.skusRegistrados=skus.map(function(f){return{
+        sku:f.CodProducto||'',desc:f.Nombre||'',
+        cantidad:Number(f.Cantidad)||0,estado:f.Estado||'OK',novedad:f.Novedades||'',
+      };});
+      // Navegar al paso correcto según eventos ya registrados
+      if(S.eventos.salida)       showResumenContenedor('','');
+      else if(S.eventos.cierre)  showEventoSalida();
+      else if(S.eventos.llegada) showEscaneo();  // llegada registrada → ir a escaneo
+      else                       showEventoLlegada();
+    });
+  }).catch(function(){
+    S.recId=generarRecId();
+    S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+    showEventoLlegada();
+  });
 }
 
 function showNuevoContenedor(){
@@ -1015,7 +1034,7 @@ function showEventoLlegada(){
       '</div>'+
     '</div>'+
     '<div class="lbl"># sello del contenedor</div>'+
-    '<input class="inp inp-sm" id="ev-sello" type="text" placeholder="Ej: SL-98765" value="'+S.sello+'" autocomplete="off" autocorrect="off" spellcheck="false">'+
+    '<input class="inp inp-sm" id="ev-sello" type="text" placeholder="Ingresa el sello físico del contenedor" value="" autocomplete="off" autocorrect="off" spellcheck="false">'+
     '<div class="lbl" style="margin-top:6px">hora de llegada</div>'+
     '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
     '<div class="btn-row" style="margin-top:10px">'+
