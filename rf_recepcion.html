@@ -386,34 +386,198 @@ function filaValida(v,maxLen){
 function leerCatalogos(){
   return descubrirExcel().then(function(ok){
     if(!ok||!DB.catalogoDriveId||!DB.catalogoItemId){
-      console.warn('[INIT] Excel no disponible');
       render('<div class="loading"><div class="loading-icon">⚠️</div>'+
         '<div class="loading-txt" style="color:var(--dan)">Excel no encontrado</div>'+
-        '<div class="loading-sub">Verifica que "'+CFG.catalogoNombre+'" está en OneDrive/SharePoint.<br>'+
+        '<div class="loading-sub">Verifica que "'+CFG.catalogoNombre+'" está disponible.<br>'+
         'Revisa consola (F12) para más detalle.</div>'+
         '<button class="btn btn-sec btn-big" style="margin-top:16px" onclick="location.reload()">↻ Reintentar</button></div>');
       return;
     }
-    var hojas=['Operadores','Supervisores','Pedidos','Contenedores','Compra','Importaciones','C.Barra'];
+    var hojas=['Operadores','Supervisores','Pedidos','Contenedores',
+               'Compra','Importaciones','C.Barra','Asignaciones'];
     return Promise.all(hojas.map(function(h){
-      return gGet(urlWB(h)).then(function(r){
-        console.log('[INIT] Hoja '+h+': '+(r&&r.values?r.values.length-1:0)+' filas');
-        return{hoja:h,data:r};
-      }).catch(function(e){
-        console.warn('[INIT] Hoja '+h+' error:',e.message);
-        return{hoja:h,data:null};
-      });
+      return gGet(urlWB(h)).then(function(r){return{hoja:h,data:r,err:null};})
+        .catch(function(e){
+          console.warn('[EXCEL] Hoja '+h+' error:',e.message);
+          return{hoja:h,data:null,err:e.message};
+        });
     })).then(function(res){
-      res.forEach(function(r){parsear(r.hoja,r.data);});
-      console.log('[INIT] Catálogos: ops='+DB.operadores.length+
-        ' sups='+DB.supervisores.length+' pedidos='+DB.pedidos.length+
-        ' conts='+DB.contenedores.length+' cbarra='+DB.codigosBarra.length);
-      if(!DB.operadores.length&&!DB.supervisores.length){
-        console.error('[INIT] Sin operadores ni supervisores — verifica hojas Operadores/Supervisores');
-      }
+      res.forEach(function(r){parsear(r.hoja,r.data,r.err);});
     });
   });
 }
+
+// ── Utilidad de log por hoja ──────────────────────────────────────
+function logHoja(nombre,rawTotal,cargados,descartados,muestra){
+  console.log('[EXCEL] ══ '+nombre+' ════════════════════════════');
+  console.log('[EXCEL]   Filas brutas (excl encabezado): '+rawTotal);
+  console.log('[EXCEL]   Filas cargadas:   '+cargados);
+  console.log('[EXCEL]   Filas descartadas:'+descartados);
+  if(muestra&&muestra.length){
+    console.log('[EXCEL]   Primeros '+Math.min(5,muestra.length)+' registros:');
+    muestra.slice(0,5).forEach(function(m,i){
+      console.log('[EXCEL]   ['+i+']',JSON.stringify(m));
+    });
+  }
+}
+
+function parsear(hoja,data,err){
+  if(err){
+    console.error('[EXCEL] '+hoja+' — ERROR:',err);
+    return;
+  }
+  if(!data||!data.values||data.values.length<2){
+    console.warn('[EXCEL] '+hoja+' — sin datos (filas:',data&&data.values?data.values.length:0,')');
+    return;
+  }
+  // Log del encabezado real que devuelve el API
+  var hdrs=data.values[0];
+  console.log('[EXCEL] '+hoja+' encabezado raw:',
+    hdrs.map(function(v,i){return i+'="'+(v||'')+'"]';}).join(' '));
+
+  var raw=data.values.slice(1);
+  var rawTotal=raw.length;
+
+  if(hoja==='Operadores'){
+    var carg=raw.filter(function(r){return filaValida(r[0]);});
+    DB.operadores=carg.map(function(r){return r[0].toString().trim();});
+    logHoja('Operadores',rawTotal,DB.operadores.length,rawTotal-DB.operadores.length,
+      DB.operadores.map(function(v){return{Operador:v};}));
+
+  } else if(hoja==='Supervisores'){
+    var carg=raw.filter(function(r){return filaValida(r[0]);});
+    DB.supervisores=carg.map(function(r){return r[0].toString().trim();});
+    logHoja('Supervisores',rawTotal,DB.supervisores.length,rawTotal-DB.supervisores.length,
+      DB.supervisores.map(function(v){return{Supervisor:v};}));
+
+  } else if(hoja==='Pedidos'){
+    // Cols: Pedido(0), Tipo(1), ContenedoresTotal(2), Status(3), Observaciones(4)
+    var carg=raw.filter(function(r){return filaValida(r[0],50);});
+    DB.pedidos=carg.map(function(r){return{
+      pedido:    r[0]?r[0].toString().trim():'',
+      tipo:      r[1]?r[1].toString().trim():'',
+      contsTotal:r[2]?Number(r[2]):1,
+      status:    r[3]?r[3].toString().trim():'Pendiente',
+      obs:       r[4]?r[4].toString().trim():'',
+    };});
+    logHoja('Pedidos',rawTotal,DB.pedidos.length,rawTotal-DB.pedidos.length,DB.pedidos);
+
+  } else if(hoja==='Contenedores'){
+    // Workbook API omite celdas vacías desplazando índices.
+    // Detectar estructura real mirando la fila de encabezado (values[0])
+    // y mapear dinámicamente por nombre de columna.
+    var hdrRow=data.values[0].map(function(v){return v?v.toString().trim().toLowerCase():'';});
+    console.log('[EXCEL] Contenedores — columnas detectadas:',hdrRow.join(' | '));
+    var iped=hdrRow.indexOf('pedido');
+    var ifp= hdrRow.findIndex(function(h){return h.indexOf('fechaprog')>-1||h.indexOf('fecha_prog')>-1||h==='fechaprogramada';});
+    var icont=hdrRow.findIndex(function(h){return h.indexOf('contenedor')>-1;});
+    var isell=hdrRow.findIndex(function(h){return h.indexOf('sello')>-1;});
+    var ipall=hdrRow.findIndex(function(h){return h.indexOf('pallet')>-1;});
+    var istat=hdrRow.findIndex(function(h){return h==='status'||h==='estado';});
+    var ifrec=hdrRow.findIndex(function(h){return h.indexOf('fecharec')>-1||h.indexOf('fecha_rec')>-1;});
+    var iobs =hdrRow.findIndex(function(h){return h.indexOf('observ')>-1;});
+    console.log('[EXCEL] Contenedores — índices mapeados:',
+      'ped='+iped+' fp='+ifp+' cont='+icont+' sell='+isell+
+      ' pall='+ipall+' stat='+istat+' frec='+ifrec);
+    var carg=raw.filter(function(r){
+      return iped>=0&&r[iped]&&filaValida(r[iped],50);
+    });
+    DB.contenedores=carg.map(function(r){
+      var pv=ipall>=0&&r[ipall]!==null&&r[ipall]!==''&&r[ipall]!==undefined?Number(r[ipall]):0;
+      return{
+        pedido:    iped>=0&&r[iped]?r[iped].toString().trim():'',
+        fechaProg: ifp>=0?normalizarFecha(r[ifp]):'',
+        contenedor:icont>=0&&r[icont]?r[icont].toString().trim():'',
+        sello:     isell>=0&&r[isell]?r[isell].toString().trim():'',
+        pallets:   isNaN(pv)?0:pv,
+        status:    istat>=0&&r[istat]?r[istat].toString().trim():'Pendiente',
+        fechaRec:  ifrec>=0?normalizarFecha(r[ifrec]):'',
+        obs:       iobs>=0&&r[iobs]?r[iobs].toString().trim():'',
+      };
+    });
+    logHoja('Contenedores',rawTotal,DB.contenedores.length,rawTotal-DB.contenedores.length,DB.contenedores);
+
+  } else if(hoja==='Compra'){
+    // Cols: Pedido(0), SKU(1), Descripcion(2), Cantidad(3)
+    var carg=raw.filter(function(r){return filaValida(r[0],50)&&r[1];});
+    DB.compra=carg.map(function(r){return{
+      pedido:  r[0]?r[0].toString().trim():'',
+      sku:     r[1]?r[1].toString().trim():'',
+      desc:    r[2]?r[2].toString().trim():'',
+      cantidad:r[3]?Number(r[3]):0,
+    };});
+    logHoja('Compra',rawTotal,DB.compra.length,rawTotal-DB.compra.length,DB.compra);
+
+  } else if(hoja==='Importaciones'){
+    var carg=raw.filter(function(r){return filaValida(r[0],50)&&r[1];});
+    DB.importaciones=carg.map(function(r){return{
+      pedido:  r[0]?r[0].toString().trim():'',
+      sku:     r[1]?r[1].toString().trim():'',
+      desc:    r[2]?r[2].toString().trim():'',
+      cantidad:r[3]?Number(r[3]):0,
+    };});
+    logHoja('Importaciones',rawTotal,DB.importaciones.length,rawTotal-DB.importaciones.length,DB.importaciones);
+
+  } else if(hoja==='C.Barra'){
+    // Cols: SKU(0), Descripcion(1), Un(2), Cód.BarrasUnidad(3), Un/CJ(4), Cód.BarrasCaja(5)
+    DB.codigosBarra=[];
+    var carg=raw.filter(function(r){return filaValida(r[0],50);});
+    carg.forEach(function(r){
+      var sku =r[0]?r[0].toString().trim():'';
+      var desc=r[1]?r[1].toString().trim():'';
+      var cbU =r[3]?r[3].toString().trim():'';
+      var uncj=r[4]?Number(r[4]):1;
+      var cbC =r[5]?r[5].toString().trim():'';
+      if(cbU) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbU,tipo:'Unidad',factor:1});
+      if(cbC) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbC,tipo:'Caja',factor:uncj||1});
+    });
+    logHoja('C.Barra',rawTotal,DB.codigosBarra.length,rawTotal-carg.length,DB.codigosBarra);
+
+  } else if(hoja==='Asignaciones'){
+    // Cols: FechaAsignacion(0), Supervisor(1), Pedido(2), TipoAsignacion(3),
+    //       Operario(4), Status(5)
+    // Workbook API devuelve encabezado en values[0] — ya mapeamos por nombre arriba
+    // Para Asignaciones también mapear por nombre para robustez
+    var hdrA=data.values[0].map(function(v){return v?v.toString().trim().toLowerCase():'';});
+    console.log('[EXCEL] Asignaciones — columnas:',hdrA.join(' | '));
+    var iA_fecha=hdrA.findIndex(function(h){return h.indexOf('fecha')>-1&&h.indexOf('asig')>-1;});
+    var iA_sup  =hdrA.findIndex(function(h){return h.indexOf('superv')>-1;});
+    var iA_ped  =hdrA.findIndex(function(h){return h.indexOf('pedido')>-1;});
+    var iA_tipo =hdrA.findIndex(function(h){return h.indexOf('tipo')>-1;});
+    var iA_op   =hdrA.findIndex(function(h){return h.indexOf('operari')>-1||h.indexOf('operador')>-1;});
+    var iA_stat =hdrA.findIndex(function(h){return h==='status'||h==='estado';});
+    console.log('[EXCEL] Asignaciones índices: fecha='+iA_fecha+' sup='+iA_sup+
+      ' ped='+iA_ped+' tipo='+iA_tipo+' op='+iA_op+' stat='+iA_stat);
+
+    // Log de valores de Status para diagnóstico
+    var statusVals=raw.filter(function(r){return r[iA_op>=0?iA_op:4];})
+      .map(function(r){return'"'+(iA_stat>=0&&r[iA_stat]?r[iA_stat].toString().trim():'(vacío)')+'"';});
+    console.log('[EXCEL] Asignaciones — valores de Status encontrados:',statusVals.join(', '));
+
+    // Filtro: Operario no vacío + Status = Activo (case-insensitive, trim)
+    var carg=raw.filter(function(r){
+      var opVal=iA_op>=0&&r[iA_op]?r[iA_op].toString().trim():'';
+      if(!opVal) return false;
+      var stVal=iA_stat>=0&&r[iA_stat]?r[iA_stat].toString().trim().toLowerCase():'';
+      return stVal==='activo';
+    });
+    DB.asignaciones=carg.map(function(r){
+      return{
+        fechaAsignacion:iA_fecha>=0&&r[iA_fecha]?r[iA_fecha].toString():'',
+        supervisor:     iA_sup>=0&&r[iA_sup]?r[iA_sup].toString().trim():'',
+        pedido:         iA_ped>=0&&r[iA_ped]?r[iA_ped].toString().trim():'',
+        tipo:           iA_tipo>=0&&r[iA_tipo]?r[iA_tipo].toString().trim():'',
+        operario:       iA_op>=0&&r[iA_op]?r[iA_op].toString().trim():'',
+        status:         iA_stat>=0&&r[iA_stat]?r[iA_stat].toString().trim():'',
+      };
+    });
+    logHoja('Asignaciones',rawTotal,DB.asignaciones.length,rawTotal-DB.asignaciones.length,DB.asignaciones);
+    if(DB.asignaciones.length===0){
+      console.error('[EXCEL] Asignaciones — 0 activas. Verifica que Status="Activo" (con A mayúscula, sin espacios).');
+    }
+  }
+}
+
 
 function parsear(hoja,data){
   if(!data||!data.values||data.values.length<2) return;
