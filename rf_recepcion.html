@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<title>RF Recepción — Inverneg</title>
+<style>
+:root{
+  --bg:#0D1117;--sur:#161B22;--sur2:#1C2330;--bor:#2A3340;
+  --txt:#E6EDF3;--mut:#7D8590;
+  --acc:#58A6FF;--ok:#3FB950;--warn:#E3B341;--dan:#F85149;--rec:#F0883E;
+  --mono:'Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden}
+#app{display:flex;flex-direction:column;min-height:100vh}
+
+/* HEADER */
+.hdr{background:var(--sur);border-bottom:1px solid var(--bor);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.hdr-brand{font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--rec)}
+.hdr-sub{font-size:10px;color:var(--mut);margin-top:1px}
+.hdr-btn{background:var(--sur2);border:1px solid var(--bor);color:var(--mut);font-size:11px;padding:5px 10px;border-radius:5px;cursor:pointer}
+
+/* SCREEN */
+#screen{flex:1;padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* FOOTER */
+.ftr{background:var(--sur);border-top:1px solid var(--bor);padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;min-height:44px}
+.ftr-op{font-size:11px;color:var(--mut)}
+.ftr-conn{display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--warn)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--warn)}
+.dot.ok{background:var(--ok)}.dot.err{background:var(--dan)}
+
+/* INPUTS */
+.lbl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;margin-top:10px}
+.inp{width:100%;background:var(--sur2);border:1px solid var(--bor);color:var(--txt);font-size:16px;padding:10px 12px;border-radius:6px;outline:none;font-family:inherit}
+.inp:focus{border-color:var(--acc)}
+.inp-sm{font-size:14px;padding:8px 10px}
+select.inp{appearance:none;-webkit-appearance:none}
+
+/* BUTTONS */
+.btn{border:none;border-radius:6px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .1s}
+.btn:active{opacity:.75}
+.btn-pri{background:var(--acc);color:#000}
+.btn-ok{background:var(--ok);color:#000}
+.btn-warn{background:var(--dan);color:#fff}
+.btn-sec{background:var(--sur2);color:var(--txt);border:1px solid var(--bor)}
+.btn-rec{background:var(--rec);color:#000}
+.btn-big{width:100%;padding:13px;font-size:15px}
+.btn-row{display:flex;gap:8px}
+.btn-row .btn{flex:1}
+
+/* TYPE CARDS */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.card-t{background:var(--sur2);border:2px solid var(--bor);border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;transition:border-color .15s}
+.card-t:active{border-color:var(--acc)}
+.card-t.sel{border-color:var(--acc);background:#1a2030}
+.card-t.sel-rec{border-color:var(--rec);background:#1e1a14}
+.card-t-icon{font-size:26px;margin-bottom:6px}
+.card-t-lbl{font-size:12px;font-weight:700;letter-spacing:.06em}
+
+/* BADGES */
+.badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;padding:3px 10px;border-radius:4px;margin-bottom:8px;text-transform:uppercase}
+.badge-rec{background:rgba(240,136,62,.15);color:var(--rec);border:1px solid rgba(240,136,62,.3)}
+.badge-sup{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.3)}
+.badge-ok{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.3)}
+
+/* STEPS */
+.steps{display:flex;gap:3px;margin-bottom:10px}
+.step{height:3px;border-radius:2px;flex:1;background:var(--bor)}
+.step.on{background:var(--rec)}
+
+/* ALERTS */
+.alert{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);color:var(--dan);border-radius:6px;padding:8px 12px;font-size:12px;margin:6px 0}
+.alert-w{background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:12px;margin:6px 0}
+
+/* CARDS DE PEDIDO/CONTENEDOR */
+.card-item{background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;position:relative}
+.card-item:active{border-color:var(--acc)}
+.card-item-title{font-size:14px;font-weight:700;color:var(--txt);margin-bottom:3px}
+.card-item-sub{font-size:11px;color:var(--mut)}
+.card-item-badge{position:absolute;right:12px;top:12px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;text-transform:uppercase}
+.status-pend{background:rgba(227,179,65,.2);color:var(--warn)}
+.status-act{background:rgba(240,136,62,.2);color:var(--rec)}
+.status-ok{background:rgba(63,185,80,.2);color:var(--ok)}
+
+/* EVENTO CARD */
+.evt-card{background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.evt-icon{font-size:22px;flex-shrink:0}
+.evt-body{flex:1}
+.evt-title{font-size:13px;font-weight:700}
+.evt-time{font-size:12px;color:var(--ok);margin-top:2px}
+.evt-pend{font-size:12px;color:var(--mut);margin-top:2px}
+.evt-btn{flex-shrink:0}
+
+/* CALENDARIO */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
+.cal-day{padding:8px 4px;text-align:center;font-size:12px;border-radius:6px;cursor:pointer;background:var(--sur2);border:1px solid var(--bor)}
+.cal-day.hoy{border-color:var(--acc);color:var(--acc);font-weight:700}
+.cal-day.sel{background:var(--acc);color:#000;font-weight:700}
+.cal-day.has-data{border-color:var(--rec)}
+.cal-day.vacio{background:transparent;border-color:transparent;cursor:default;color:var(--mut)}
+.cal-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
+.cal-hdr-d{text-align:center;font-size:10px;color:var(--mut);font-weight:700;padding:4px}
+
+/* BUSQUEDA SKU */
+.sku-item{background:var(--sur2);border:1px solid var(--bor);border-radius:6px;padding:10px 12px;margin-bottom:6px;cursor:pointer}
+.sku-item:active{border-color:var(--acc)}
+.sku-cod{font-size:12px;color:var(--acc);font-weight:700;margin-bottom:2px}
+.sku-desc{font-size:13px;color:var(--txt)}
+
+/* TOAST */
+.toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--sur2);border:1px solid var(--bor);color:var(--txt);padding:8px 16px;border-radius:8px;font-size:12px;z-index:999;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* LOADING */
+.loading{text-align:center;padding:40px 0}
+.loading-icon{font-size:32px;margin-bottom:12px}
+.loading-txt{font-size:13px;font-weight:700;color:var(--acc);margin-bottom:6px}
+.loading-sub{font-size:11px;color:var(--mut)}
+
+/* VAL */
+.val{font-size:28px;font-weight:700;margin:6px 0;text-align:center}
+.val.ok{color:var(--ok)}.val.rec{color:var(--rec)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hdr">
+    <div>
+      <div class="hdr-brand">▸ RF RECEPCIÓN</div>
+      <div class="hdr-sub" id="hdr-sub">Inverneg · CND</div>
+    </div>
+    <button class="hdr-btn" onclick="window.goHome&&goHome()">⌂ Inicio</button>
+  </div>
+  <div id="screen">
+    <div class="loading">
+      <div class="loading-icon">📦</div>
+      <div class="loading-txt">Iniciando...</div>
+    </div>
+  </div>
+  <div class="ftr">
+    <div class="ftr-op" id="ftr-op">—</div>
+    <div class="ftr-conn"><div class="dot" id="conn-dot"></div><span id="conn-lbl">CONECTANDO</span></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════════
+// 1. UTILIDADES
+// ═══════════════════════════════════════════════════════════════════
+function pad(n){return String(n).padStart(2,'0');}
+function ahora(){
+  var d=new Date();
+  var fecha=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  var hora=pad(d.getHours())+':'+pad(d.getMinutes());
+  return{fecha:fecha,hora:hora,ts:fecha+' '+hora+':'+pad(d.getSeconds()),raw:d};
+}
+function horaActual(){var t=ahora();return t.hora;}
+function generarRecId(){
+  var t=ahora();
+  return 'REC-'+t.fecha.replace(/-/g,'')+'-'+String(Math.floor(Math.random()*900)+100);
+}
+function render(html){document.getElementById('screen').innerHTML=html;}
+function toast(msg,dur){
+  var el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},dur||2200);
+}
+function setConn(s){
+  var dot=document.getElementById('conn-dot');
+  var lbl=document.getElementById('conn-lbl');
+  dot.className='dot';
+  if(s==='ok'){dot.classList.add('ok');lbl.textContent='LIVE';}
+  else if(s==='err'){dot.classList.add('err');lbl.textContent='SIN CONEXIÓN';}
+  else lbl.textContent='CONECTANDO';
+}
+function updateFtr(){
+  var op=S.operario||'—';
+  var rol=S.rol?(' · '+(S.rol==='supervisor'?'SUP':'OP')):'';
+  document.getElementById('ftr-op').textContent=op+rol;
+}
+function stepsBar(cur,tot){
+  var h='<div class="steps">';
+  for(var i=0;i<tot;i++) h+='<div class="step'+(i<cur?' on':'')+'"></div>';
+  return h+'</div>';
+}
+function normStr(s){return s?s.trim().toUpperCase():'';}
+function fechaDisplay(iso){
+  if(!iso) return '';
+  var p=iso.split('-');
+  return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:iso;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 2. CFG
+// ═══════════════════════════════════════════════════════════════════
+var CFG={
+  clientId:   'ec976114-e146-4ce4-850c-5d978e12acfd',
+  tenantId:   '5e008bd3-17b6-4f83-8d23-019691a40609',
+  siteId:     'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
+  catalogoNombre: 'Inverneg_ConteoRF_Base_Live.xlsx',
+  listas:{
+    recepciones: 'RF_PRecepciones_LRecepciones',
+    eventos:     'RF_PRecepciones_LEventos',
+    asignaciones:'RF_PRecepciones_LAsignaciones',
+  },
+};
+var GRAPH='https://graph.microsoft.com/v1.0';
+
+// ═══════════════════════════════════════════════════════════════════
+// 3. DB
+// ═══════════════════════════════════════════════════════════════════
+var DB={
+  operadores:[],supervisores:[],
+  pedidos:[],contenedores:[],
+  compra:[],importaciones:[],
+  codigosBarra:[],
+  listIds:{recepciones:null,eventos:null,asignaciones:null},
+  catalogoDriveId:null,catalogoItemId:null,
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// 4. ESTADO DE SESIÓN
+// ═══════════════════════════════════════════════════════════════════
+var S={
+  rol:'',operario:'',
+  // Recepción activa
+  recId:'',pedido:'',contenedor:'',sello:'',pallets:0,subtipo:'',
+  eventos:{llegada:null,apertura:null,cierre:null,salida:null},
+  skusRegistrados:[],
+  step:'home',
+  // Calendario
+  calFecha:'',
+  // SKU scan
+  skuActual:null,
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// 5. MSAL
+// ═══════════════════════════════════════════════════════════════════
+var msalInst,msalAcc;
+var SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
+var msalCfg={
+  auth:{
+    clientId:CFG.clientId,
+    authority:'https://login.microsoftonline.com/'+CFG.tenantId,
+    redirectUri:location.href.split('?')[0].split('#')[0],
+    navigateToLoginRequestUrl:false,
+  },
+  cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true},
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// 6. GRAPH HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function getToken(){
+  if(!msalAcc) return Promise.reject(new Error('Sin sesión'));
+  var req={scopes:SCOPES,account:msalAcc};
+  return msalInst.acquireTokenSilent(req).catch(function(){
+    return msalInst.acquireTokenRedirect(req);
+  });
+}
+function gGet(url){
+  return getToken().then(function(r){
+    return fetch(url,{headers:{'Authorization':'Bearer '+r.accessToken}});
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
+    return r.json();
+  });
+}
+function gPost(url,body){
+  return getToken().then(function(r){
+    return fetch(url,{method:'POST',
+      headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
+    return r.json();
+  });
+}
+function gPatch(url,body){
+  return getToken().then(function(r){
+    return fetch(url,{method:'PATCH',
+      headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
+    return r.status===204?{}:r.json();
+  });
+}
+function urlLista(id){return GRAPH+'/sites/'+CFG.siteId+'/lists/'+id;}
+function urlWB(hoja){
+  return GRAPH+'/drives/'+DB.catalogoDriveId+'/items/'+DB.catalogoItemId+
+    "/workbook/worksheets('"+hoja+"')/usedRange";
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 7. DESCUBRIMIENTO AUTOMÁTICO
+// ═══════════════════════════════════════════════════════════════════
+function descubrirListas(){
+  var url=GRAPH+'/sites/'+CFG.siteId+'/lists?$select=id,displayName&$top=200';
+  return gGet(url).then(function(d){
+    if(!d.value) return false;
+    d.value.forEach(function(l){
+      Object.keys(CFG.listas).forEach(function(k){
+        if(l.displayName===CFG.listas[k]) DB.listIds[k]=l.id;
+      });
+    });
+    var ok=DB.listIds.recepciones&&DB.listIds.eventos&&DB.listIds.asignaciones;
+    console.log('[INIT] Listas:',JSON.stringify(DB.listIds));
+    if(!ok) console.warn('[INIT] Alguna lista no encontrada');
+    return ok;
+  }).catch(function(e){console.error('[INIT] descubrirListas:',e.message);return false;});
+}
+
+function descubrirExcel(){
+  var nom=CFG.catalogoNombre;
+  var url=GRAPH+'/me/drive/root/search(q='+encodeURIComponent("'"+nom+"'")+')';
+  return gGet(url).then(function(d){
+    if(!d.value||!d.value.length){console.warn('[INIT] Excel no encontrado:',nom);return false;}
+    var f=d.value.find(function(x){return x.name===nom;});
+    if(!f){console.warn('[INIT] Sin coincidencia exacta:',nom);return false;}
+    DB.catalogoDriveId=f.parentReference&&f.parentReference.driveId?f.parentReference.driveId:null;
+    DB.catalogoItemId=f.id;
+    console.log('[INIT] Excel:',nom,'| webUrl:',f.webUrl);
+    console.log('[INIT]   driveType:',f.parentReference&&f.parentReference.driveType);
+    console.log('[INIT]   path:',f.parentReference&&f.parentReference.path);
+    return true;
+  }).catch(function(e){console.error('[INIT] descubrirExcel:',e.message);return false;});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 8. LECTURA DE CATÁLOGOS DESDE EXCEL
+// ═══════════════════════════════════════════════════════════════════
+var NOISE=/^[\u2191\*\-\#]/;
+
+// Normalizar fechas desde Workbook API a formato YYYY-MM-DD
+// Excel Online en Ecuador/España devuelve fechas como D/M/YYYY (ej: 6/9/2026 = 6 sep 2026)
+function normalizarFecha(v){
+  if(!v) return '';
+  // Número serial Excel (días desde 1900-01-00)
+  if(typeof v==='number'){
+    var d=new Date(Math.round((v-25569)*86400*1000));
+    var pn=function(n){return String(n).padStart(2,'0');};
+    return d.getUTCFullYear()+'-'+pn(d.getUTCMonth()+1)+'-'+pn(d.getUTCDate());
+  }
+  var s=v.toString().trim();
+  if(!s) return '';
+  // Ya es YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
+  // ISO con T: 2026-09-06T00:00:00
+  if(s.indexOf('T')>-1) return s.substring(0,10);
+  // Formato con /: Excel Online Ecuador/España usa D/M/YYYY
+  // ej: "6/9/2026" = 6 de septiembre de 2026
+  var partes=s.split('/');
+  if(partes.length===3){
+    var dia=partes[0].trim();
+    var mes=partes[1].trim();
+    var anio=partes[2].trim().length===4?partes[2].trim():'20'+partes[2].trim();
+    var d2=parseInt(dia);
+    var m2=parseInt(mes);
+    // Si el primer valor > 12, definitivamente es día (D/M/YYYY)
+    // Si el segundo valor > 12, definitivamente es día en posición 2 (M/D/YYYY inverso — raro)
+    // Excel Online en configuración ES siempre usa D/M/YYYY
+    if(d2>12 || (d2<=12 && m2<=12)){
+      // Asumir D/M/YYYY (formato Ecuador/España)
+      return anio+'-'+String(m2).padStart(2,'0')+'-'+String(d2).padStart(2,'0');
+    }
+  }
+  console.warn('[FECHA] Formato no reconocido:',v);
+  return s;
+}
+
+function filaValida(v,maxLen){
+  if(!v) return false;
+  var s=v.toString().trim();
+  return s.length>0&&s.length<=(maxLen||80)&&!NOISE.test(s);
+}
+
+function leerCatalogos(){
+  return descubrirExcel().then(function(ok){
+    if(!ok||!DB.catalogoDriveId||!DB.catalogoItemId){
+      console.warn('[INIT] Excel no disponible');
+      render('<div class="loading"><div class="loading-icon">⚠️</div>'+
+        '<div class="loading-txt" style="color:var(--dan)">Excel no encontrado</div>'+
+        '<div class="loading-sub">Verifica que "'+CFG.catalogoNombre+'" está en OneDrive/SharePoint.<br>'+
+        'Revisa consola (F12) para más detalle.</div>'+
+        '<button class="btn btn-sec btn-big" style="margin-top:16px" onclick="location.reload()">↻ Reintentar</button></div>');
+      return;
+    }
+    var hojas=['Operadores','Supervisores','Pedidos','Contenedores','Compra','Importaciones','C.Barra'];
+    return Promise.all(hojas.map(function(h){
+      return gGet(urlWB(h)).then(function(r){
+        console.log('[INIT] Hoja '+h+': '+(r&&r.values?r.values.length-1:0)+' filas');
+        return{hoja:h,data:r};
+      }).catch(function(e){
+        console.warn('[INIT] Hoja '+h+' error:',e.message);
+        return{hoja:h,data:null};
+      });
+    })).then(function(res){
+      res.forEach(function(r){parsear(r.hoja,r.data);});
+      console.log('[INIT] Catálogos: ops='+DB.operadores.length+
+        ' sups='+DB.supervisores.length+' pedidos='+DB.pedidos.length+
+        ' conts='+DB.contenedores.length+' cbarra='+DB.codigosBarra.length);
+      if(!DB.operadores.length&&!DB.supervisores.length){
+        console.error('[INIT] Sin operadores ni supervisores — verifica hojas Operadores/Supervisores');
+      }
+    });
+  });
+}
+
+function parsear(hoja,data){
+  if(!data||!data.values||data.values.length<2) return;
+  var raw=data.values.slice(1);
+  if(hoja==='Operadores'){
+    DB.operadores=raw.filter(function(r){return filaValida(r[0]);})
+      .map(function(r){return r[0].toString().trim();});
+  } else if(hoja==='Supervisores'){
+    DB.supervisores=raw.filter(function(r){return filaValida(r[0]);})
+      .map(function(r){return r[0].toString().trim();});
+  } else if(hoja==='Pedidos'){
+    // Cols: Pedido(A),Tipo(B),ContenedoresTotal(C),Status(D),Observaciones(E)
+    DB.pedidos=raw.filter(function(r){return filaValida(r[0],50);})
+      .map(function(r){return{
+        pedido:r[0].toString().trim(),
+        tipo:r[1]?r[1].toString().trim():'',
+        contsTotal:r[2]?Number(r[2]):1,
+        status:r[3]?r[3].toString().trim():'Pendiente',
+        obs:r[4]?r[4].toString().trim():'',
+      };});
+  } else if(hoja==='Contenedores'){
+    // Cols confirmadas: A=Pedido(0), B=FechaProgramada(1), C=#Contenedor(2),
+    // D=#Sello(3), E=PalletsReportados(4), F=Status(5), G=FechaRecepcion(6), H=Obs(7)
+    // Log detallado de las primeras 3 filas para diagnosticar índices
+    console.log('[INIT] Contenedores raw — encabezado esperado: Pedido|FechaProg|Contenedor|Sello|Pallets|Status');
+    for(var _i=0;_i<Math.min(raw.length,3);_i++){
+      console.log('[INIT] Fila '+_i+':',
+        raw[_i].slice(0,8).map(function(v,idx){
+          return 'col'+idx+'='+(v===null?'null':(v===undefined?'undef':(v===''?'vacío':String(v).substring(0,20))));
+        }).join(' | '));
+    }
+    DB.contenedores=raw.filter(function(r){return filaValida(r[0],50);})
+      .map(function(r){
+        // Mapeo fijo por índice confirmado desde Excel:
+        // col0=Pedido | col1=FechaProg | col2=#Contenedor | col3=#Sello | col4=Pallets | col5=Status | col6=FechaRec
+        var _fp   = normalizarFecha(r[1]);
+        var _cont = r[2]!==null&&r[2]!==undefined&&r[2]!==''?r[2].toString().trim():'';
+        var _sell = r[3]!==null&&r[3]!==undefined&&r[3]!==''?r[3].toString().trim():'';
+        var _pallV= r[4];
+        var _pall = (_pallV!==null&&_pallV!==undefined&&_pallV!=='')?(isNaN(Number(_pallV))?0:Number(_pallV)):0;
+        var _stat = r[5]?r[5].toString().trim():'Pendiente';
+        var _frec = normalizarFecha(r[6]);
+        return{
+          pedido:    r[0]?r[0].toString().trim():'',
+          fechaProg: _fp,
+          contenedor:_cont,
+          sello:     _sell,
+          pallets:   _pall,
+          status:    _stat,
+          fechaRec:  _frec,
+          obs:       r[7]?r[7].toString().trim():'',
+        };
+      });
+    console.log('[INIT] Contenedores cargados:',DB.contenedores.length);
+    if(DB.contenedores.length>0){
+      var c0=DB.contenedores[0];
+      console.log('[INIT] Primer contenedor: pedido='+c0.pedido+
+        ' fp='+c0.fechaProg+' cont='+c0.contenedor+
+        ' sello='+c0.sello+' pallets='+c0.pallets+' status='+c0.status);
+    }
+  } else if(hoja==='Compra'){
+    // Cols: Pedido(A),SKU(B),Descripcion(C),Cantidad(D)
+    DB.compra=raw.filter(function(r){return filaValida(r[0],50)&&r[1];})
+      .map(function(r){return{
+        pedido:r[0].toString().trim(),
+        sku:r[1].toString().trim(),
+        desc:r[2]?r[2].toString().trim():'',
+        cantidad:r[3]?Number(r[3]):0,
+      };});
+  } else if(hoja==='Importaciones'){
+    DB.importaciones=raw.filter(function(r){return filaValida(r[0],50)&&r[1];})
+      .map(function(r){return{
+        pedido:r[0].toString().trim(),
+        sku:r[1].toString().trim(),
+        desc:r[2]?r[2].toString().trim():'',
+        cantidad:r[3]?Number(r[3]):0,
+      };});
+  } else if(hoja==='C.Barra'){
+    // Cols: SKU(A),Descripcion(B),Un(C),Cód.BarrasUnidad(D),Un/CJ(E),Cód.BarrasCaja(F)
+    DB.codigosBarra=[];
+    raw.filter(function(r){return filaValida(r[0],50);}).forEach(function(r){
+      var sku=r[0]?r[0].toString().trim():'';
+      var desc=r[1]?r[1].toString().trim():'';
+      var cbUnd=r[3]?r[3].toString().trim():'';
+      var uncj=r[4]?Number(r[4]):1;
+      var cbCaj=r[5]?r[5].toString().trim():'';
+      if(cbUnd) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbUnd,tipo:'Unidad',factor:1});
+      if(cbCaj) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbCaj,tipo:'Caja',factor:uncj||1});
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 9. ESCRITURA EN SP LISTS
+// ═══════════════════════════════════════════════════════════════════
+function escribirEvento(tipo,hora,contenedor){
+  if(!DB.listIds.eventos) return Promise.resolve();
+  var t=ahora();
+  var fields={
+    Title:       S.recId+'-'+tipo,
+    RecepcionId: S.recId,
+    Pedido:      S.pedido,
+    Contenedor:  contenedor||S.contenedor||'',
+    TipoEvento:  tipo,
+    Operario:    S.operario,
+    Hora:        hora||t.hora,
+    Fecha:       t.fecha,
+    Timestamp:   t.ts,
+  };
+  return gPost(urlLista(DB.listIds.eventos)+'/items',{fields:fields})
+    .then(function(r){console.log('[SP] Evento '+tipo+' OK');return r;})
+    .catch(function(e){console.error('[SP] Evento '+tipo+' error:',e.message);});
+}
+
+function escribirSKU(reg){
+  if(!DB.listIds.recepciones) return Promise.resolve();
+  var fields={
+    Title:          S.recId+'-'+reg.sku+'-'+Date.now(),
+    Sesion:         S.recId,
+    Operario:       S.operario,
+    Solicitante:    S.operario,
+    Subtipo:        S.subtipo,
+    Pedido:         S.pedido,
+    Contenedor:     S.contenedor,
+    Sello:          S.sello||'',
+    Pallets:        Number(S.pallets)||0,
+    H_Llegada:      S.eventos.llegada||'',
+    H_Apertura:     S.eventos.apertura||'',
+    H_Cierre:       '',
+    H_Salida:       '',
+    LPN:            '',
+    LPN_OK:         true,
+    CodProducto:    reg.sku,
+    CodInterno:     reg.sku,
+    Nombre:         reg.desc,
+    UnXCaja:        Number(reg.factor)||1,
+    NumCajas:       Number(reg.numCajas)||1,
+    Cantidad:       Number(reg.cantidad)||0,
+    Estado:         reg.estado||'OK',
+    Novedades:      reg.novedad||'',
+    Personas:       0,
+    AlertaProducto: false,
+    Fecha:          ahora().fecha,
+    Hora:           ahora().hora,
+  };
+  return gPost(urlLista(DB.listIds.recepciones)+'/items',{fields:fields})
+    .then(function(r){console.log('[SP] SKU '+reg.sku+' OK');return r;})
+    .catch(function(e){console.error('[SP] SKU error:',e.message);});
+}
+
+function escribirAsignacion(pedido,tipo,operario){
+  if(!DB.listIds.asignaciones) return Promise.resolve();
+  var t=ahora();
+  var fields={
+    Title:          pedido+'-'+tipo,
+    Pedido:         pedido,
+    TipoAsignacion: tipo,
+    Operario:       operario,
+    Supervisor:     S.operario,
+    FechaAsignacion:t.fecha,
+    Status:         'Activo',
+  };
+  return gPost(urlLista(DB.listIds.asignaciones)+'/items',{fields:fields})
+    .then(function(r){console.log('[SP] Asignación OK');return r;})
+    .catch(function(e){console.error('[SP] Asignación error:',e.message);});
+}
+
+function cargarAsignacionesSP(){
+  if(!DB.listIds.asignaciones) return Promise.resolve([]);
+  return gGet(urlLista(DB.listIds.asignaciones)+'/items?$expand=fields&$top=500')
+    .then(function(d){return(d.value||[]).map(function(i){return i.fields;});})
+    .catch(function(){return[];});
+}
+function cargarEventosSP(pedido){
+  if(!DB.listIds.eventos) return Promise.resolve([]);
+  return gGet(urlLista(DB.listIds.eventos)+'/items?$expand=fields&$top=500')
+    .then(function(d){
+      return(d.value||[])
+        .map(function(i){return i.fields;})
+        .filter(function(f){return f.Pedido===pedido;});
+    }).catch(function(){return[];});
+}
+function cargarSKUsSP(pedido,contenedor){
+  if(!DB.listIds.recepciones) return Promise.resolve([]);
+  return gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500')
+    .then(function(d){
+      return(d.value||[])
+        .map(function(i){return i.fields;})
+        .filter(function(f){return f.Pedido===pedido&&(!contenedor||f.Contenedor===contenedor);});
+    }).catch(function(){return[];});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 10. BÚSQUEDA DE CÓDIGO DE BARRAS
+// ═══════════════════════════════════════════════════════════════════
+function buscarCodigo(cb){
+  var norm=cb.trim().toUpperCase();
+  return DB.codigosBarra.filter(function(r){
+    return r.cb.trim().toUpperCase()===norm;
+  });
+}
+function getPacingList(pedido,subtipo){
+  var lista=subtipo==='IMPORTACION'?DB.importaciones:DB.compra;
+  return lista.filter(function(r){return r.pedido===pedido;});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 11. PANTALLAS — HOME Y ROL
+// ═══════════════════════════════════════════════════════════════════
+function showHome(){
+  S.step='home';
+  var lista=S.rol==='supervisor'?DB.supervisores:DB.operadores;
+  render(
+    '<div class="lbl">¿con qué rol ingresas?</div>'+
+    '<div class="grid2">'+
+      '<div class="card-t'+(S.rol==='supervisor'?' sel':'')+'" onclick="S.rol=\'supervisor\';S.operario=\'\';showHome()">'+
+        '<div class="card-t-icon">👔</div><div class="card-t-lbl">SUPERVISOR</div></div>'+
+      '<div class="card-t'+(S.rol==='operario'?' sel':'')+'" onclick="S.rol=\'operario\';S.operario=\'\';showHome()">'+
+        '<div class="card-t-icon">👷</div><div class="card-t-lbl">OPERARIO</div></div>'+
+    '</div>'+
+    '<div class="lbl" style="margin-top:10px">'+(S.rol==='supervisor'?'supervisor':'operario')+'</div>'+
+    '<select class="inp" id="sel-quien" onchange="S.operario=this.value;updateFtr()">'+
+      '<option value="">— seleccionar —</option>'+
+      lista.map(function(o){return'<option'+(S.operario===o?' selected':'')+'>'+o+'</option>';}).join('')+
+    '</select>'+
+    '<div class="btn-row" style="margin-top:12px">'+
+      '<button class="btn btn-rec btn-big" onclick="iniciarSesion()">ENT → INGRESAR</button>'+
+    '</div>'
+  );
+}
+
+function iniciarSesion(){
+  S.operario=document.getElementById('sel-quien').value;
+  if(!S.rol){toast('Selecciona tu rol');return;}
+  if(!S.operario){toast('Selecciona '+(S.rol==='supervisor'?'el supervisor':'el operario'));return;}
+  updateFtr();
+  if(S.rol==='supervisor') showMenuSup();
+  else showMenuOp();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 12. MENÚ SUPERVISOR
+// ═══════════════════════════════════════════════════════════════════
+function showMenuSup(){
+  S.step='menu-sup';
+  render(
+    '<div class="badge badge-sup">👔 '+S.operario+'</div>'+
+    '<div class="lbl" style="margin-top:4px">¿qué deseas hacer?</div>'+
+    '<div class="grid2" style="margin-top:8px">'+
+      '<div class="card-t" onclick="showCalendario()">'+
+        '<div class="card-t-icon">📅</div><div class="card-t-lbl">CALENDARIO</div></div>'+
+      '<div class="card-t" onclick="showPedidosSup()">'+
+        '<div class="card-t-icon">📦</div><div class="card-t-lbl">PEDIDOS</div></div>'+
+    '</div>'+
+    '<div class="grid2" style="margin-top:8px">'+
+      '<div class="card-t" onclick="showAsignarSup()">'+
+        '<div class="card-t-icon">👤</div><div class="card-t-lbl">ASIGNAR</div></div>'+
+      '<div class="card-t" onclick="showEstadoPedidos()">'+
+        '<div class="card-t-icon">📊</div><div class="card-t-lbl">ESTADO</div></div>'+
+    '</div>'
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 13. MENÚ OPERARIO
+// ═══════════════════════════════════════════════════════════════════
+function showMenuOp(){
+  S.step='menu-op';
+  render('<div class="loading"><div class="loading-icon">⏳</div>'+
+    '<div class="loading-txt">Cargando pedidos...</div></div>');
+  cargarAsignacionesSP().then(function(asigs){
+    var misAsigs=asigs.filter(function(a){
+      return normStr(a.Operario)===normStr(S.operario)&&
+             normStr(a.Status)==='ACTIVO';
+    });
+    var html='<div class="badge badge-rec">👷 '+S.operario+'</div>'+
+      '<div class="grid2" style="margin-bottom:10px">'+
+        '<div class="card-t" onclick="showCalendario()">'+
+          '<div class="card-t-icon">📅</div><div class="card-t-lbl">CALENDARIO</div></div>'+
+        '<div class="card-t" onclick="showMenuOp()">'+
+          '<div class="card-t-icon">🔄</div><div class="card-t-lbl">ACTUALIZAR</div></div>'+
+      '</div>';
+    if(!misAsigs.length){
+      html+='<div class="alert-w">No tienes pedidos asignados hoy.<br>Consulta con tu supervisor.</div>';
+    } else {
+      html+='<div class="lbl">tus pedidos asignados</div>';
+      misAsigs.forEach(function(a){
+        var ped=DB.pedidos.find(function(p){return normStr(p.pedido)===normStr(a.Pedido);})||{};
+        html+='<div class="card-item" onclick="iniciarFlujo(\''+a.Pedido+'\',\''+a.TipoAsignacion+'\')">'+
+          '<div class="card-item-title">'+a.Pedido+'</div>'+
+          '<div class="card-item-sub">'+(ped.tipo||a.TipoAsignacion)+' · '+a.TipoAsignacion+'</div>'+
+          '<div class="card-item-badge status-act">'+a.TipoAsignacion+'</div>'+
+        '</div>';
+      });
+    }
+    render(html);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 14. CALENDARIO
+// ═══════════════════════════════════════════════════════════════════
+function showCalendario(){
+  S.step='calendario';
+  var hoy=ahora().raw;
+  var anio=hoy.getFullYear();
+  var mes=hoy.getMonth();
+  var fechaHoy=ahora().fecha;
+  if(!S.calFecha) S.calFecha=fechaHoy;
+
+  // Generar grid del mes
+  var primerDia=new Date(anio,mes,1).getDay();
+  var diasMes=new Date(anio,mes+1,0).getDate();
+  var meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  // Log para diagnóstico de fechas
+  console.log('[CAL] Mes buscado:',anio+'-'+pad(mes+1));
+  console.log('[CAL] Contenedores total:',DB.contenedores.length);
+  console.log('[CAL] Muestra fechasProg:',DB.contenedores.slice(0,5).map(function(c){return c.pedido+':'+c.fechaProg;}).join(' | '));
+
+  // Contenedores del mes con fecha programada
+  var contsMes=DB.contenedores.filter(function(c){
+    if(!c.fechaProg) return false;
+    var fp=c.fechaProg.substring(0,7); // YYYY-MM
+    return fp===anio+'-'+pad(mes+1);
+  });
+  console.log('[CAL] Contenedores del mes:',contsMes.length);
+  var diasConData={};
+  contsMes.forEach(function(c){
+    var d=c.fechaProg.substring(8,10);
+    if(!diasConData[d]) diasConData[d]=0;
+    diasConData[d]++;
+  });
+
+  var html='<div class="badge badge-sup">📅 CALENDARIO DE RECEPCIÓN</div>'+
+    '<div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:8px;text-align:center">'+
+      meses[mes]+' '+anio+'</div>'+
+    '<div class="cal-hdr"><div class="cal-hdr-d">Do</div><div class="cal-hdr-d">Lu</div>'+
+    '<div class="cal-hdr-d">Ma</div><div class="cal-hdr-d">Mi</div>'+
+    '<div class="cal-hdr-d">Ju</div><div class="cal-hdr-d">Vi</div><div class="cal-hdr-d">Sa</div></div>'+
+    '<div class="cal-grid">';
+
+  // Celdas vacías antes del primer día
+  for(var i=0;i<primerDia;i++) html+='<div class="cal-day vacio"></div>';
+
+  for(var d=1;d<=diasMes;d++){
+    var dStr=pad(d);
+    var fechaD=anio+'-'+pad(mes+1)+'-'+dStr;
+    var cls='cal-day';
+    if(fechaD===fechaHoy) cls+=' hoy';
+    if(fechaD===S.calFecha) cls+=' sel';
+    if(diasConData[dStr]) cls+=' has-data';
+    html+='<div class="'+cls+'" onclick="selCalDia(\''+fechaD+'\')">'+d+
+      (diasConData[dStr]?'<div style="font-size:8px;color:var(--rec)">'+diasConData[dStr]+'</div>':'')+'</div>';
+  }
+  html+='</div>';
+
+  // Contenedores del día seleccionado
+  var diaConts=DB.contenedores.filter(function(c){return c.fechaProg===S.calFecha;});
+  html+='<div class="lbl" style="margin-top:12px">'+fechaDisplay(S.calFecha)+
+    ' · '+diaConts.length+' contenedor'+(diaConts.length!==1?'es':'')+'</div>';
+
+  if(!diaConts.length){
+    html+='<div class="alert-w" style="margin-top:6px">Sin contenedores programados para este día.</div>';
+  } else {
+    diaConts.forEach(function(c){
+      var statusCls=c.status==='Recibido'?'status-ok':c.status==='En proceso'?'status-act':'status-pend';
+      html+='<div class="card-item">'+
+        '<div class="card-item-title">'+c.pedido+' · '+c.contenedor+'</div>'+
+        '<div class="card-item-sub">'+c.pallets+' pallets'+'</div>'+
+        '<div class="card-item-badge '+statusCls+'">'+c.status+'</div>'+
+      '</div>';
+    });
+  }
+
+  html+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver</button>';
+  render(html);
+}
+
+function selCalDia(fecha){
+  S.calFecha=fecha;
+  showCalendario();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 15. SUPERVISOR — PEDIDOS Y ESTADO
+// ═══════════════════════════════════════════════════════════════════
+function showPedidosSup(){
+  S.step='pedidos-sup';
+  var html='<div class="badge badge-sup">📦 PEDIDOS</div>';
+  if(!DB.pedidos.length){
+    html+='<div class="alert-w">Sin pedidos en el Excel. Verifica la hoja Pedidos.</div>';
+  } else {
+    DB.pedidos.forEach(function(p){
+      var sc=p.status==='Cerrado'?'status-ok':'status-pend';
+      var conts=DB.contenedores.filter(function(c){return c.pedido===p.pedido;});
+      html+='<div class="card-item">'+
+        '<div class="card-item-title">'+p.pedido+'</div>'+
+        '<div class="card-item-sub">'+p.tipo+' · '+conts.length+'/'+p.contsTotal+' contenedores'+
+          (p.obs?' · '+p.obs:'')+'</div>'+
+        '<div class="card-item-badge '+sc+'">'+p.status+'</div>'+
+      '</div>';
+    });
+  }
+  html+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showMenuSup()">← Volver</button>';
+  render(html);
+}
+
+function showEstadoPedidos(){
+  S.step='estado-pedidos';
+  render('<div class="loading"><div class="loading-icon">⏳</div>'+
+    '<div class="loading-txt">Cargando estado...</div></div>');
+  cargarAsignacionesSP().then(function(asigs){
+    var html='<div class="badge badge-sup">📊 ESTADO DE PEDIDOS</div>';
+    if(!DB.pedidos.length){
+      html+='<div class="alert-w">Sin pedidos en el Excel.</div>';
+    } else {
+      DB.pedidos.forEach(function(p){
+        var asigRec=asigs.find(function(a){return a.Pedido===p.pedido&&a.TipoAsignacion==='RECEPCION';});
+        var asigPerch=asigs.find(function(a){return a.Pedido===p.pedido&&a.TipoAsignacion==='PERCHADO';});
+        var contsRec=DB.contenedores.filter(function(c){return c.pedido===p.pedido&&c.status==='Recibido';}).length;
+        var sc=p.status==='Cerrado'?'status-ok':'status-pend';
+        html+='<div class="card-item">'+
+          '<div class="card-item-title">'+p.pedido+'</div>'+
+          '<div class="card-item-sub">'+p.tipo+
+            ' · Contenedores: '+contsRec+'/'+p.contsTotal+
+            '<br>Recepción: '+(asigRec?asigRec.Operario:'Sin asignar')+
+            ' · Perchado: '+(asigPerch?asigPerch.Operario:'Sin asignar')+'</div>'+
+          '<div class="card-item-badge '+sc+'">'+p.status+'</div>'+
+        '</div>';
+      });
+    }
+    html+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showMenuSup()">← Volver</button>';
+    render(html);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 16. SUPERVISOR — ASIGNAR
+// ═══════════════════════════════════════════════════════════════════
+var _asigPedido='',_asigTipo='',_asigOp='';
+function showAsignarSup(){
+  S.step='asignar';
+  _asigPedido='';_asigTipo='';_asigOp='';
+  var pedOps=DB.pedidos.filter(function(p){return p.status!=='Cerrado';});
+  render(
+    '<div class="badge badge-sup">👤 ASIGNAR PEDIDO</div>'+
+    '<div class="lbl">pedido</div>'+
+    '<select class="inp inp-sm" id="asig-ped" onchange="_asigPedido=this.value">'+
+      '<option value="">— seleccionar —</option>'+
+      pedOps.map(function(p){return'<option>'+p.pedido+'</option>';}).join('')+
+    '</select>'+
+    '<div class="lbl" style="margin-top:8px">tipo de asignación</div>'+
+    '<div class="grid2">'+
+      '<div class="card-t" id="at-rec" onclick="selTipoAsig(\'RECEPCION\')">'+
+        '<div class="card-t-icon">📦</div><div class="card-t-lbl">RECEPCIÓN</div></div>'+
+      '<div class="card-t" id="at-per" onclick="selTipoAsig(\'PERCHADO\')">'+
+        '<div class="card-t-icon">🗄️</div><div class="card-t-lbl">PERCHADO</div></div>'+
+    '</div>'+
+    '<div class="lbl" style="margin-top:8px">operario</div>'+
+    '<select class="inp inp-sm" id="asig-op" onchange="_asigOp=this.value">'+
+      '<option value="">— seleccionar —</option>'+
+      DB.operadores.map(function(o){return'<option>'+o+'</option>';}).join('')+
+    '</select>'+
+    '<div class="btn-row" style="margin-top:12px">'+
+      '<button class="btn btn-sec" onclick="showMenuSup()">← ATR</button>'+
+      '<button class="btn btn-ok btn-big" onclick="confAsignar()">✓ ASIGNAR</button>'+
+    '</div>'
+  );
+}
+function selTipoAsig(t){
+  _asigTipo=t;
+  document.getElementById('at-rec').className='card-t'+(t==='RECEPCION'?' sel':'');
+  document.getElementById('at-per').className='card-t'+(t==='PERCHADO'?' sel':'');
+}
+function confAsignar(){
+  _asigPedido=document.getElementById('asig-ped').value;
+  _asigOp=document.getElementById('asig-op').value;
+  if(!_asigPedido){toast('Selecciona el pedido');return;}
+  if(!_asigTipo){toast('Selecciona el tipo');return;}
+  if(!_asigOp){toast('Selecciona el operario');return;}
+  render('<div class="loading"><div class="loading-icon">⏳</div>'+
+    '<div class="loading-txt">Guardando asignación...</div></div>');
+  escribirAsignacion(_asigPedido,_asigTipo,_asigOp).then(function(){
+    toast('✓ Asignado: '+_asigOp+' → '+_asigPedido+' ('+_asigTipo+')');
+    showMenuSup();
+  }).catch(function(){
+    toast('Error al guardar asignación');showMenuSup();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 17. FLUJO PRINCIPAL — RECEPCIÓN O PERCHADO
+// ═══════════════════════════════════════════════════════════════════
+function iniciarFlujo(pedido,tipo){
+  S.pedido=pedido;
+  var pedInfo=DB.pedidos.find(function(p){return normStr(p.pedido)===normStr(pedido);})||{};
+  S.subtipo=pedInfo.tipo&&pedInfo.tipo.toLowerCase().indexOf('import')>-1?'IMPORTACION':'COMPRA LOCAL';
+  if(tipo==='PERCHADO') showFlujoPerchado();
+  else showSeleccionarContenedor();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 18. RECEPCIÓN — SELECCIONAR CONTENEDOR
+// ═══════════════════════════════════════════════════════════════════
+function showSeleccionarContenedor(){
+  S.step='sel-cont';
+  var contsPend=DB.contenedores.filter(function(c){
+    return normStr(c.pedido)===normStr(S.pedido)&&
+           normStr(c.status)!=='RECIBIDO';
+  });
+  var html=stepsBar(1,6)+
+    '<div class="badge badge-rec">'+S.pedido+' · '+S.subtipo+'</div>'+
+    '<div class="lbl">selecciona el contenedor</div>';
+
+  if(contsPend.length){
+    contsPend.forEach(function(c){
+      html+='<div class="card-item" onclick="selContRow(\''+c.contenedor+'\',\''+c.sello+'\','+c.pallets+')">'+
+        '<div class="card-item-title">'+c.contenedor+'</div>'+
+        '<div class="card-item-sub">'+
+          (c.fechaProg?'Prog: '+fechaDisplay(c.fechaProg)+' · ':'')+'Pallets: '+c.pallets+
+        '</div>'+
+        '<div class="card-item-badge status-pend">PENDIENTE</div>'+
+      '</div>';
+    });
+  } else {
+    html+='<div class="alert-w">No hay contenedores pendientes para este pedido.</div>';
+  }
+
+  html+='<div class="lbl" style="margin-top:4px">¿contenedor no listado?</div>'+
+    '<div class="card-item" onclick="showNuevoContenedor()">'+
+      '<div class="card-item-title">+ Registrar nuevo contenedor</div>'+
+      '<div class="card-item-sub">Para contenedores no programados</div>'+
+    '</div>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:8px" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver</button>';
+  render(html);
+}
+
+function selContRow(cont,sello,pallets){
+  S.contenedor=cont;S.sello=sello||'';S.pallets=pallets||0;
+  S.skusRegistrados=[];
+  // Consultar SP si ya hay eventos para este contenedor+pedido
+  render('<div class="loading"><div class="loading-icon">⏳</div>'+
+    '<div class="loading-txt">Verificando estado...</div></div>');
+  cargarEventosSP(S.pedido).then(function(evts){
+    // Filtrar por contenedor
+    var evtsCont=evts.filter(function(e){return e.Contenedor===cont;});
+    // Reconstituir eventos registrados
+    S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+    var tieneId=false;
+    evtsCont.forEach(function(e){
+      var t=e.TipoEvento?e.TipoEvento.toLowerCase():'';
+      if(t==='llegada')   {S.eventos.llegada=e.Hora;if(e.RecepcionId){S.recId=e.RecepcionId;tieneId=true;}}
+      if(t==='apertura')  S.eventos.apertura=e.Hora;
+      if(t==='cierre')    S.eventos.cierre=e.Hora;
+      if(t==='salida')    S.eventos.salida=e.Hora;
+    });
+    if(!tieneId) S.recId=generarRecId();
+    // Cargar SKUs ya registrados para este contenedor
+    cargarSKUsSP(S.pedido,cont).then(function(skus){
+      S.skusRegistrados=skus.map(function(f){return{
+        sku:f.CodProducto||'',desc:f.Nombre||'',
+        cantidad:Number(f.Cantidad)||0,estado:f.Estado||'OK',novedad:f.Novedades||'',
+      };});
+      // Navegar al paso correcto según eventos ya registrados
+      if(S.eventos.salida)       showResumenContenedor('','');
+      else if(S.eventos.cierre)  showEventoSalida();
+      else if(S.eventos.llegada) showEscaneo();  // llegada registrada → ir a escaneo
+      else                       showEventoLlegada();
+    });
+  }).catch(function(){
+    S.recId=generarRecId();
+    S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+    showEventoLlegada();
+  });
+}
+
+function showNuevoContenedor(){
+  S.step='nuevo-cont';
+  render(
+    stepsBar(1,6)+
+    '<div class="badge badge-rec">'+S.pedido+' · NUEVO CONTENEDOR</div>'+
+    '<div class="lbl">número de contenedor</div>'+
+    '<input class="inp" id="nc-cont" type="text" placeholder="Ej: TCNU1234567" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase">'+
+    '<div class="lbl" style="margin-top:6px"># pallets</div>'+
+    '<input class="inp inp-sm" id="nc-pall" type="number" min="0" placeholder="0" autocomplete="off">'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showSeleccionarContenedor()">← ATR</button>'+
+      '<button class="btn btn-rec" onclick="confNuevoContenedor()">ENT →</button>'+
+    '</div>'
+  );
+  setTimeout(function(){var el=document.getElementById('nc-cont');if(el)el.focus();},100);
+}
+function confNuevoContenedor(){
+  var cont=document.getElementById('nc-cont').value.trim().toUpperCase();
+  var pall=parseInt(document.getElementById('nc-pall').value)||0;
+  if(!cont){toast('Ingresa el número de contenedor');return;}
+  S.contenedor=cont;S.sello='';S.pallets=pall;
+  S.recId=generarRecId();
+  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+  S.skusRegistrados=[];
+  showEventoLlegada();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 19. RECEPCIÓN — EVENTOS
+// ═══════════════════════════════════════════════════════════════════
+function showEventoLlegada(){
+  S.step='ev-llegada';
+  render(
+    stepsBar(2,6)+
+    '<div class="badge badge-rec">'+S.contenedor+' · '+S.pedido+'</div>'+
+    '<div class="evt-card">'+
+      '<div class="evt-icon">🚛</div>'+
+      '<div class="evt-body">'+
+        '<div class="evt-title">LLEGADA DEL CONTENEDOR</div>'+
+        '<div class="evt-pend">Registra la hora de llegada</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="lbl"># sello del contenedor</div>'+
+    '<input class="inp inp-sm" id="ev-sello" type="text" placeholder="Ingresa el sello físico del contenedor" value="" autocomplete="off" autocorrect="off" spellcheck="false">'+
+    '<div class="lbl" style="margin-top:6px">hora de llegada</div>'+
+    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showSeleccionarContenedor()">← ATR</button>'+
+      '<button class="btn btn-rec btn-big" onclick="confEvento(\'llegada\',\'ev-hora\',showEventoApertura)">✓ REGISTRAR LLEGADA</button>'+
+    '</div>'
+  );
+}
+function confEvento(tipo,inputId,nextFn){
+  var hora=document.getElementById(inputId).value;
+  if(!hora){toast('Ingresa la hora');return;}
+  // Capturar sello si está en pantalla
+  var selEl=document.getElementById('ev-sello');
+  if(selEl) S.sello=selEl.value.trim();
+  S.eventos[tipo]=hora;
+  escribirEvento(tipo.toUpperCase(),hora);
+  if(nextFn) nextFn();
+}
+
+function showEventoApertura(){
+  S.step='ev-apertura';
+  render(
+    stepsBar(3,6)+
+    '<div class="badge badge-rec">'+S.contenedor+' · '+S.pedido+'</div>'+
+    '<div class="evt-card">'+
+      '<div class="evt-icon">🔓</div>'+
+      '<div class="evt-body">'+
+        '<div class="evt-title">APERTURA DEL CONTENEDOR</div>'+
+        '<div class="evt-pend">Registra la hora de apertura</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="lbl">hora de apertura</div>'+
+    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showEventoLlegada()">← ATR</button>'+
+      '<button class="btn btn-rec btn-big" onclick="confEvento(\'apertura\',\'ev-hora\',showEscaneo)">✓ REGISTRAR APERTURA</button>'+
+    '</div>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="showEscaneo()">Registrar después →</button>'
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 20. RECEPCIÓN — ESCANEO DE SKUs
+// ═══════════════════════════════════════════════════════════════════
+function showEscaneo(){
+  S.step='escaneo';
+  var nSkus=S.skusRegistrados.length;
+  var html=stepsBar(4,6)+
+    '<div class="badge badge-rec">'+S.contenedor+' · '+nSkus+' SKUs</div>'+
+    '<div class="lbl">escanea o ingresa código</div>'+
+    '<input class="inp" id="inp-scan" type="text" placeholder="Código de barras o SKU" autocomplete="off" autocorrect="off" spellcheck="false">'+
+    '<div class="btn-row" style="margin-top:8px">'+
+      '<button class="btn btn-rec btn-big" onclick="confScan()">🔍 BUSCAR</button>'+
+    '</div>';
+
+  if(nSkus>0){
+    html+='<div class="lbl" style="margin-top:12px">registrados en este contenedor</div>'+
+      '<div style="max-height:200px;overflow-y:auto">';
+    S.skusRegistrados.slice(-5).reverse().forEach(function(r){
+      html+='<div style="background:var(--sur2);border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:11px;display:flex;justify-content:space-between">'+
+        '<span style="color:var(--acc)">'+r.sku+'</span>'+
+        '<span style="color:var(--txt)">'+r.cantidad+' un</span>'+
+        '<span style="color:'+(r.estado==='DAÑADO'?'var(--dan)':'var(--ok)')+'">'+r.estado+'</span>'+
+      '</div>';
+    });
+    html+='</div>';
+  }
+
+  html+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
+    '<button class="btn btn-sec btn-big" onclick="showEventoCierre()">🔒 CERRAR CONTENEDOR</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">💾 Guardar y salir</button>'+
+  '</div>';
+
+  render(html);
+  setTimeout(function(){var el=document.getElementById('inp-scan');if(el)el.focus();},100);
+}
+
+function confScan(){
+  var v=document.getElementById('inp-scan').value.trim();
+  if(!v){toast('Ingresa un código');return;}
+  var hits=buscarCodigo(v);
+  if(hits.length===0){
+    // No encontrado — continuar con ingreso manual
+    S.skuActual={sku:v,desc:'No encontrado en catálogo',factor:1,tipo:'Unidad',noEncontrado:true};
+    showIngresoCantidad();
+  } else if(hits.length===1){
+    S.skuActual=hits[0];
+    showIngresoCantidad();
+  } else {
+    showSeleccionSKU(hits);
+  }
+}
+
+function showSeleccionSKU(hits){
+  S.step='sel-sku';
+  var html=stepsBar(4,6)+
+    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
+    '<div class="lbl">múltiples coincidencias — selecciona el SKU</div>';
+  hits.forEach(function(h,i){
+    html+='<div class="sku-item" onclick="selSKU('+i+')">'+
+      '<div class="sku-cod">'+h.sku+' · '+h.tipo+'</div>'+
+      '<div class="sku-desc">'+h.desc+'</div>'+
+    '</div>';
+  });
+  html+='<button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">← Volver</button>';
+  render(html);
+  // guardar hits para selección
+  window._hitsTemp=hits;
+}
+function selSKU(i){
+  S.skuActual=window._hitsTemp[i];
+  showIngresoCantidad();
+}
+
+function showIngresoCantidad(){
+  S.step='cant-sku';
+  var sk=S.skuActual;
+  var html=stepsBar(4,6)+
+    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
+    (sk.noEncontrado?'<div class="alert">⚠ SKU no encontrado en catálogo C.Barra. Puedes continuar.</div>':'')+
+    '<div class="lbl">producto</div>'+
+    '<div style="background:var(--sur2);border-radius:6px;padding:10px 12px;margin-bottom:8px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--acc)">'+sk.sku+'</div>'+
+      '<div style="font-size:12px;color:var(--txt);margin-top:2px">'+sk.desc+'</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-top:2px">Tipo: '+sk.tipo+'</div>'+
+    '</div>'+
+    '<div class="lbl">cantidad (unidades)</div>'+
+    '<input class="inp" id="inp-cant" type="number" min="0" placeholder="0" style="font-size:24px;font-weight:700;text-align:center" autocomplete="off">'+
+    '<div class="lbl" style="margin-top:8px">estado</div>'+
+    '<div class="grid2">'+
+      '<div class="card-t sel" id="est-ok" onclick="selEstado(\'OK\')">✓ OK</div>'+
+      '<div class="card-t" id="est-dan" onclick="selEstado(\'DAÑADO\')">⚠ DAÑADO</div>'+
+    '</div>'+
+    '<div id="novedad-wrap" style="display:none">'+
+      '<div class="lbl" style="margin-top:8px">descripción de la novedad</div>'+
+      '<textarea class="inp" id="inp-novedad" rows="2" style="font-size:13px;resize:none" placeholder="Ej: Cajas aplastadas, producto mojado..."></textarea>'+
+    '</div>'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showEscaneo()">← ATR</button>'+
+      '<button class="btn btn-ok btn-big" onclick="confCantidad()">✓ CONFIRMAR</button>'+
+    '</div>';
+  render(html);
+  setTimeout(function(){var el=document.getElementById('inp-cant');if(el)el.focus();},100);
+  window._estadoActual='OK';
+}
+function selEstado(e){
+  window._estadoActual=e;
+  document.getElementById('est-ok').className='card-t'+(e==='OK'?' sel':'');
+  document.getElementById('est-dan').className='card-t'+(e==='DAÑADO'?' sel':'');
+  var nw=document.getElementById('novedad-wrap');
+  if(nw) nw.style.display=e==='DAÑADO'?'block':'none';
+}
+function confCantidad(){
+  var cant=parseInt(document.getElementById('inp-cant').value);
+  if(isNaN(cant)||cant<0){toast('Ingresa una cantidad válida');return;}
+  var novEl=document.getElementById('inp-novedad');
+  var nov=novEl?novEl.value.trim():'';
+  var sk=S.skuActual;
+  var reg={
+    sku:sk.sku,desc:sk.desc,factor:sk.factor||1,
+    numCajas:1,cantidad:cant,
+    estado:window._estadoActual||'OK',
+    novedad:nov,
+  };
+  S.skusRegistrados.push(reg);
+  escribirSKU(reg).catch(function(e){console.warn('[SP] SKU async:',e.message);});
+  toast('✓ '+sk.sku+' — '+cant+' un registradas');
+  showEscaneo();
+}
+
+function guardarYSalir(){
+  toast('Sesión guardada. Puedes retomar desde Mis Pedidos.');
+  if(S.rol==='supervisor') showMenuSup();
+  else showMenuOp();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 21. RECEPCIÓN — CIERRE Y SALIDA
+// ═══════════════════════════════════════════════════════════════════
+function showEventoCierre(){
+  S.step='ev-cierre';
+  render(
+    stepsBar(5,6)+
+    '<div class="badge badge-rec">'+S.contenedor+' · '+S.skusRegistrados.length+' SKUs</div>'+
+    '<div class="evt-card">'+
+      '<div class="evt-icon">🔒</div>'+
+      '<div class="evt-body">'+
+        '<div class="evt-title">CIERRE DEL CONTENEDOR</div>'+
+        '<div class="evt-pend">Registra la hora de cierre</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="lbl">hora de cierre</div>'+
+    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showEscaneo()">← Volver</button>'+
+      '<button class="btn btn-rec btn-big" onclick="confEvento(\'cierre\',\'ev-hora\',showEventoSalida)">✓ REGISTRAR CIERRE</button>'+
+    '</div>'
+  );
+}
+
+function showEventoSalida(){
+  S.step='ev-salida';
+  render(
+    stepsBar(6,6)+
+    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
+    '<div class="evt-card">'+
+      '<div class="evt-icon">🚛</div>'+
+      '<div class="evt-body">'+
+        '<div class="evt-title">SALIDA DEL CONTENEDOR</div>'+
+        '<div class="evt-pend">Registra la hora de salida</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="lbl">hora de salida</div>'+
+    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+    '<div class="lbl" style="margin-top:8px">novedades generales (opcional)</div>'+
+    '<textarea class="inp inp-sm" id="ev-nov" rows="2" style="resize:none" placeholder="Observaciones del contenedor..."></textarea>'+
+    '<div class="lbl" style="margin-top:6px"># personas en cuadrilla</div>'+
+    '<input class="inp inp-sm" id="ev-pers" type="number" min="0" placeholder="0">'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showEventoCierre()">← ATR</button>'+
+      '<button class="btn btn-ok btn-big" onclick="confSalida()">✓ FINALIZAR RECEPCIÓN</button>'+
+    '</div>'
+  );
+}
+function confSalida(){
+  var hora=document.getElementById('ev-hora').value;
+  if(!hora){toast('Ingresa la hora de salida');return;}
+  S.eventos.salida=hora;
+  var nov=document.getElementById('ev-nov').value.trim();
+  var pers=parseInt(document.getElementById('ev-pers').value)||0;
+  escribirEvento('SALIDA',hora);
+  // Mostrar resumen + opción cerrar pedido
+  showResumenContenedor(nov,pers);
+}
+
+function showResumenContenedor(nov,pers){
+  S.step='resumen-cont';
+  var totalPend=DB.contenedores.filter(function(c){
+    return normStr(c.pedido)===normStr(S.pedido)&&normStr(c.status)!=='RECIBIDO';
+  }).length;
+  var esUltimo=totalPend<=1; // este contenedor es el último pendiente
+
+  render(
+    '<div class="badge badge-ok">✓ CONTENEDOR COMPLETADO</div>'+
+    '<div class="val ok">✓ OK</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin:10px 0">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
+        '<span style="font-size:12px;color:var(--mut)">Contenedor</span>'+
+        '<span style="font-size:13px;font-weight:700">'+S.contenedor+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
+        '<span style="font-size:12px;color:var(--mut)">SKUs registrados</span>'+
+        '<span style="font-size:13px;font-weight:700">'+S.skusRegistrados.length+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
+        '<span style="font-size:12px;color:var(--mut)">Dañados</span>'+
+        '<span style="font-size:13px;font-weight:700;color:'+(S.skusRegistrados.filter(function(r){return r.estado==='DAÑADO';}).length>0?'var(--dan)':'var(--ok)')+'">'+
+          S.skusRegistrados.filter(function(r){return r.estado==='DAÑADO';}).length+'</span></div>'+
+      (nov?'<div style="font-size:11px;color:var(--mut);margin-top:4px">Novedades: '+nov+'</div>':'')+
+    '</div>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+      '<button class="btn btn-rec btn-big" onclick="nuevoContenedorMismoPedido()">🔄 Siguiente contenedor</button>'+
+      (esUltimo
+        ?'<button class="btn btn-warn btn-big" onclick="cerrarPedido()">🔐 CERRAR PEDIDO</button>'
+        :'<button class="btn btn-sec btn-big" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver al menú</button>')+
+    '</div>'
+  );
+}
+
+function nuevoContenedorMismoPedido(){
+  S.contenedor='';S.sello='';S.pallets=0;
+  S.recId=generarRecId();
+  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+  S.skusRegistrados=[];
+  showSeleccionarContenedor();
+}
+
+function cerrarPedido(){
+  if(!confirm('¿Cerrar el pedido '+S.pedido+'? Esta acción marca el pedido como completado.')) return;
+  // En live: se actualizaría el status en SP / Excel
+  toast('Pedido '+S.pedido+' cerrado');
+  S.pedido='';S.contenedor='';
+  if(S.rol==='supervisor') showMenuSup();
+  else showMenuOp();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 22. PERCHADO
+// ═══════════════════════════════════════════════════════════════════
+function showFlujoPerchado(){
+  S.step='perchado';
+  S.recId=generarRecId();
+  render(
+    '<div class="badge badge-rec">🗄️ PERCHADO — '+S.pedido+'</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin-bottom:10px">'+
+      '<div style="font-size:11px;color:var(--mut);margin-bottom:4px">PEDIDO ASIGNADO</div>'+
+      '<div style="font-size:18px;font-weight:700;color:var(--rec)">'+S.pedido+'</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-top:4px">'+S.subtipo+'</div>'+
+    '</div>'+
+    '<div class="lbl">hora de inicio de perchado</div>'+
+    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+    '<button class="btn btn-rec btn-big" style="margin-top:10px" onclick="confPerchadoInicio()">▶ INICIAR PERCHADO</button>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver</button>'
+  );
+}
+function confPerchadoInicio(){
+  var hora=document.getElementById('ev-hora').value;
+  if(!hora){toast('Ingresa la hora');return;}
+  S.eventos.llegada=hora;
+  escribirEvento('PERCHADO_INICIO',hora);
+  showPerchadoActivo();
+}
+function showPerchadoActivo(){
+  S.step='perchado-activo';
+  render(
+    '<div class="badge badge-rec">🗄️ PERCHADO EN CURSO</div>'+
+    '<div class="val rec">▶ ACTIVO</div>'+
+    '<div style="font-size:13px;color:var(--mut);text-align:center;margin-bottom:16px">'+S.pedido+' · inicio: '+S.eventos.llegada+'</div>'+
+    '<div class="lbl">hora de fin de perchado</div>'+
+    '<input class="inp inp-sm" id="ev-hora-fin" type="time" value="'+horaActual()+'">'+
+    '<button class="btn btn-ok btn-big" style="margin-top:10px" onclick="confPerchadoFin()">✓ FINALIZAR PERCHADO</button>'
+  );
+}
+function confPerchadoFin(){
+  var hora=document.getElementById('ev-hora-fin').value;
+  if(!hora){toast('Ingresa la hora de fin');return;}
+  escribirEvento('PERCHADO_FIN',hora);
+  toast('✓ Perchado completado: '+S.pedido);
+  if(S.rol==='supervisor') showMenuSup();
+  else showMenuOp();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 23. RESET
+// ═══════════════════════════════════════════════════════════════════
+function goHome(){
+  if(S.skusRegistrados&&S.skusRegistrados.length>0){
+    if(!confirm('¿Salir? Hay '+S.skusRegistrados.length+' SKUs en sesión activa.')) return;
+  }
+  S.rol='';S.operario='';S.pedido='';S.contenedor='';S.sello='';
+  S.pallets=0;S.subtipo='';S.recId='';S.step='home';
+  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+  S.skusRegistrados=[];S.skuActual=null;
+  updateFtr();showHome();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 24. MSAL — LOGIN / INIT
+// ═══════════════════════════════════════════════════════════════════
+function msalLogin(){msalInst.loginRedirect({scopes:SCOPES});}
+
+function postLogin(){
+  console.log('[INIT] RF Recepción — cuenta:',msalAcc?msalAcc.username:'?');
+  // Mostrar home inmediatamente — carga en background
+  showHome();
+  // Carga paralela en background
+  Promise.all([
+    descubrirListas(),
+    leerCatalogos(),
+  ]).then(function(res){
+    var listasOk=res[0];
+    setConn(listasOk?'ok':'err');
+    document.getElementById('hdr-sub').textContent=
+      'Inverneg · CND'+(listasOk?'':' · sin SP');
+    console.log('[INIT] Listo — ops:'+DB.operadores.length+' sups:'+DB.supervisores.length+
+      ' pedidos:'+DB.pedidos.length+' conts:'+DB.contenedores.length);
+    // Refrescar home si el usuario sigue ahí para mostrar operadores/supervisores reales
+    if(S.step==='home') showHome();
+  }).catch(function(e){
+    console.error('[INIT] postLogin error:',e.message);
+    setConn('err');
+  });
+}
+
+function showPantallaLogin(){
+  render(
+    '<div class="loading">'+
+      '<div class="loading-icon">📦</div>'+
+      '<div style="font-size:16px;font-weight:700;color:var(--rec);margin-bottom:8px">RF Recepción</div>'+
+      '<div style="font-size:12px;color:var(--mut);margin-bottom:24px">Inverneg · Centro de Distribución Nacional</div>'+
+      '<button class="btn btn-rec btn-big" onclick="msalLogin()">🔐 Iniciar sesión Microsoft</button>'+
+    '</div>'
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 25. EXPONER AL SCOPE GLOBAL
+// ═══════════════════════════════════════════════════════════════════
+window.S=S;window.DB=DB;
+window.goHome=goHome;
+window.showHome=showHome;
+window.iniciarSesion=iniciarSesion;
+window.msalLogin=msalLogin;
+window.updateFtr=updateFtr;
+window.selCalDia=selCalDia;
+window.selTipoAsig=selTipoAsig;
+window.confAsignar=confAsignar;
+window.selContRow=selContRow;
+window.selSKU=selSKU;
+window.selEstado=selEstado;
+window.confScan=confScan;
+window.confCantidad=confCantidad;
+window.confEvento=confEvento;
+window.confSalida=confSalida;
+window.confNuevoContenedor=confNuevoContenedor;
+window.confPerchadoInicio=confPerchadoInicio;
+window.confPerchadoFin=confPerchadoFin;
+window.guardarYSalir=guardarYSalir;
+window.cerrarPedido=cerrarPedido;
+window.nuevoContenedorMismoPedido=nuevoContenedorMismoPedido;
+window.iniciarFlujo=iniciarFlujo;
+window.showMenuSup=showMenuSup;
+window.showMenuOp=showMenuOp;
+window.showCalendario=showCalendario;
+window.showPedidosSup=showPedidosSup;
+window.showEstadoPedidos=showEstadoPedidos;
+window.showAsignarSup=showAsignarSup;
+window.showSeleccionarContenedor=showSeleccionarContenedor;
+window.showNuevoContenedor=showNuevoContenedor;
+window.showEventoLlegada=showEventoLlegada;
+window.showEventoApertura=showEventoApertura;
+window.showEscaneo=showEscaneo;
+window.showSeleccionSKU=showSeleccionSKU;
+window.showIngresoCantidad=showIngresoCantidad;
+window.showEventoCierre=showEventoCierre;
+window.showEventoSalida=showEventoSalida;
+window.showFlujoPerchado=showFlujoPerchado;
+window.showPerchadoActivo=showPerchadoActivo;
+
+// ═══════════════════════════════════════════════════════════════════
+// 26. ARRANCAR — CARGAR MSAL Y EJECUTAR
+// ═══════════════════════════════════════════════════════════════════
+var s=document.createElement('script');
+s.src='https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
+s.onload=function(){
+  msalInst=new msal.PublicClientApplication(msalCfg);
+  msalInst.handleRedirectPromise().then(function(result){
+    if(result&&result.account){
+      msalAcc=result.account;postLogin();
+    } else {
+      var acc=msalInst.getAllAccounts();
+      if(acc.length>0){msalAcc=acc[0];postLogin();}
+      else showPantallaLogin();
+    }
+  }).catch(function(e){
+    console.error('[MSAL]',e.message);showPantallaLogin();
+  });
+};
+s.onerror=function(){
+  render('<div class="alert" style="margin-top:20px">Error cargando MSAL. Verifica tu conexión.</div>');
+};
+document.head.appendChild(s);
+
+})();
+</script>
+</body>
+</html>
