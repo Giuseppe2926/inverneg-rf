@@ -432,18 +432,48 @@ function parsear(hoja,data){
         obs:r[4]?r[4].toString().trim():'',
       };});
   } else if(hoja==='Contenedores'){
-    // Cols: Pedido(A),FechaProgramada(B),#Contenedor(C),#Sello(D),PalletsReportados(E),Status(F),FechaRecepcion(G),Observaciones(H)
+    // Detectar automáticamente si col B es FechaProgramada o #Contenedor
+    // Si col B parece un contenedor (TCNU, HLXU, TEMU, etc.) → sin FechaProgramada
+    // Si col B parece una fecha → con FechaProgramada
+    var tieneColFecha=false;
+    for(var ri=0;ri<Math.min(raw.length,5);ri++){
+      var v1=raw[ri][1]?raw[ri][1].toString().trim():'';
+      if(!v1) continue;
+      // Es fecha si: es número, contiene /, contiene T, o empieza con 4 dígitos
+      if(typeof raw[ri][1]==='number'||v1.indexOf('/')>-1||v1.indexOf('T')>-1||/^\d{4}/.test(v1)){
+        tieneColFecha=true; break;
+      }
+    }
+    console.log('[INIT] Contenedores — tieneColFecha:',tieneColFecha);
     DB.contenedores=raw.filter(function(r){return filaValida(r[0],50);})
-      .map(function(r){return{
-        pedido:    r[0]?r[0].toString().trim():'',
-        fechaProg: normalizarFecha(r[1]),
-        contenedor:r[2]?r[2].toString().trim():'',
-        sello:     r[3]?r[3].toString().trim():'',
-        pallets:   r[4]?Number(r[4]):0,
-        status:    r[5]?r[5].toString().trim():'Pendiente',
-        fechaRec:  normalizarFecha(r[6]),
-      };});
-    console.log('[INIT] Muestra fechaProg:',DB.contenedores.slice(0,3).map(function(c){return c.pedido+'→'+c.fechaProg;}).join(' | '));
+      .map(function(r){
+        if(tieneColFecha){
+          // A=Pedido, B=FechaProgramada, C=#Contenedor, D=#Sello, E=Pallets, F=Status, G=FechaRec
+          return{
+            pedido:    r[0]?r[0].toString().trim():'',
+            fechaProg: normalizarFecha(r[1]),
+            contenedor:r[2]?r[2].toString().trim():'',
+            sello:     r[3]?r[3].toString().trim():'',
+            pallets:   r[4]?Number(r[4]):0,
+            status:    r[5]?r[5].toString().trim():'Pendiente',
+            fechaRec:  normalizarFecha(r[6]),
+          };
+        } else {
+          // A=Pedido, B=#Contenedor, C=#Sello, D=Pallets, E=Status, F=FechaRec, G=Obs
+          return{
+            pedido:    r[0]?r[0].toString().trim():'',
+            fechaProg: '',
+            contenedor:r[1]?r[1].toString().trim():'',
+            sello:     r[2]?r[2].toString().trim():'',
+            pallets:   r[3]?Number(r[3]):0,
+            status:    r[4]?r[4].toString().trim():'Pendiente',
+            fechaRec:  normalizarFecha(r[5]),
+          };
+        }
+      });
+    console.log('[INIT] Contenedores cargados:',DB.contenedores.length,
+      '| muestra:',DB.contenedores.slice(0,2).map(function(c){
+        return c.pedido+':cont='+c.contenedor+':fp='+c.fechaProg;}).join(' | '));
   } else if(hoja==='Compra'){
     // Cols: Pedido(A),SKU(B),Descripcion(C),Cantidad(D)
     DB.compra=raw.filter(function(r){return filaValida(r[0],50)&&r[1];})
@@ -1324,12 +1354,10 @@ function goHome(){
 function msalLogin(){msalInst.loginRedirect({scopes:SCOPES});}
 
 function postLogin(){
-  render('<div class="loading">'+
-    '<div class="loading-icon">⏳</div>'+
-    '<div class="loading-txt">Conectando con SharePoint...</div>'+
-    '<div class="loading-sub">Cargando catálogos desde Excel</div>'+
-  '</div>');
   console.log('[INIT] RF Recepción — cuenta:',msalAcc?msalAcc.username:'?');
+  // Mostrar home inmediatamente — carga en background
+  showHome();
+  // Carga paralela en background
   Promise.all([
     descubrirListas(),
     leerCatalogos(),
@@ -1340,11 +1368,11 @@ function postLogin(){
       'Inverneg · CND'+(listasOk?'':' · sin SP');
     console.log('[INIT] Listo — ops:'+DB.operadores.length+' sups:'+DB.supervisores.length+
       ' pedidos:'+DB.pedidos.length+' conts:'+DB.contenedores.length);
-    showHome();
+    // Refrescar home si el usuario sigue ahí para mostrar operadores/supervisores reales
+    if(S.step==='home') showHome();
   }).catch(function(e){
     console.error('[INIT] postLogin error:',e.message);
     setConn('err');
-    showHome();
   });
 }
 
