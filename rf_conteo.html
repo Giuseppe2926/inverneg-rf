@@ -341,36 +341,39 @@ function descubrirExcel(){
 var NOISE=/^[\u2191\*\-\#]/;
 
 // Normalizar fechas desde Workbook API a formato YYYY-MM-DD
-// El API puede devolver: número serial Excel, ISO string, o string local
+// Excel Online en Ecuador/España devuelve fechas como D/M/YYYY (ej: 6/9/2026 = 6 sep 2026)
 function normalizarFecha(v){
   if(!v) return '';
   // Número serial Excel (días desde 1900-01-00)
   if(typeof v==='number'){
     var d=new Date(Math.round((v-25569)*86400*1000));
-    var pad=function(n){return String(n).padStart(2,'0');};
-    return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());
+    var pn=function(n){return String(n).padStart(2,'0');};
+    return d.getUTCFullYear()+'-'+pn(d.getUTCMonth()+1)+'-'+pn(d.getUTCDate());
   }
   var s=v.toString().trim();
   if(!s) return '';
   // Ya es YYYY-MM-DD
   if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
-  // ISO con T: 2026-09-07T00:00:00
+  // ISO con T: 2026-09-06T00:00:00
   if(s.indexOf('T')>-1) return s.substring(0,10);
-  // Formato DD/MM/YYYY o M/D/YYYY
+  // Formato con /: Excel Online Ecuador/España usa D/M/YYYY
+  // ej: "6/9/2026" = 6 de septiembre de 2026
   var partes=s.split('/');
   if(partes.length===3){
-    var a=partes[2].length===4?partes[2]:'20'+partes[2];
-    // Detectar si es D/M/YYYY o M/D/YYYY por el valor del primer campo
-    var p0=parseInt(partes[0]);
-    var p1=parseInt(partes[1]);
-    if(p0>12){
-      // D/M/YYYY → día primero
-      return a+'-'+String(p1).padStart(2,'0')+'-'+String(p0).padStart(2,'0');
-    } else {
-      // M/D/YYYY → mes primero (formato US de Excel)
-      return a+'-'+String(p0).padStart(2,'0')+'-'+String(p1).padStart(2,'0');
+    var dia=partes[0].trim();
+    var mes=partes[1].trim();
+    var anio=partes[2].trim().length===4?partes[2].trim():'20'+partes[2].trim();
+    var d2=parseInt(dia);
+    var m2=parseInt(mes);
+    // Si el primer valor > 12, definitivamente es día (D/M/YYYY)
+    // Si el segundo valor > 12, definitivamente es día en posición 2 (M/D/YYYY inverso — raro)
+    // Excel Online en configuración ES siempre usa D/M/YYYY
+    if(d2>12 || (d2<=12 && m2<=12)){
+      // Asumir D/M/YYYY (formato Ecuador/España)
+      return anio+'-'+String(m2).padStart(2,'0')+'-'+String(d2).padStart(2,'0');
     }
   }
+  console.warn('[FECHA] Formato no reconocido:',v);
   return s;
 }
 
@@ -432,48 +435,57 @@ function parsear(hoja,data){
         obs:r[4]?r[4].toString().trim():'',
       };});
   } else if(hoja==='Contenedores'){
-    // Detectar automáticamente si col B es FechaProgramada o #Contenedor
-    // Si col B parece un contenedor (TCNU, HLXU, TEMU, etc.) → sin FechaProgramada
-    // Si col B parece una fecha → con FechaProgramada
-    var tieneColFecha=false;
-    for(var ri=0;ri<Math.min(raw.length,5);ri++){
-      var v1=raw[ri][1]?raw[ri][1].toString().trim():'';
-      if(!v1) continue;
-      // Es fecha si: es número, contiene /, contiene T, o empieza con 4 dígitos
-      if(typeof raw[ri][1]==='number'||v1.indexOf('/')>-1||v1.indexOf('T')>-1||/^\d{4}/.test(v1)){
-        tieneColFecha=true; break;
-      }
+    // Cols confirmadas: A=Pedido(0), B=FechaProgramada(1), C=#Contenedor(2),
+    // D=#Sello(3), E=PalletsReportados(4), F=Status(5), G=FechaRecepcion(6), H=Obs(7)
+    // Log detallado de las primeras 3 filas para diagnosticar índices
+    console.log('[INIT] Contenedores raw — encabezado esperado: Pedido|FechaProg|Contenedor|Sello|Pallets|Status');
+    for(var _i=0;_i<Math.min(raw.length,3);_i++){
+      console.log('[INIT] Fila '+_i+':',
+        raw[_i].slice(0,8).map(function(v,idx){
+          return 'col'+idx+'='+(v===null?'null':(v===undefined?'undef':(v===''?'vacío':String(v).substring(0,20))));
+        }).join(' | '));
     }
-    console.log('[INIT] Contenedores — tieneColFecha:',tieneColFecha);
     DB.contenedores=raw.filter(function(r){return filaValida(r[0],50);})
       .map(function(r){
-        if(tieneColFecha){
-          // A=Pedido, B=FechaProgramada, C=#Contenedor, D=#Sello, E=Pallets, F=Status, G=FechaRec
-          return{
-            pedido:    r[0]?r[0].toString().trim():'',
-            fechaProg: normalizarFecha(r[1]),
-            contenedor:r[2]?r[2].toString().trim():'',
-            sello:     r[3]?r[3].toString().trim():'',
-            pallets:   r[4]?Number(r[4]):0,
-            status:    r[5]?r[5].toString().trim():'Pendiente',
-            fechaRec:  normalizarFecha(r[6]),
-          };
+        // Mapeo robusto: buscar contenedor por patrón (4+ letras mayúsculas + dígitos)
+        // y sello por patrón (SL-, LC-, etc.) para no depender del índice exacto
+        var fp=normalizarFecha(r[1]);
+        // Identificar qué columna es el contenedor vs sello
+        var _cont='', _sello='', _pall=0, _status='Pendiente', _fechaRec='';
+        var CONT_PAT=/^[A-Z]{2,4}[0-9]{5,}/;
+        var SELLO_PAT=/^[A-Z]{1,3}[-_][0-9]/;
+        // Revisar cols 2,3 para identificar cuál es contenedor y cuál sello
+        var c2=r[2]?r[2].toString().trim():'';
+        var c3=r[3]?r[3].toString().trim():'';
+        if(CONT_PAT.test(c2)&&!SELLO_PAT.test(c2)){
+          _cont=c2; _sello=c3;
+        } else if(CONT_PAT.test(c3)&&!SELLO_PAT.test(c3)){
+          _cont=c3; _sello=c2;
         } else {
-          // A=Pedido, B=#Contenedor, C=#Sello, D=Pallets, E=Status, F=FechaRec, G=Obs
-          return{
-            pedido:    r[0]?r[0].toString().trim():'',
-            fechaProg: '',
-            contenedor:r[1]?r[1].toString().trim():'',
-            sello:     r[2]?r[2].toString().trim():'',
-            pallets:   r[3]?Number(r[3]):0,
-            status:    r[4]?r[4].toString().trim():'Pendiente',
-            fechaRec:  normalizarFecha(r[5]),
-          };
+          _cont=c2; _sello=c3; // fallback: orden por índice
         }
+        var _pallRaw=r[4];
+        _pall=(_pallRaw!==null&&_pallRaw!==''&&_pallRaw!==undefined)?Number(_pallRaw):0;
+        _status=r[5]?r[5].toString().trim():'Pendiente';
+        _fechaRec=normalizarFecha(r[6]);
+        return{
+          pedido:    r[0]?r[0].toString().trim():'',
+          fechaProg: fp,
+          contenedor:_cont,
+          sello:     _sello,
+          pallets:   isNaN(_pall)?0:_pall,
+          status:    _status,
+          fechaRec:  _fechaRec,
+          obs:       r[7]?r[7].toString().trim():'',
+        };
       });
-    console.log('[INIT] Contenedores cargados:',DB.contenedores.length,
-      '| muestra:',DB.contenedores.slice(0,2).map(function(c){
-        return c.pedido+':cont='+c.contenedor+':fp='+c.fechaProg;}).join(' | '));
+    console.log('[INIT] Contenedores cargados:',DB.contenedores.length);
+    if(DB.contenedores.length>0){
+      var c0=DB.contenedores[0];
+      console.log('[INIT] Primer contenedor: pedido='+c0.pedido+
+        ' fp='+c0.fechaProg+' cont='+c0.contenedor+
+        ' sello='+c0.sello+' pallets='+c0.pallets+' status='+c0.status);
+    }
   } else if(hoja==='Compra'){
     // Cols: Pedido(A),SKU(B),Descripcion(C),Cantidad(D)
     DB.compra=raw.filter(function(r){return filaValida(r[0],50)&&r[1];})
