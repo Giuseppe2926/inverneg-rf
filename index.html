@@ -563,7 +563,6 @@ function postLogin() {
   mostrarMsalLoading(true);
   descubrirListas()
     .then(function(){ return leerCatalogos(); })
-    .then(function(){ return leerEstadoOrdenes(); })
     .then(function(){ mostrarMsalLoading(false); mostrar('s-login'); })
     .catch(function(e){ mostrarMsalLoading(false); console.error('postLogin:',e.message); });
 }
@@ -626,10 +625,20 @@ function urlLista(listId) {
 // Obtiene los listId por nombre — nunca hardcodeados
 // ============================================================
 function descubrirListas() {
+  // Cache de listIds en sessionStorage
+  var cacheKey = 'listIds_inverneg';
+  var cached = sessionStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      DB.listIds = JSON.parse(cached);
+      console.log('Listas desde cache:', JSON.stringify(DB.listIds));
+      return Promise.resolve();
+    } catch(e) { sessionStorage.removeItem(cacheKey); }
+  }
+
   var url = 'https://graph.microsoft.com/v1.0/sites/'+CFG.siteId+'/lists?$select=id,name,displayName';
   return graphGet(url).then(function(data) {
     if (!data.value) throw new Error('No se pudieron obtener las listas del sitio');
-    var nombresEsperados = Object.values(CFG.listas);
     data.value.forEach(function(lista) {
       var nombre = lista.displayName || lista.name || '';
       Object.keys(CFG.listas).forEach(function(key) {
@@ -645,6 +654,7 @@ function descubrirListas() {
       toast('Advertencia: listas no encontradas en SharePoint', 'warn', 5000);
     } else {
       console.log('Todas las listas descubiertas correctamente');
+      sessionStorage.setItem(cacheKey, JSON.stringify(DB.listIds));
     }
   }).catch(function(e) {
     console.error('descubrirListas:', e.message);
@@ -663,6 +673,20 @@ function descubrirListas() {
 // ============================================================
 function descubrirCatalogoExcel() {
   var nombre = CFG.catalogoNombre;
+
+  // Usar cache en sessionStorage para evitar busqueda en cada recarga
+  var cacheKey = 'catalogo_ids_' + nombre;
+  var cached = sessionStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      var ids = JSON.parse(cached);
+      DB.catalogoDriveId = ids.driveId;
+      DB.catalogoItemId  = ids.itemId;
+      console.log('[descubrirCatalogoExcel] Desde cache:', nombre);
+      return Promise.resolve(true);
+    } catch(e) { sessionStorage.removeItem(cacheKey); }
+  }
+
   // Buscar en el sitio SharePoint corporativo, no en OneDrive personal
   var url = 'https://graph.microsoft.com/v1.0/sites/' + CFG.siteId +
             '/drive/root/search(q=' + encodeURIComponent("'" + nombre + "'") + ')';
@@ -693,9 +717,9 @@ function descubrirCatalogoExcel() {
     DB.catalogoDriveId = archivo.parentReference && archivo.parentReference.driveId
       ? archivo.parentReference.driveId : null;
     DB.catalogoItemId = archivo.id;
-    console.log('[descubrirCatalogoExcel] Encontrado:', nombre);
-    console.log('  driveId:', DB.catalogoDriveId);
-    console.log('  itemId: ', DB.catalogoItemId);
+    // Guardar en cache para proximas recargas
+    sessionStorage.setItem(cacheKey, JSON.stringify({ driveId: DB.catalogoDriveId, itemId: DB.catalogoItemId }));
+    console.log('[descubrirCatalogoExcel] Encontrado y cacheado:', nombre);
     return true;
   }).catch(function(e) {
     console.warn('[descubrirCatalogoExcel] Error:', e.message);
@@ -955,13 +979,10 @@ function siguienteAccion(ordenId) {
 // 10. INIT y UI base
 // ============================================================
 function refrescoAutomatico() {
-  if (!msalAccount) return;
-  console.log('[Auto] Refrescando estado de ordenes...');
-  leerEstadoOrdenes().then(function() {
-    console.log('[Auto] Estado actualizado en background');
-  }).catch(function(e) {
-    console.warn('[Auto] Refresco fallido (no critico):', e.message);
-  });
+  // El estado de ordenes se refresca al escanear cada orden individualmente.
+  // El refresco automatico solo actualiza actividades varias pendientes.
+  if (!msalAccount || !estado.operadorActual) return;
+  refrescarActividadVaria().catch(function(){});
 }
 
 function init() {
