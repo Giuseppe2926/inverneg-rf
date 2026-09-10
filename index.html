@@ -769,6 +769,13 @@ function leerCatalogos() {
 }
 
 // Leer estado de ordenes desde RF_Estado_OT
+// Genera fecha ISO de hace N dias para filtros OData en Graph
+function fechaHaceNDias(n) {
+  var d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString();
+}
+
 function procesarPaginaEstado(data) {
   if (!data.value) return;
   data.value.forEach(function(item) {
@@ -781,7 +788,7 @@ function procesarPaginaEstado(data) {
 function leerEstadoOrdenes() {
   var listId = DB.listIds['estado'];
   if (!listId) { console.warn('Lista estado no disponible'); return Promise.resolve(); }
-  var baseUrl = urlLista(listId)+'/items?$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
+  var baseUrl = urlLista(listId)+'/items?$orderby=ID%20desc&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
 
   function cargarPagina(url) {
     return graphGet(url).then(function(data) {
@@ -1030,7 +1037,7 @@ function aplicarEstadoDesdeItem(item, ordenId) {
 function refrescarEstadoOrden(ordenId) {
   var listId = DB.listIds['estado'];
   if (!listId) return Promise.resolve();
-  var baseUrl = urlLista(listId)+'/items?$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
+  var baseUrl = urlLista(listId)+'/items?$orderby=ID%20desc&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
 
   function buscarEnPagina(url) {
     return graphGet(url).then(function(data) {
@@ -1385,7 +1392,7 @@ function refrescarActividadVaria() {
     });
   }
 
-  var baseUrl = urlLista(listId)+'/items?$expand=fields($select=Actividad,Evento,Operador,Sesi_x00f3_n,TimestampEvento)&$top=500';
+  var baseUrl = urlLista(listId)+'/items?$orderby=ID%20desc&$expand=fields($select=Actividad,Evento,Operador,Sesi_x00f3_n,TimestampEvento)&$top=500';
   return cargarPagina(baseUrl).then(function() {
     var registros = todosRegistros.sort(function(a,b){ return a.ts.localeCompare(b.ts); });
     console.log('[ActVaria] Registros del operador:', registros.length);
