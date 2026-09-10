@@ -2,1662 +2,1588 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="mobile-web-app-capable" content="yes">
-<title>RF Recepción — Inverneg</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Despacho RF — Inverneg</title>
 <style>
-:root{
-  --bg:#0D1117;--sur:#161B22;--sur2:#1C2330;--bor:#2A3340;
-  --txt:#E6EDF3;--mut:#7D8590;
-  --acc:#58A6FF;--ok:#3FB950;--warn:#E3B341;--dan:#F85149;--rec:#F0883E;
-  --mono:'Courier New',monospace;
-}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden}
-#app{display:flex;flex-direction:column;min-height:100vh}
+  :root {
+    --negro:    #0D0D0D;
+    --gris-dk:  #1C1C1E;
+    --gris-md:  #2C2C2E;
+    --gris-lt:  #3A3A3C;
+    --borde:    #48484A;
+    --texto:    #F5F5F7;
+    --sub:      #AEAEB2;
+    --pick:     #30D158;
+    --check:    #FF9F0A;
+    --pack:     #BF5AF2;
+    --fact:     #0A84FF;
+    --danger:   #FF453A;
+    --warn:     #FFD60A;
+    --teal:     #2EC4B6;
+    --r:        12px;
+    --r-sm:     8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--negro); color: var(--texto); font-family: -apple-system, "SF Pro Display", Arial, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
 
-/* HEADER */
-.hdr{background:var(--sur);border-bottom:1px solid var(--bor);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.hdr-brand{font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--rec)}
-.hdr-sub{font-size:10px;color:var(--mut);margin-top:1px}
-.hdr-btn{background:var(--sur2);border:1px solid var(--bor);color:var(--mut);font-size:11px;padding:5px 10px;border-radius:5px;cursor:pointer}
+  /* HEADER */
+  header { background: var(--gris-dk); border-bottom: 1px solid var(--borde); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  header h1 { font-size: 15px; font-weight: 700; letter-spacing: .3px; }
+  header span.sub { font-size: 11px; color: var(--sub); display: block; }
+  .btn-inicio { background: var(--gris-lt); border: none; color: var(--texto); font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: var(--r-sm); cursor: pointer; }
+  .btn-inicio:active { opacity: .7; }
 
-/* SCREEN */
-#screen{flex:1;padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  /* MAIN */
+  main { flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-bottom: 30px; }
 
-/* FOOTER */
-.ftr{background:var(--sur);border-top:1px solid var(--bor);padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;min-height:44px}
-.ftr-op{font-size:11px;color:var(--mut)}
-.ftr-conn{display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--warn)}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--warn)}
-.dot.ok{background:var(--ok)}.dot.err{background:var(--dan)}
+  /* PANTALLAS */
+  .screen { display: none; flex-direction: column; gap: 12px; }
+  .screen.active { display: flex; }
 
-/* INPUTS */
-.lbl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;margin-top:10px}
-.inp{width:100%;background:var(--sur2);border:1px solid var(--bor);color:var(--txt);font-size:16px;padding:10px 12px;border-radius:6px;outline:none;font-family:inherit}
-.inp:focus{border-color:var(--acc)}
-.inp-sm{font-size:14px;padding:8px 10px}
-select.inp{appearance:none;-webkit-appearance:none}
+  /* CARD */
+  .card { background: var(--gris-dk); border: 1px solid var(--borde); border-radius: var(--r); padding: 14px; }
+  .card-title { font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
 
-/* BUTTONS */
-.btn{border:none;border-radius:6px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .1s}
-.btn:active{opacity:.75}
-.btn-pri{background:var(--acc);color:#000}
-.btn-ok{background:var(--ok);color:#000}
-.btn-warn{background:var(--dan);color:#fff}
-.btn-sec{background:var(--sur2);color:var(--txt);border:1px solid var(--bor)}
-.btn-rec{background:var(--rec);color:#000}
-.btn-big{width:100%;padding:13px;font-size:15px}
-.btn-row{display:flex;gap:8px}
-.btn-row .btn{flex:1}
+  /* INPUTS */
+  input, select { width: 100%; background: var(--gris-md); border: 1px solid var(--borde); border-radius: var(--r-sm); color: var(--texto); font-size: 20px; font-weight: 600; padding: 13px 14px; outline: none; -webkit-appearance: none; }
+  input:focus, select:focus { border-color: var(--fact); }
+  input.scan { font-size: 22px; letter-spacing: 1px; }
+  select { font-size: 18px; }
+  select option { background: var(--gris-dk); }
+  label { font-size: 12px; color: var(--sub); display: block; margin-bottom: 5px; }
 
-/* TYPE CARDS */
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
-.card-t{background:var(--sur2);border:2px solid var(--bor);border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;transition:border-color .15s}
-.card-t:active{border-color:var(--acc)}
-.card-t.sel{border-color:var(--acc);background:#1a2030}
-.card-t.sel-rec{border-color:var(--rec);background:#1e1a14}
-.card-t-icon{font-size:26px;margin-bottom:6px}
-.card-t-lbl{font-size:12px;font-weight:700;letter-spacing:.06em}
+  /* BOTONES */
+  .btn { width: 100%; border: none; border-radius: var(--r); font-size: 17px; font-weight: 700; padding: 16px; cursor: pointer; letter-spacing: .2px; transition: opacity .15s; }
+  .btn:active { opacity: .75; }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .btn-pick   { background: var(--pick);    color: #000; }
+  .btn-check  { background: var(--check);   color: #000; }
+  .btn-pack   { background: var(--pack);    color: #fff; }
+  .btn-fact   { background: var(--fact);    color: #fff; }
+  .btn-gris   { background: var(--gris-lt); color: var(--texto); }
+  .btn-teal   { background: var(--teal);    color: #000; }
+  .btn-danger { background: var(--danger);  color: #fff; }
+  .btn-sm { font-size: 14px; padding: 11px 14px; border-radius: var(--r-sm); }
 
-/* BADGES */
-.badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;padding:3px 10px;border-radius:4px;margin-bottom:8px;text-transform:uppercase}
-.badge-rec{background:rgba(240,136,62,.15);color:var(--rec);border:1px solid rgba(240,136,62,.3)}
-.badge-sup{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.3)}
-.badge-ok{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.3)}
+  /* BADGES */
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .badge-pick  { background: rgba(48,209,88,.18);   color: var(--pick);  border: 1px solid var(--pick); }
+  .badge-check { background: rgba(255,159,10,.18);  color: var(--check); border: 1px solid var(--check); }
+  .badge-pack  { background: rgba(191,90,242,.18);  color: var(--pack);  border: 1px solid var(--pack); }
+  .badge-fact  { background: rgba(10,132,255,.18);  color: var(--fact);  border: 1px solid var(--fact); }
+  .badge-ok    { background: rgba(48,209,88,.18);   color: var(--pick);  border: 1px solid var(--pick); }
+  .badge-pend  { background: rgba(174,174,178,.12); color: var(--sub);   border: 1px solid var(--borde); }
+  .badge-init  { background: rgba(255,214,10,.18);  color: var(--warn);  border: 1px solid var(--warn); }
 
-/* STEPS */
-.steps{display:flex;gap:3px;margin-bottom:10px}
-.step{height:3px;border-radius:2px;flex:1;background:var(--bor)}
-.step.on{background:var(--rec)}
+  /* ETAPAS TRACKER */
+  .etapas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .etapa-item { background: var(--gris-md); border: 1px solid var(--borde); border-radius: var(--r-sm); padding: 10px 12px; }
+  .etapa-item .etapa-nombre { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+  .etapa-item .etapa-det { font-size: 10px; color: var(--sub); line-height: 1.4; }
+  .etapa-pick  .etapa-nombre { color: var(--pick); }
+  .etapa-check .etapa-nombre { color: var(--check); }
+  .etapa-pack  .etapa-nombre { color: var(--pack); }
+  .etapa-fact  .etapa-nombre { color: var(--fact); }
 
-/* ALERTS */
-.alert{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);color:var(--dan);border-radius:6px;padding:8px 12px;font-size:12px;margin:6px 0}
-.alert-w{background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:12px;margin:6px 0}
+  /* ORDEN INFO */
+  .orden-num  { font-size: 30px; font-weight: 800; letter-spacing: 1px; color: var(--texto); margin-bottom: 4px; }
+  .orden-meta { font-size: 12px; color: var(--sub); }
+  .divider    { height: 1px; background: var(--borde); }
 
-/* CARDS DE PEDIDO/CONTENEDOR */
-.card-item{background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;position:relative}
-.card-item:active{border-color:var(--acc)}
-.card-item-title{font-size:14px;font-weight:700;color:var(--txt);margin-bottom:3px}
-.card-item-sub{font-size:11px;color:var(--mut)}
-.card-item-badge{position:absolute;right:12px;top:12px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;text-transform:uppercase}
-.status-pend{background:rgba(227,179,65,.2);color:var(--warn)}
-.status-act{background:rgba(240,136,62,.2);color:var(--rec)}
-.status-ok{background:rgba(63,185,80,.2);color:var(--ok)}
+  /* TOAST */
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--gris-lt); color: var(--texto); border-radius: var(--r); padding: 12px 20px; font-size: 14px; font-weight: 600; z-index: 999; transition: transform .3s ease; white-space: nowrap; border: 1px solid var(--borde); max-width: 90vw; text-align: center; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.ok   { border-color: var(--pick);   color: var(--pick); }
+  #toast.err  { border-color: var(--danger); color: var(--danger); }
+  #toast.warn { border-color: var(--warn);   color: var(--warn); }
 
-/* EVENTO CARD */
-.evt-card{background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
-.evt-icon{font-size:22px;flex-shrink:0}
-.evt-body{flex:1}
-.evt-title{font-size:13px;font-weight:700}
-.evt-time{font-size:12px;color:var(--ok);margin-top:2px}
-.evt-pend{font-size:12px;color:var(--mut);margin-top:2px}
-.evt-btn{flex-shrink:0}
+  /* AVISO */
+  .aviso { background: rgba(255,69,58,.1); border: 1px solid var(--danger); border-radius: var(--r-sm); padding: 10px 12px; font-size: 13px; color: #FF6B63; display: none; }
+  .aviso.show { display: block; }
 
-/* CALENDARIO */
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
-.cal-day{padding:8px 4px;text-align:center;font-size:12px;border-radius:6px;cursor:pointer;background:var(--sur2);border:1px solid var(--bor)}
-.cal-day.hoy{border-color:var(--acc);color:var(--acc);font-weight:700}
-.cal-day.sel{background:var(--acc);color:#000;font-weight:700}
-.cal-day.has-data{border-color:var(--rec)}
-.cal-day.vacio{background:transparent;border-color:transparent;cursor:default;color:var(--mut)}
-.cal-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
-.cal-hdr-d{text-align:center;font-size:10px;color:var(--mut);font-weight:700;padding:4px}
+  /* ROW */
+  .row { display: flex; gap: 8px; }
+  .row .btn { flex: 1; }
 
-/* BUSQUEDA SKU */
-.sku-item{background:var(--sur2);border:1px solid var(--bor);border-radius:6px;padding:10px 12px;margin-bottom:6px;cursor:pointer}
-.sku-item:active{border-color:var(--acc)}
-.sku-cod{font-size:12px;color:var(--acc);font-weight:700;margin-bottom:2px}
-.sku-desc{font-size:13px;color:var(--txt)}
+  /* HORA DISPLAY */
+  .hora-grande { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--warn); letter-spacing: 2px; }
+  .fecha-label { font-size: 11px; color: var(--sub); margin-top: 2px; }
 
-/* TOAST */
-.toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--sur2);border:1px solid var(--bor);color:var(--txt);padding:8px 16px;border-radius:8px;font-size:12px;z-index:999;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
-.toast.show{opacity:1}
+  /* TOGGLE MULTIPERSONAS */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0 6px; border-bottom: 1px solid var(--borde); margin-bottom: 12px; }
+  .toggle-label { font-size: 13px; font-weight: 700; color: var(--texto); }
+  .toggle-sub   { font-size: 11px; color: var(--sub); }
+  .toggle-wrap  { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+  .toggle-wrap input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--gris-lt); border-radius: 26px; cursor: pointer; transition: background .2s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+  .toggle-wrap input:checked + .toggle-slider { background: var(--fact); }
+  .toggle-wrap input:checked + .toggle-slider::before { transform: translateX(18px); }
 
-/* LOADING */
-.loading{text-align:center;padding:40px 0}
-.loading-icon{font-size:32px;margin-bottom:12px}
-.loading-txt{font-size:13px;font-weight:700;color:var(--acc);margin-bottom:6px}
-.loading-sub{font-size:11px;color:var(--mut)}
+  /* TIPO SELECCION */
+  .tipo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .tipo-card { border: 2px solid var(--borde); border-radius: 16px; padding: 24px 14px; text-align: center; cursor: pointer; transition: all .18s; background: var(--gris-dk); }
+  .tipo-card:active { transform: scale(.96); opacity: .85; }
+  .tipo-card .tc-icon { font-size: 38px; margin-bottom: 10px; }
+  .tipo-card .tc-lbl  { font-size: 14px; font-weight: 800; letter-spacing: .2px; }
+  .tipo-card .tc-sub  { font-size: 11px; color: var(--sub); margin-top: 5px; line-height: 1.4; }
+  .tipo-card.t-orden  { border-color: var(--fact); }
+  .tipo-card.t-varias { border-color: var(--teal); }
+  .tipo-card.t-orden  .tc-lbl { color: var(--fact); }
+  .tipo-card.t-varias .tc-lbl { color: var(--teal); }
 
-/* VAL */
-.val{font-size:28px;font-weight:700;margin:6px 0;text-align:center}
-.val.ok{color:var(--ok)}.val.rec{color:var(--rec)}
+  /* ACTIVIDADES VARIAS */
+  .varias-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var-card { border: 2px solid var(--borde); border-radius: 12px; padding: 18px 10px; text-align: center; cursor: pointer; transition: all .18s; background: var(--gris-dk); }
+  .var-card:active { transform: scale(.95); }
+  .var-card .v-icon { font-size: 28px; margin-bottom: 6px; }
+  .var-card .v-lbl  { font-size: 13px; font-weight: 700; }
+  .var-card.v-inv    { border-color: var(--fact);  color: var(--fact); }
+  .var-card.v-etiq   { border-color: var(--warn);  color: var(--warn); }
+  .var-card.v-dan    { border-color: var(--danger); color: var(--danger); }
+  .var-card.v-mkt    { border-color: #FF6AD2;       color: #FF6AD2; }
+  .var-card.v-dest   { border-color: #FF8C42;       color: #FF8C42; }
+  .var-card.v-embpal { border-color: var(--teal);  color: var(--teal); }
+  .var-card.v-embdan { border-color: var(--pack);  color: var(--pack); }
+
+  /* Banner actividad pendiente */
+  .activa-banner { background: rgba(255,214,10,.08); border: 1px solid var(--warn); border-radius: var(--r); padding: 12px 14px; display: flex; align-items: flex-start; gap: 10px; }
+  .activa-banner .ab-icon   { font-size: 22px; flex-shrink: 0; }
+  .activa-banner .ab-titulo { font-size: 13px; font-weight: 700; color: var(--warn); }
+  .activa-banner .ab-det    { font-size: 11px; color: var(--sub); margin-top: 3px; line-height: 1.4; }
+
+  /* Box actividad en curso */
+  .box-varias { border-radius: var(--r); padding: 20px 16px; text-align: center; background: linear-gradient(135deg, #0D3B38, #0a5c56); border: 1px solid var(--teal); }
+  .box-varias .bv-act { font-size: 11px; color: var(--teal); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+  .box-varias .bv-val { font-size: 26px; font-weight: 800; color: #fff; margin: 8px 0 4px; }
+  .box-varias .bv-sub { font-size: 12px; color: rgba(255,255,255,.6); }
+
+  /* PANTALLA MSAL — autenticacion Microsoft */
+  .msal-card { background: var(--gris-dk); border: 1px solid var(--borde); border-radius: var(--r); padding: 28px 20px; text-align: center; }
+  .msal-logo { font-size: 48px; margin-bottom: 12px; }
+  .msal-titulo { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+  .msal-sub { font-size: 12px; color: var(--sub); margin-bottom: 20px; line-height: 1.5; }
+  .msal-user { background: rgba(10,132,255,.12); border: 1px solid var(--fact); border-radius: var(--r-sm); padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--fact); margin-bottom: 14px; word-break: break-all; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid var(--borde); border-top-color: var(--fact); border-radius: 50%; animation: spin .8s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-<div id="app">
-  <div class="hdr">
-    <div>
-      <div class="hdr-brand">▸ RF RECEPCIÓN</div>
-      <div class="hdr-sub" id="hdr-sub">Inverneg · CND</div>
-    </div>
-    <button class="hdr-btn" onclick="window.goHome&&goHome()">⌂ Inicio</button>
+
+<header>
+  <div>
+    <h1>Despacho RF</h1>
+    <span class="sub" id="header-sub">Inverneg · CND</span>
   </div>
-  <div id="screen">
-    <div class="loading">
-      <div class="loading-icon">📦</div>
-      <div class="loading-txt">Iniciando...</div>
+  <button class="btn-inicio" onclick="irInicio()">⌂ Inicio</button>
+</header>
+
+<main>
+
+<!-- PANTALLA MSAL: autenticacion Microsoft -->
+<div class="screen active" id="s-msal">
+  <div class="msal-card">
+    <div class="msal-logo">🔐</div>
+    <div class="msal-titulo">Inverneg · Despacho RF</div>
+    <div class="msal-sub">Inicia sesión con tu cuenta Microsoft<br>de Inverneg para continuar.</div>
+    <div class="msal-user" id="msal-user-info" style="display:none;"></div>
+    <button class="btn btn-fact" id="btn-msal-login" onclick="msalLogin()">
+      Iniciar sesión con Microsoft
+    </button>
+    <div id="msal-loading" style="display:none; margin-top:14px; font-size:13px; color:var(--sub);">
+      <span class="spinner"></span>Verificando sesión...
     </div>
-  </div>
-  <div class="ftr">
-    <div class="ftr-op" id="ftr-op">—</div>
-    <div class="ftr-conn"><div class="dot" id="conn-dot"></div><span id="conn-lbl">CONECTANDO</span></div>
+    <div class="aviso" id="aviso-msal" style="margin-top:12px;"></div>
   </div>
 </div>
-<div class="toast" id="toast"></div>
+
+<!-- PANTALLA LOGIN: seleccion de operador -->
+<div class="screen" id="s-login">
+  <div class="card">
+    <div class="card-title">Identificación</div>
+    <label>Selecciona tu nombre</label>
+    <select id="sel-operador"><option value="">— Operador —</option></select>
+  </div>
+  <div class="card" style="text-align:center; padding:10px 14px;">
+    <div class="hora-grande" id="reloj">--:--:--</div>
+    <div class="fecha-label" id="fecha-hoy"></div>
+  </div>
+  <button class="btn btn-fact" onclick="loginContinuar()">Continuar →</button>
+  <button class="btn btn-gris btn-sm" onclick="msalLogout()">Cerrar sesión Microsoft</button>
+</div>
+
+<!-- PANTALLA TIPO -->
+<div class="screen" id="s-tipo">
+  <div class="card">
+    <div class="card-title">¿Qué vas a realizar?</div>
+    <div class="tipo-grid">
+      <div class="tipo-card t-orden" onclick="selTipo('orden')">
+        <div class="tc-icon">📋</div>
+        <div class="tc-lbl">Orden de Trabajo</div>
+        <div class="tc-sub">Picking, Checking, Packing, Facturación</div>
+      </div>
+      <div class="tipo-card t-varias" onclick="selTipo('varias')">
+        <div class="tc-icon">⚡</div>
+        <div class="tc-lbl">Actividades Varias</div>
+        <div class="tc-sub">Inventario, MKT, Dañados y más</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA 1: ESCANEO DE ORDEN -->
+<div class="screen" id="s-scan">
+  <div class="card">
+    <div class="card-title">Escanear Orden</div>
+    <label>Código / # de Orden</label>
+    <input id="inp-orden" class="scan" type="text" placeholder="Escanea o ingresa..."
+           autocomplete="off" autocorrect="off" spellcheck="false"
+           onkeydown="if(event.key==='Enter') buscarOrden()">
+  </div>
+  <button class="btn btn-gris" onclick="buscarOrden()">Buscar Orden</button>
+  <div class="aviso" id="aviso-scan"></div>
+  <button class="btn btn-gris btn-sm" onclick="mostrar('s-tipo')">← Volver</button>
+</div>
+
+<!-- PANTALLA 2: DETALLE / ACCIONES DE ORDEN -->
+<div class="screen" id="s-detalle">
+  <div class="card">
+    <div class="card-title">Orden</div>
+    <div class="orden-num" id="d-orden-num">—</div>
+    <div class="orden-meta" id="d-orden-meta"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Estado actual</div>
+    <div class="etapas" id="etapas-tracker"></div>
+  </div>
+  <div id="acciones-container"></div>
+  <button class="btn btn-gris btn-sm" id="btn-override" onclick="abrirOverride()" disabled
+    style="border:1px solid #FF9F0A;color:#FF9F0A;background:transparent;opacity:.4;margin-top:4px">
+    ⚡ Override supervisorial
+  </button>
+  <button class="btn btn-gris btn-sm" onclick="volverScan()">← Escanear otra orden</button>
+</div>
+
+<!-- MODAL OVERRIDE -->
+<div id="modal-override" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--gris-dk);border:1px solid #FF9F0A;border-radius:var(--r);padding:20px;width:90%;max-width:360px">
+    <div style="font-size:13px;font-weight:700;color:#FF9F0A;margin-bottom:6px">⚡ Override supervisorial</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:14px" id="override-desc">—</div>
+    <label style="font-size:12px;color:var(--sub)">Contraseña de supervisor</label>
+    <input id="override-pass" type="password" placeholder="••••••"
+      style="font-size:20px;margin-top:6px;margin-bottom:12px;letter-spacing:4px"
+      onkeydown="if(event.key==='Enter') confirmarOverride()">
+    <div class="aviso" id="aviso-override" style="margin-bottom:10px"></div>
+    <button class="btn" style="background:#FF9F0A;color:#000;margin-bottom:8px" onclick="confirmarOverride()">Aprobar override</button>
+    <button class="btn btn-gris btn-sm" onclick="cerrarOverride()">Cancelar</button>
+  </div>
+</div>
+
+<!-- PANTALLA 3: CONFIRMAR ACCION -->
+<div class="screen" id="s-confirmar">
+  <div class="card">
+    <div class="card-title" id="conf-titulo">Confirmar acción</div>
+    <div class="orden-num" id="conf-orden">—</div>
+    <div class="orden-meta" id="conf-accion" style="margin-top:6px; font-size:14px; font-weight:600;"></div>
+  </div>
+  <div class="card" id="card-operadores">
+    <div class="toggle-row" id="toggle-multi-row" style="display:none;">
+      <div>
+        <div class="toggle-label">👥 Multipersonas</div>
+        <div class="toggle-sub">Varias personas trabajarán esta etapa</div>
+      </div>
+      <label class="toggle-wrap">
+        <input type="checkbox" id="chk-multi" onchange="toggleMulti()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div id="bloque-num-personas" style="display:none; margin-bottom:12px;">
+      <label>¿Cuántas personas en total?</label>
+      <select id="sel-num-personas">
+        <option value="">— Selecciona —</option>
+        <option value="2">2 personas</option>
+        <option value="3">3 personas</option>
+        <option value="4">4 personas</option>
+        <option value="5">5 personas</option>
+      </select>
+    </div>
+    <div id="modo-individual">
+      <label id="label-op-accion">¿Quién realiza esta acción?</label>
+      <select id="sel-op-accion"><option value="">— Selecciona tu nombre —</option></select>
+    </div>
+  </div>
+  <div id="nota-multi" style="display:none; background:rgba(10,132,255,.1); border:1px solid var(--fact); border-radius:var(--r-sm); padding:10px 12px; font-size:12px; color:#5AC8FA; line-height:1.6;"></div>
+  <div class="aviso" id="aviso-conf"></div>
+  <button class="btn" id="btn-confirmar-accion" onclick="ejecutarAccion()">Registrar</button>
+  <button class="btn btn-gris btn-sm" onclick="volverDetalle()">← Volver</button>
+</div>
+
+<!-- PANTALLA 4: CONFIRMACION REGISTRADA -->
+<div class="screen" id="s-ok">
+  <div class="card" style="text-align:center; padding: 24px 14px;">
+    <div style="font-size:48px; margin-bottom:8px;">✓</div>
+    <div style="font-size:20px; font-weight:800; color: var(--pick); margin-bottom:6px;" id="ok-titulo">Registrado</div>
+    <div style="font-size:14px; color: var(--sub);" id="ok-detalle"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Resumen</div>
+    <div id="ok-resumen" style="font-size:13px; line-height:1.8; color: var(--sub);"></div>
+  </div>
+  <div id="ok-siguiente" style="display:flex; flex-direction:column; gap:8px;"></div>
+  <button class="btn btn-pick" id="btn-add-picking" style="display:none;" onclick="agregarOrdenAlPicking()">＋ Agregar otra orden al Picking</button>
+  <div class="divider"></div>
+  <button class="btn btn-fact" onclick="otraOrden()">Escanear otra orden</button>
+  <button class="btn btn-gris btn-sm" onclick="irInicio()">⌂ Menú principal</button>
+</div>
+
+<!-- PANTALLA A: ACTIVIDADES VARIAS — seleccion -->
+<div class="screen" id="s-varias">
+  <div class="activa-banner" id="banner-activa" style="display:none;">
+    <div class="ab-icon">⚠️</div>
+    <div>
+      <div class="ab-titulo">Actividad pendiente de finalizar</div>
+      <div class="ab-det" id="banner-activa-det">—</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">⚡ Selecciona la actividad</div>
+    <div class="varias-grid" id="varias-grid"></div>
+  </div>
+  <button class="btn btn-gris btn-sm" onclick="mostrar('s-tipo')">← Volver</button>
+</div>
+
+<!-- PANTALLA B: ACTIVIDADES VARIAS — confirmar inicio -->
+<div class="screen" id="s-varias-confirmar">
+  <div class="card" style="text-align:center; padding: 20px 14px;">
+    <div style="font-size:40px; margin-bottom:8px;" id="vc-icon">⚡</div>
+    <div style="font-size:22px; font-weight:800; color: var(--teal); margin-bottom:4px;" id="vc-act">—</div>
+    <div style="font-size:13px; color: var(--sub);" id="vc-op">—</div>
+  </div>
+  <div class="aviso" id="aviso-vc"></div>
+  <button class="btn btn-teal" style="font-size:18px; padding:18px;" onclick="iniciarActividadVaria()">
+    ▶ Iniciar Actividad
+  </button>
+  <button class="btn btn-gris btn-sm" onclick="mostrar('s-varias')">← Cambiar actividad</button>
+</div>
+
+<!-- PANTALLA C: ACTIVIDADES VARIAS — en curso -->
+<div class="screen" id="s-varias-activa">
+  <div class="box-varias">
+    <div class="bv-act" id="va-act-lbl">—</div>
+    <div class="bv-val" id="va-op-val">—</div>
+    <div class="bv-sub" id="va-inicio-sub">Inicio: —</div>
+  </div>
+  <div class="card">
+    <div class="card-title">⏱ Control de tiempo</div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <span style="font-size:12px; color:var(--sub);">Operador</span>
+      <span style="font-size:13px; font-weight:700;" id="va-op">—</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <span style="font-size:12px; color:var(--sub);">Actividad</span>
+      <span style="font-size:13px; font-weight:700;" id="va-act">—</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <span style="font-size:12px; color:var(--sub);">Inicio</span>
+      <span style="font-size:13px; font-weight:700;" id="va-inicio">—</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;" id="va-fin-row">
+      <span style="font-size:12px; color:var(--sub);">Fin</span>
+      <span style="font-size:13px; font-weight:700; color:var(--pick);" id="va-fin">—</span>
+    </div>
+    <button class="btn btn-teal" id="btn-va-fin" onclick="finActividadVaria()" style="margin-top:12px; font-size:16px;">
+      ■ Finalizar Actividad
+    </button>
+  </div>
+  <button class="btn btn-gris btn-sm" onclick="mostrar('s-tipo')">⌂ Menú principal</button>
+</div>
+
+</main>
+<div id="toast"></div>
 
 <script>
-(function(){
 'use strict';
 
-// ═══════════════════════════════════════════════════════════════════
-// 1. UTILIDADES
-// ═══════════════════════════════════════════════════════════════════
-function pad(n){return String(n).padStart(2,'0');}
-function ahora(){
+(function() {
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
+  s.onerror = function() {
+    document.getElementById('aviso-msal').textContent = 'Error cargando libreria de autenticacion. Verifica tu conexion.';
+    document.getElementById('aviso-msal').classList.add('show');
+  };
+  s.onload = function() {
+
+// ============================================================
+// 1. UTILIDADES PURAS
+// ============================================================
+function generarSesion() {
+  var d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
+  return 'SES-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+
+         '-'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
+}
+function ahora() {
+  var d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
+  var fecha = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  var hora  = pad(d.getHours())+':'+pad(d.getMinutes());
+  return { fecha:fecha, hora:hora, ts:fecha+' '+hora+':'+pad(d.getSeconds()), raw:d };
+}
+function toast(msg, tipo, dur) {
+  tipo=tipo||'ok'; dur=dur||2400;
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.className='show '+tipo;
+  setTimeout(function(){ t.className=''; }, dur);
+}
+function mostrar(id) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+function reloj() {
+  var d=new Date(), pad=function(n){ return String(n).padStart(2,'0'); };
+  var el=document.getElementById('reloj');
+  if (el) el.textContent=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+}
+function fechaHoy() {
   var d=new Date();
-  var fecha=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
-  var hora=pad(d.getHours())+':'+pad(d.getMinutes());
-  return{fecha:fecha,hora:hora,ts:fecha+' '+hora+':'+pad(d.getSeconds()),raw:d};
+  var dias=['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+  var meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return dias[d.getDay()]+' '+d.getDate()+' '+meses[d.getMonth()]+' '+d.getFullYear();
 }
-function horaActual(){var t=ahora();return t.hora;}
-function generarRecId(){
-  var t=ahora();
-  return 'REC-'+t.fecha.replace(/-/g,'')+'-'+String(Math.floor(Math.random()*900)+100);
-}
-function render(html){document.getElementById('screen').innerHTML=html;}
-function toast(msg,dur){
-  var el=document.getElementById('toast');
-  el.textContent=msg;el.classList.add('show');
-  setTimeout(function(){el.classList.remove('show');},dur||2200);
-}
-function setConn(s){
-  var dot=document.getElementById('conn-dot');
-  var lbl=document.getElementById('conn-lbl');
-  dot.className='dot';
-  if(s==='ok'){dot.classList.add('ok');lbl.textContent='LIVE';}
-  else if(s==='err'){dot.classList.add('err');lbl.textContent='SIN CONEXIÓN';}
-  else lbl.textContent='CONECTANDO';
-}
-function updateFtr(){
-  var op=S.operario||'—';
-  var rol=S.rol?(' · '+(S.rol==='supervisor'?'SUP':'OP')):'';
-  document.getElementById('ftr-op').textContent=op+rol;
-}
-function stepsBar(cur,tot){
-  var h='<div class="steps">';
-  for(var i=0;i<tot;i++) h+='<div class="step'+(i<cur?' on':'')+'"></div>';
-  return h+'</div>';
-}
-function normStr(s){return s?s.trim().toUpperCase():'';}
-function fechaDisplay(iso){
-  if(!iso) return '';
-  var p=iso.split('-');
-  return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:iso;
+function getSemana(d) {
+  var d2=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  d2.setUTCDate(d2.getUTCDate()+4-(d2.getUTCDay()||7));
+  var ys=new Date(Date.UTC(d2.getUTCFullYear(),0,1));
+  return Math.ceil((((d2-ys)/86400000)+1)/7);
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// 2. CFG
-// ═══════════════════════════════════════════════════════════════════
-var CFG={
-  clientId:   'ec976114-e146-4ce4-850c-5d978e12acfd',
-  tenantId:   '5e008bd3-17b6-4f83-8d23-019691a40609',
-  siteId:     'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
-  catalogoNombre: 'Inverneg_ConteoRF_Base_Live.xlsx',
-  listas:{
-    recepciones: 'RF_PRecepciones_LRecepciones',
-    eventos:     'RF_PRecepciones_LEventos',
-    asignaciones:'RF_PRecepciones_LAsignaciones',
+// ============================================================
+// 2. CONFIGURACION
+// ============================================================
+var CFG = {
+  clientId:    'ec976114-e146-4ce4-850c-5d978e12acfd',
+  tenantId:    '5e008bd3-17b6-4f83-8d23-019691a40609',
+  redirectUri: window.location.href.split('?')[0].split('#')[0],
+  siteId:      'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
+  listas: {
+    registros: 'RF_Registros_Despacho',
+    estado:    'RF_Estado_OT',
+    varias:    'RF_Actividades_Varias',
   },
-};
-var GRAPH='https://graph.microsoft.com/v1.0';
-
-// ═══════════════════════════════════════════════════════════════════
-// 3. DB
-// ═══════════════════════════════════════════════════════════════════
-var DB={
-  operadores:[],supervisores:[],
-  pedidos:[],contenedores:[],
-  compra:[],importaciones:[],
-  codigosBarra:[],
-  listIds:{recepciones:null,eventos:null,asignaciones:null},
-  catalogoDriveId:null,catalogoItemId:null,
+  // Nombre del archivo Excel de catálogos en SharePoint
+  // driveId e itemId se descubren automáticamente al iniciar sesión
+  catalogoNombre: 'Inverneg_DespachoRF_Base_Catálogos.xlsx',
 };
 
-// ═══════════════════════════════════════════════════════════════════
-// 4. ESTADO DE SESIÓN
-// ═══════════════════════════════════════════════════════════════════
-var S={
-  rol:'',operario:'',
-  // Recepción activa
-  recId:'',pedido:'',contenedor:'',sello:'',pallets:0,subtipo:'',
-  eventos:{llegada:null,apertura:null,cierre:null,salida:null},
-  skusRegistrados:[],
-  step:'home',
-  // Calendario
-  calFecha:'',
-  // SKU scan
-  skuActual:null,
-};
+var GRAPH_SCOPES = ['Files.ReadWrite', 'Sites.ReadWrite.All'];
 
-// ═══════════════════════════════════════════════════════════════════
-// 5. MSAL
-// ═══════════════════════════════════════════════════════════════════
-var msalInst,msalAcc;
-var SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
-var msalCfg={
-  auth:{
-    clientId:CFG.clientId,
-    authority:'https://login.microsoftonline.com/'+CFG.tenantId,
-    redirectUri:location.href.split('?')[0].split('#')[0],
-    navigateToLoginRequestUrl:false,
+// ============================================================
+// 3. MSAL
+// ============================================================
+var msalInstance = new msal.PublicClientApplication({
+  auth: {
+    clientId:    CFG.clientId,
+    authority:   'https://login.microsoftonline.com/'+CFG.tenantId,
+    redirectUri: CFG.redirectUri,
   },
-  cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true},
+  cache: { cacheLocation:'sessionStorage', storeAuthStateInCookie:false },
+});
+var msalAccount = null;
+
+// ============================================================
+// 4. DB EN MEMORIA
+// ============================================================
+var DB = {
+  // Operadores de respaldo — se sobreescriben al cargar el Excel de catálogos
+  operadores:  ['ALAVA LUIS','ALBAN FERNANDO','BACILIO WILLIAN','BRIONES JOHNNY','CAMPOVERDE ERWIN','CORDERO JOEL','GARCIA JAVIER','JUMBO JONATHAN','LEDEZMA CRISTIAN','LUCAS DAVE','MENDOZA HENRY','COBOS CRISTHIAN','RIVERO BRYAN','MORA KEVIN','MUDUMBA ISAAC','MURILLO JOSE','VERA OMAR','RODRIGUEZ PETER','SALDAÑA JHON','TOALA ERICK','ZAMBRANO ANDRES','LOPEZ KEVIN','MONTEVERDE LONDRES','JUNCO GIUSEPPE'],
+  actividades: [],
+  ordenes:     {},
+  listIds:     {},
+  catalogoDriveId: null,  // se descubre automáticamente
+  catalogoItemId:  null,  // se descubre automáticamente
 };
 
-// ═══════════════════════════════════════════════════════════════════
-// 6. GRAPH HELPERS
-// ═══════════════════════════════════════════════════════════════════
-function getToken(){
-  if(!msalAcc) return Promise.reject(new Error('Sin sesión'));
-  var req={scopes:SCOPES,account:msalAcc};
-  return msalInst.acquireTokenSilent(req).catch(function(){
-    return msalInst.acquireTokenRedirect(req);
-  });
-}
-function gGet(url){
-  return getToken().then(function(r){
-    return fetch(url,{headers:{'Authorization':'Bearer '+r.accessToken}});
-  }).then(function(r){
-    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
-    return r.json();
-  });
-}
-function gPost(url,body){
-  return getToken().then(function(r){
-    return fetch(url,{method:'POST',
-      headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify(body)});
-  }).then(function(r){
-    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
-    return r.json();
-  });
-}
-function gPatch(url,body){
-  return getToken().then(function(r){
-    return fetch(url,{method:'PATCH',
-      headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify(body)});
-  }).then(function(r){
-    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
-    return r.status===204?{}:r.json();
-  });
-}
-function urlLista(id){return GRAPH+'/sites/'+CFG.siteId+'/lists/'+id;}
-function urlWB(hoja){
-  return GRAPH+'/drives/'+DB.catalogoDriveId+'/items/'+DB.catalogoItemId+
-    "/workbook/worksheets('"+hoja+"')/usedRange";
+var COLOR_MAP = {
+  // Inglés (compatibilidad anterior)
+  'azul':'var(--fact)',    'amarillo':'var(--warn)',   'rojo':'var(--danger)',
+  'rosado':'#FF6AD2',      'naranja':'#FF8C42',         'teal':'var(--teal)',
+  'morado':'var(--pack)',  'verde':'var(--pick)',        'gris':'var(--sub)',
+  'blanco':'#FFFFFF',      'marron':'#8B5E3C',          'aguamarina':'var(--teal)',
+  // Español con tilde (tal como vienen del Excel)
+  'amarillo':'var(--warn)',  'rojo':'var(--danger)',    'verde':'var(--pick)',
+  'azul':'var(--fact)',      'gris':'var(--sub)',        'blanco':'#FFFFFF',
+  'marrón':'#8B5E3C',  'aguamarina':'var(--teal)', 'naranja':'#FF8C42',
+};
+function colorActividad(c) {
+  var key=c?c.toString().trim().toLowerCase():'';
+  return COLOR_MAP[key]||'var(--teal)';
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// 7. DESCUBRIMIENTO AUTOMÁTICO
-// ═══════════════════════════════════════════════════════════════════
-function descubrirListas(){
-  var url=GRAPH+'/sites/'+CFG.siteId+'/lists?$select=id,displayName&$top=200';
-  return gGet(url).then(function(d){
-    if(!d.value) return false;
-    d.value.forEach(function(l){
-      Object.keys(CFG.listas).forEach(function(k){
-        if(l.displayName===CFG.listas[k]) DB.listIds[k]=l.id;
+var activasVarias     = {};
+var variaSeleccionada = null;
+var estado = {
+  operadorActual:'', ordenActual:'', accionPendiente:null, sesionId:generarSesion(),
+};
+
+var ETAPAS      = ['PICKING','CHECKING','PACKING','FACTURACION'];
+var ETAPA_COLOR = { PICKING:'pick', CHECKING:'check', PACKING:'pack', FACTURACION:'fact' };
+var ETAPA_ICONO = { PICKING:'📦', CHECKING:'✅', PACKING:'📫', FACTURACION:'🧾' };
+
+// ============================================================
+// 5. MSAL — login / logout / token
+// ============================================================
+function msalLogin() {
+  mostrarMsalLoading(true);
+  document.getElementById('aviso-msal').classList.remove('show');
+  msalInstance.loginRedirect({ scopes:GRAPH_SCOPES })
+    .catch(function(e) {
+      mostrarMsalLoading(false);
+      var av=document.getElementById('aviso-msal');
+      av.textContent='Error de autenticacion: '+e.message;
+      av.classList.add('show');
+    });
+}
+function msalLogout() {
+  msalInstance.logoutRedirect({ account:msalAccount })
+    .catch(function(e){ console.warn('logout:',e.message); });
+}
+function getToken() {
+  if (!msalAccount) return Promise.reject(new Error('No hay sesion activa'));
+  var req={ scopes:GRAPH_SCOPES, account:msalAccount };
+  return msalInstance.acquireTokenSilent(req)
+    .catch(function(){ return msalInstance.acquireTokenRedirect(req); })
+    .then(function(r){ return r?r.accessToken:null; });
+}
+function mostrarMsalLoading(v) {
+  document.getElementById('msal-loading').style.display=v?'block':'none';
+}
+function postLogin() {
+  var email=msalAccount.username||msalAccount.name||'';
+  var el=document.getElementById('msal-user-info');
+  el.textContent='✓ Sesion activa: '+email; el.style.display='block';
+  document.getElementById('btn-msal-login').style.display='none';
+  mostrarMsalLoading(true);
+  descubrirListas()
+    .then(function(){ return leerCatalogos(); })
+    .then(function(){ mostrarMsalLoading(false); mostrar('s-login'); })
+    .catch(function(e){ mostrarMsalLoading(false); console.error('postLogin:',e.message); });
+}
+function intentarSesionSilenciosa() {
+  mostrarMsalLoading(true);
+  msalInstance.handleRedirectPromise()
+    .then(function(result) {
+      if (result&&result.account) { msalAccount=result.account; postLogin(); }
+      else {
+        var accounts=msalInstance.getAllAccounts();
+        if (accounts.length>0) { msalAccount=accounts[0]; postLogin(); }
+        else { mostrarMsalLoading(false); }
+      }
+    })
+    .catch(function(e){ mostrarMsalLoading(false); console.warn('handleRedirect:',e.message); });
+}
+
+// ============================================================
+// 6. GRAPH API — helpers
+// ============================================================
+function graphGet(url) {
+  return getToken().then(function(token) {
+    return fetch(url, { headers:{ Authorization:'Bearer '+token } });
+  }).then(function(res) {
+    if (!res.ok) return res.json().then(function(e){ throw new Error((e.error&&e.error.message)||'Graph GET '+res.status); });
+    return res.json();
+  });
+}
+function graphPost(url, body) {
+  return getToken().then(function(token) {
+    return fetch(url, {
+      method:'POST',
+      headers:{ Authorization:'Bearer '+token, 'Content-Type':'application/json' },
+      body:JSON.stringify(body),
+    });
+  }).then(function(res) {
+    if (!res.ok) return res.json().then(function(e){ throw new Error((e.error&&e.error.message)||'Graph POST '+res.status); });
+    return res.json();
+  });
+}
+function graphPatch(url, body) {
+  return getToken().then(function(token) {
+    return fetch(url, {
+      method:'PATCH',
+      headers:{ Authorization:'Bearer '+token, 'Content-Type':'application/json' },
+      body:JSON.stringify(body),
+    });
+  }).then(function(res) {
+    if (!res.ok) return res.json().then(function(e){ throw new Error((e.error&&e.error.message)||'Graph PATCH '+res.status); });
+    return res.json();
+  });
+}
+
+function urlLista(listId) {
+  return 'https://graph.microsoft.com/v1.0/sites/'+CFG.siteId+'/lists/'+listId;
+}
+
+// ============================================================
+// 7. DESCUBRIMIENTO AUTOMATICO DE LISTAS
+// Obtiene los listId por nombre — nunca hardcodeados
+// ============================================================
+function descubrirListas() {
+  var url = 'https://graph.microsoft.com/v1.0/sites/'+CFG.siteId+'/lists?$select=id,name,displayName';
+  return graphGet(url).then(function(data) {
+    if (!data.value) throw new Error('No se pudieron obtener las listas del sitio');
+    var nombresEsperados = Object.values(CFG.listas);
+    data.value.forEach(function(lista) {
+      var nombre = lista.displayName || lista.name || '';
+      Object.keys(CFG.listas).forEach(function(key) {
+        if (CFG.listas[key] === nombre) {
+          DB.listIds[key] = lista.id;
+          console.log('Lista descubierta:', nombre, '->', lista.id);
+        }
       });
     });
-    var ok=DB.listIds.recepciones&&DB.listIds.eventos&&DB.listIds.asignaciones;
-    console.log('[INIT] Listas:',JSON.stringify(DB.listIds));
-    if(!ok) console.warn('[INIT] Alguna lista no encontrada');
-    return ok;
-  }).catch(function(e){console.error('[INIT] descubrirListas:',e.message);return false;});
-}
-
-function descubrirExcel(){
-  var nom=CFG.catalogoNombre;
-  var url=GRAPH+'/me/drive/root/search(q='+encodeURIComponent("'"+nom+"'")+')';
-  return gGet(url).then(function(d){
-    if(!d.value||!d.value.length){console.warn('[INIT] Excel no encontrado:',nom);return false;}
-    var f=d.value.find(function(x){return x.name===nom;});
-    if(!f){console.warn('[INIT] Sin coincidencia exacta:',nom);return false;}
-    DB.catalogoDriveId=f.parentReference&&f.parentReference.driveId?f.parentReference.driveId:null;
-    DB.catalogoItemId=f.id;
-    console.log('[INIT] Excel:',nom,'| webUrl:',f.webUrl);
-    console.log('[INIT]   driveType:',f.parentReference&&f.parentReference.driveType);
-    console.log('[INIT]   path:',f.parentReference&&f.parentReference.path);
-    return true;
-  }).catch(function(e){console.error('[INIT] descubrirExcel:',e.message);return false;});
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 8. LECTURA DE CATÁLOGOS DESDE EXCEL
-// ═══════════════════════════════════════════════════════════════════
-var NOISE=/^[\u2191\*\-\#]/;
-
-// Normalizar fechas desde Workbook API a formato YYYY-MM-DD
-// Excel Online en Ecuador/España devuelve fechas como D/M/YYYY (ej: 6/9/2026 = 6 sep 2026)
-function normalizarFecha(v){
-  if(!v) return '';
-  // Número serial Excel (días desde 1900-01-00)
-  if(typeof v==='number'){
-    var d=new Date(Math.round((v-25569)*86400*1000));
-    var pn=function(n){return String(n).padStart(2,'0');};
-    return d.getUTCFullYear()+'-'+pn(d.getUTCMonth()+1)+'-'+pn(d.getUTCDate());
-  }
-  var s=v.toString().trim();
-  if(!s) return '';
-  // Ya es YYYY-MM-DD
-  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
-  // ISO con T: 2026-09-06T00:00:00
-  if(s.indexOf('T')>-1) return s.substring(0,10);
-  // Formato con /: Excel Online Ecuador/España usa D/M/YYYY
-  // ej: "6/9/2026" = 6 de septiembre de 2026
-  var partes=s.split('/');
-  if(partes.length===3){
-    var dia=partes[0].trim();
-    var mes=partes[1].trim();
-    var anio=partes[2].trim().length===4?partes[2].trim():'20'+partes[2].trim();
-    var d2=parseInt(dia);
-    var m2=parseInt(mes);
-    // Si el primer valor > 12, definitivamente es día (D/M/YYYY)
-    // Si el segundo valor > 12, definitivamente es día en posición 2 (M/D/YYYY inverso — raro)
-    // Excel Online en configuración ES siempre usa D/M/YYYY
-    if(d2>12 || (d2<=12 && m2<=12)){
-      // Asumir D/M/YYYY (formato Ecuador/España)
-      return anio+'-'+String(m2).padStart(2,'0')+'-'+String(d2).padStart(2,'0');
+    var faltantes = Object.keys(CFG.listas).filter(function(k){ return !DB.listIds[k]; });
+    if (faltantes.length > 0) {
+      console.warn('Listas no encontradas:', faltantes.map(function(k){ return CFG.listas[k]; }).join(', '));
+      toast('Advertencia: listas no encontradas en SharePoint', 'warn', 5000);
+    } else {
+      console.log('Todas las listas descubiertas correctamente');
     }
-  }
-  console.warn('[FECHA] Formato no reconocido:',v);
-  return s;
+  }).catch(function(e) {
+    console.error('descubrirListas:', e.message);
+    toast('Error al conectar con SharePoint Lists', 'err', 5000);
+  });
 }
 
-function filaValida(v,maxLen){
-  if(!v) return false;
-  var s=v.toString().trim();
-  return s.length>0&&s.length<=(maxLen||80)&&!NOISE.test(s);
+// ============================================================
+// 8. OPERACIONES SHAREPOINT LISTS
+// ============================================================
+
+// ============================================================
+// DESCUBRIR CATALOGO EXCEL
+// Busca Inverneg_DespachoRF_Base_Catálogos.xlsx en el drive del usuario
+// y guarda driveId e itemId en DB para usarlos en leerCatalogos()
+// ============================================================
+function descubrirCatalogoExcel() {
+  var nombre = CFG.catalogoNombre;
+  // Buscar en el sitio SharePoint corporativo, no en OneDrive personal
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + CFG.siteId +
+            '/drive/root/search(q=' + encodeURIComponent("'" + nombre + "'") + ')';
+  console.log('[descubrirCatalogoExcel] URL de búsqueda:', url);
+  return graphGet(url).then(function(data) {
+    var total = data.value ? data.value.length : 0;
+    console.log('[descubrirCatalogoExcel] Archivos encontrados:', total);
+    if (data.value) {
+      data.value.forEach(function(f, i) {
+        console.log('  ['+i+'] nombre:', f.name, '| id:', f.id,
+                    '| driveId:', f.parentReference ? f.parentReference.driveId : 'N/A');
+      });
+    }
+    if (total === 0) {
+      console.warn('[descubrirCatalogoExcel] Sin resultados para:', nombre);
+      return false;
+    }
+    // Buscar coincidencia exacta por nombre
+    var archivo = null;
+    for (var i = 0; i < data.value.length; i++) {
+      if (data.value[i].name === nombre) { archivo = data.value[i]; break; }
+    }
+    if (!archivo) {
+      console.warn('[descubrirCatalogoExcel] Sin coincidencia exacta para:', nombre);
+      console.warn('  Nombres encontrados:', data.value.map(function(f){ return f.name; }).join(', '));
+      return false;
+    }
+    DB.catalogoDriveId = archivo.parentReference && archivo.parentReference.driveId
+      ? archivo.parentReference.driveId : null;
+    DB.catalogoItemId = archivo.id;
+    console.log('[descubrirCatalogoExcel] Encontrado:', nombre);
+    console.log('  driveId:', DB.catalogoDriveId);
+    console.log('  itemId: ', DB.catalogoItemId);
+    return true;
+  }).catch(function(e) {
+    console.warn('[descubrirCatalogoExcel] Error:', e.message);
+    return false;
+  });
 }
 
-function leerCatalogos(){
-  return descubrirExcel().then(function(ok){
-    if(!ok||!DB.catalogoDriveId||!DB.catalogoItemId){
-      render('<div class="loading"><div class="loading-icon">⚠️</div>'+
-        '<div class="loading-txt" style="color:var(--dan)">Excel no encontrado</div>'+
-        '<div class="loading-sub">Verifica que "'+CFG.catalogoNombre+'" está disponible.<br>'+
-        'Revisa consola (F12) para más detalle.</div>'+
-        '<button class="btn btn-sec btn-big" style="margin-top:16px" onclick="location.reload()">↻ Reintentar</button></div>');
+// URL base para workbook del Excel de catálogos
+function urlWorkbook(hoja) {
+  return 'https://graph.microsoft.com/v1.0/drives/' + DB.catalogoDriveId +
+         '/items/' + DB.catalogoItemId +
+         "/workbook/worksheets('" + hoja + "')/usedRange";
+}
+
+// ============================================================
+// LEER CATALOGOS DESDE EXCEL
+// Lee hoja Operadores (col A desde fila 2) y hoja Actividades (col A+B desde fila 2)
+// Si el Excel no responde, mantiene los valores de respaldo en DB
+// ============================================================
+function leerCatalogos() {
+  return descubrirCatalogoExcel().then(function(encontrado) {
+    if (!encontrado || !DB.catalogoDriveId || !DB.catalogoItemId) {
+      console.warn('Usando catálogos de respaldo (Excel no disponible)');
+      poblarOperadores('sel-operador');
+      poblarOperadores('sel-op-accion');
+      console.log('Operadores cargados (respaldo):', DB.operadores.length);
       return;
     }
-    var hojas=['Operadores','Supervisores','Pedidos','Contenedores',
-               'Compra','Importaciones','C.Barra','Asignaciones'];
-    return Promise.all(hojas.map(function(h){
-      return gGet(urlWB(h)).then(function(r){return{hoja:h,data:r,err:null};})
-        .catch(function(e){
-          console.warn('[EXCEL] Hoja '+h+' error:',e.message);
-          return{hoja:h,data:null,err:e.message};
-        });
-    })).then(function(res){
-      res.forEach(function(r){parsear(r.hoja,r.data,r.err);});
+    // Leer operadores y actividades en paralelo
+    return Promise.all([
+      graphGet(urlWorkbook('Operadores')),
+      graphGet(urlWorkbook('Actividades')),
+    ]).then(function(resultados) {
+      var dataOps  = resultados[0];
+      var dataActs = resultados[1];
+
+      // Hoja Operadores — columna A desde fila 2
+      if (dataOps && dataOps.values && dataOps.values.length > 1) {
+        var ops = dataOps.values.slice(1)
+          .map(function(f){ return f[0] ? f[0].toString().trim() : ''; })
+          .filter(function(v){ return v !== ''; });
+        if (ops.length > 0) {
+          DB.operadores = ops;
+          console.log('Operadores cargados desde Excel:', ops.length);
+        }
+      }
+
+      // Hoja Actividades — columna A = nombre, columna B = color
+      if (dataActs && dataActs.values && dataActs.values.length > 1) {
+        var acts = dataActs.values.slice(1)
+          .filter(function(f){ return f[0] && f[0].toString().trim() !== ''; })
+          .map(function(f, i){
+            var lbl   = f[0].toString().trim();
+            var color = colorActividad(f[1]);
+            return { id:'act_'+i+'_'+lbl.replace(/\s+/g,'_').toLowerCase(), lbl:lbl, color:color };
+          });
+        if (acts.length > 0) {
+          DB.actividades = acts;
+          console.log('Actividades cargadas desde Excel:', acts.length);
+        }
+      }
+
+      poblarOperadores('sel-operador');
+      poblarOperadores('sel-op-accion');
+    }).catch(function(e) {
+      console.warn('Error leyendo hojas del Excel:', e.message, '— usando respaldo');
+      poblarOperadores('sel-operador');
+      poblarOperadores('sel-op-accion');
     });
   });
 }
 
-// ── Utilidad de log por hoja ──────────────────────────────────────
-function logHoja(nombre,rawTotal,cargados,descartados,muestra){
-  console.log('[EXCEL] ══ '+nombre+' ════════════════════════════');
-  console.log('[EXCEL]   Filas brutas (excl encabezado): '+rawTotal);
-  console.log('[EXCEL]   Filas cargadas:   '+cargados);
-  console.log('[EXCEL]   Filas descartadas:'+descartados);
-  if(muestra&&muestra.length){
-    console.log('[EXCEL]   Primeros '+Math.min(5,muestra.length)+' registros:');
-    muestra.slice(0,5).forEach(function(m,i){
-      console.log('[EXCEL]   ['+i+']',JSON.stringify(m));
+// Leer estado de ordenes desde RF_Estado_OT
+// Genera fecha ISO de hace N dias para filtros OData en Graph
+function fechaHaceNDias(n) {
+  var d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString();
+}
+
+function procesarPaginaEstado(data) {
+  if (!data.value) return;
+  data.value.forEach(function(item) {
+    var f = item.fields;
+    if (!f || !f.OrdenId) return;
+    aplicarEstadoDesdeItem(item, f.OrdenId.toString().trim());
+  });
+}
+
+function leerEstadoOrdenes() {
+  var listId = DB.listIds['estado'];
+  if (!listId) { console.warn('Lista estado no disponible'); return Promise.resolve(); }
+  var baseUrl = urlLista(listId)+'/items?$orderby=ID%20desc&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
+
+  function cargarPagina(url) {
+    return graphGet(url).then(function(data) {
+      procesarPaginaEstado(data);
+      // Si hay mas paginas, seguir cargando
+      if (data['@odata.nextLink']) {
+        return cargarPagina(data['@odata.nextLink']);
+      }
     });
+  }
+
+  return cargarPagina(baseUrl)
+    .then(function(){ console.log('Estado_OT cargado:', Object.keys(DB.ordenes).length, 'ordenes'); })
+    .catch(function(e){ console.error('leerEstadoOrdenes:',e.message); });
+}
+
+// Escribir registro en RF_Registros_Despacho
+function escribirEnExcel(fila) {
+  var listId = DB.listIds['registros'];
+  if (!listId) { console.warn('Lista registros no disponible'); return; }
+  var url = urlLista(listId)+'/items';
+  var fields = {
+    Orden:                fila.Orden         || '',
+    Etapa:                fila.Etapa         || '',
+    Evento:               fila.Evento        || '',
+    Operador:             fila.Operador      || '',
+    Sesi_x00f3_n:         fila.Sesion        || '',
+    Multipersona:         fila.Multipersona === 'SI' ? true : false,
+    N_x00fa_mero:         fila.Total_Personas!==undefined ? Number(fila.Total_Personas) : 1,
+    TimestampEvento:      fila.Timestamp     || '',
+    DuracionMin:          fila.Duracion_min  !==undefined ? Number(fila.Duracion_min) : 0,
+    Novedades:            fila.Novedades     || '',
+  };
+  console.log('[POST] RF_Registros_Despacho — campos:', JSON.stringify(fields));
+  graphPost(url, { fields:fields })
+    .then(function(){ console.log('[OK] RF_Registros_Despacho guardado'); })
+    .catch(function(e){ console.error('[ERROR] RF_Registros_Despacho:', e.message); toast('Error al guardar registro','err',4000); });
+}
+
+// Escribir registro en RF_Actividades_Varias
+function escribirActVaria(fila) {
+  var listId = DB.listIds['varias'];
+  if (!listId) { console.warn('Lista varias no disponible'); return; }
+  var url = urlLista(listId)+'/items';
+  var fields = {
+    Actividad:            fila.Actividad     || '',
+    Evento:               fila.Evento        || '',
+    Operador:             fila.Operador      || '',
+    Sesi_x00f3_n:         fila.Sesion        || '',
+    TimestampEvento:      fila.Timestamp     || '',
+    Duraci_x00f3_nMin:    fila.Duracion_min  !==undefined ? fila.Duracion_min : 0,
+  };
+  console.log('[POST] RF_Actividades_Varias — campos:', JSON.stringify(fields));
+  graphPost(url, { fields:fields })
+    .then(function(){ console.log('[OK] RF_Actividades_Varias guardada'); })
+    .catch(function(e){ console.error('[ERROR] RF_Actividades_Varias:', e.message); toast('Error al guardar actividad','err',4000); });
+}
+
+// Actualizar estado de orden en RF_Estado_OT
+// Si la orden existe la actualiza (PATCH), si no existe la crea (POST)
+function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
+  var listId = DB.listIds['estado'];
+  if (!listId) { console.warn('Lista estado no disponible'); return; }
+
+  // Normalizar nombre del campo: PICKING -> Picking
+  var campoSP = etapa==='FACTURACION' ? 'Facturaci_x00f3_n' : etapa[0]+etapa.slice(1).toLowerCase();
+  var fields = {};
+  fields[campoSP] = nuevoEstado;
+  fields['UltimaActualizaci_x00f3_n'] = ahora().ts;
+
+  var o = DB.ordenes[ordenId];
+  if (o && o._spItemId) {
+    // Item existe en SP — actualizar
+    var url = urlLista(listId)+'/items/'+o._spItemId;
+    console.log('[PATCH] RF_Estado_OT id:', o._spItemId, '— campos:', JSON.stringify(fields));
+    graphPatch(url, { fields:fields })
+      .then(function(){ console.log('[OK] RF_Estado_OT actualizado:', ordenId, etapa, nuevoEstado); })
+      .catch(function(e){ console.error('[ERROR] RF_Estado_OT PATCH:', e.message); });
+  } else {
+    // Item no existe — crear
+    fields['OrdenId'] = ordenId;
+    // Inicializar etapas vacías
+    ['Picking','Checking','Packing','Facturaci_x00f3_n'].forEach(function(c){
+      if (!fields[c]) fields[c]='';
+    });
+    console.log('[POST] RF_Estado_OT nueva orden:', ordenId, '— campos:', JSON.stringify(fields));
+    graphPost(urlLista(listId)+'/items', { fields:fields })
+      .then(function(result){
+        console.log('[OK] RF_Estado_OT creado:', ordenId);
+        if (!DB.ordenes[ordenId]) DB.ordenes[ordenId]={};
+        DB.ordenes[ordenId]._spItemId = result.id;
+      })
+      .catch(function(e){ console.error('[ERROR] RF_Estado_OT POST:', e.message); });
   }
 }
 
-function parsear(hoja,data,err){
-  if(err){
-    console.error('[EXCEL] '+hoja+' — ERROR:',err);
-    return;
+// ============================================================
+// 9. ETAPAS — logica operativa
+// ============================================================
+function initEtapa(o,etapa,tot) { if (!o[etapa]) o[etapa]={ totalPersonas:tot||1, personas:{} }; }
+function personasIniciadas(o,etapa) {
+  if (!o[etapa]) return 0;
+  return Object.values(o[etapa].personas).filter(function(p){ return p.inicio; }).length;
+}
+function personasFinalizadas(o,etapa) {
+  if (!o[etapa]) return 0;
+  return Object.values(o[etapa].personas).filter(function(p){ return p.fin; }).length;
+}
+function totalPersonas(o,etapa)  { return (o[etapa]&&o[etapa].totalPersonas)||1; }
+function etapaCompleta(o,etapa)  {
+  if (!o[etapa]) return false;
+  return personasFinalizadas(o,etapa)>=o[etapa].totalPersonas;
+}
+function estadoEtapa(ordenId,etapa) {
+  var o=DB.ordenes[ordenId];
+  if (!o||!o[etapa]) return 'pendiente';
+  if (etapaCompleta(o,etapa)) return 'finalizada';
+  if (personasIniciadas(o,etapa)>0) return 'iniciada';
+  // Estado cargado desde SharePoint — etapa existe y fue iniciada
+  if (o[etapa]._spIniciada) return 'iniciada';
+  return 'pendiente';
+}
+function accionDisponibleParaOperador(ordenId,etapa) {
+  var o=DB.ordenes[ordenId], op=estado.operadorActual;
+  if (!o||!o[etapa]) {
+    // Sin override: verificar restriccion de secuencia
+    if (!o) return 'INICIO';
+    // Con override aprobado: permitir INICIO aunque la anterior no haya finalizado
+    var idx = ETAPAS.indexOf(etapa);
+    if (idx > 0 && o[etapa] && o[etapa]._overrideAprobado) return 'INICIO';
+    return 'INICIO';
   }
-  if(!data||!data.values||data.values.length<2){
-    console.warn('[EXCEL] '+hoja+' — sin datos (filas:',data&&data.values?data.values.length:0,')');
-    return;
+  if (o[etapa]._spIniciada) return 'FIN';
+  // Override aprobado: permitir INICIO de esta etapa
+  if (o[etapa]._overrideAprobado) return 'INICIO';
+  var p=o[etapa].personas[op];
+  if (!p) return personasIniciadas(o,etapa)<o[etapa].totalPersonas?'INICIO':'ESPERA';
+  if (p.inicio&&!p.fin) return 'FIN';
+  return 'ESPERA';
+}
+function siguienteAccion(ordenId) {
+  var o=DB.ordenes[ordenId];
+  if (!o) return { etapa:'PICKING', evento:'INICIO' };
+  var pSt=estadoEtapa(ordenId,'PICKING'), cSt=estadoEtapa(ordenId,'CHECKING');
+  if (pSt==='pendiente') return { etapa:'PICKING', evento:'INICIO' };
+  if (pSt==='iniciada') {
+    var a1=accionDisponibleParaOperador(ordenId,'PICKING');
+    // Con override: Checking disponible aunque Picking no haya finalizado
+    var cOverride = o['CHECKING'] && o['CHECKING']._overrideAprobado;
+    if (cOverride && cSt==='pendiente') return null; // mostrar ambos en acciones disponibles
+    return (a1==='INICIO'||a1==='FIN')?{ etapa:'PICKING',evento:a1 }:{ etapa:'PICKING',evento:'ESPERA' };
   }
-  // Log del encabezado real que devuelve el API
-  var hdrs=data.values[0];
-  console.log('[EXCEL] '+hoja+' encabezado raw:',
-    hdrs.map(function(v,i){return i+'="'+(v||'')+'"]';}).join(' '));
-
-  var raw=data.values.slice(1);
-  var rawTotal=raw.length;
-
-  if(hoja==='Operadores'){
-    var carg=raw.filter(function(r){return filaValida(r[0]);});
-    DB.operadores=carg.map(function(r){return r[0].toString().trim();});
-    logHoja('Operadores',rawTotal,DB.operadores.length,rawTotal-DB.operadores.length,
-      DB.operadores.map(function(v){return{Operador:v};}));
-
-  } else if(hoja==='Supervisores'){
-    var carg=raw.filter(function(r){return filaValida(r[0]);});
-    DB.supervisores=carg.map(function(r){return r[0].toString().trim();});
-    logHoja('Supervisores',rawTotal,DB.supervisores.length,rawTotal-DB.supervisores.length,
-      DB.supervisores.map(function(v){return{Supervisor:v};}));
-
-  } else if(hoja==='Pedidos'){
-    // Cols: Pedido(0), Tipo(1), ContenedoresTotal(2), Status(3), Observaciones(4)
-    var carg=raw.filter(function(r){return filaValida(r[0],50);});
-    DB.pedidos=carg.map(function(r){return{
-      pedido:    r[0]?r[0].toString().trim():'',
-      tipo:      r[1]?r[1].toString().trim():'',
-      contsTotal:r[2]?Number(r[2]):1,
-      status:    r[3]?r[3].toString().trim():'Pendiente',
-      obs:       r[4]?r[4].toString().trim():'',
-    };});
-    logHoja('Pedidos',rawTotal,DB.pedidos.length,rawTotal-DB.pedidos.length,DB.pedidos);
-
-  } else if(hoja==='Contenedores'){
-    // Workbook API omite celdas vacías desplazando índices.
-    // Detectar estructura real mirando la fila de encabezado (values[0])
-    // y mapear dinámicamente por nombre de columna.
-    var hdrRow=data.values[0].map(function(v){return v?v.toString().trim().toLowerCase():'';});
-    console.log('[EXCEL] Contenedores — columnas detectadas:',hdrRow.join(' | '));
-    var iped=hdrRow.indexOf('pedido');
-    var ifp= hdrRow.findIndex(function(h){return h.indexOf('fechaprog')>-1||h.indexOf('fecha_prog')>-1||h==='fechaprogramada';});
-    var icont=hdrRow.findIndex(function(h){return h.indexOf('contenedor')>-1;});
-    var isell=hdrRow.findIndex(function(h){return h.indexOf('sello')>-1;});
-    var ipall=hdrRow.findIndex(function(h){return h.indexOf('pallet')>-1;});
-    var istat=hdrRow.findIndex(function(h){return h==='status'||h==='estado';});
-    var ifrec=hdrRow.findIndex(function(h){return h.indexOf('fecharec')>-1||h.indexOf('fecha_rec')>-1;});
-    var iobs =hdrRow.findIndex(function(h){return h.indexOf('observ')>-1;});
-    console.log('[EXCEL] Contenedores — índices mapeados:',
-      'ped='+iped+' fp='+ifp+' cont='+icont+' sell='+isell+
-      ' pall='+ipall+' stat='+istat+' frec='+ifrec);
-    var carg=raw.filter(function(r){
-      return iped>=0&&r[iped]&&filaValida(r[iped],50);
-    });
-    DB.contenedores=carg.map(function(r){
-      var pv=ipall>=0&&r[ipall]!==null&&r[ipall]!==''&&r[ipall]!==undefined?Number(r[ipall]):0;
-      return{
-        pedido:    iped>=0&&r[iped]?r[iped].toString().trim():'',
-        fechaProg: ifp>=0?normalizarFecha(r[ifp]):'',
-        contenedor:icont>=0&&r[icont]?r[icont].toString().trim():'',
-        sello:     isell>=0&&r[isell]?r[isell].toString().trim():'',
-        pallets:   isNaN(pv)?0:pv,
-        status:    istat>=0&&r[istat]?r[istat].toString().trim():'Pendiente',
-        fechaRec:  ifrec>=0?normalizarFecha(r[ifrec]):'',
-        obs:       iobs>=0&&r[iobs]?r[iobs].toString().trim():'',
-      };
-    });
-    logHoja('Contenedores',rawTotal,DB.contenedores.length,rawTotal-DB.contenedores.length,DB.contenedores);
-
-  } else if(hoja==='Compra'){
-    // Cols: Pedido(0), SKU(1), Descripcion(2), Cantidad(3)
-    var carg=raw.filter(function(r){return filaValida(r[0],50)&&r[1];});
-    DB.compra=carg.map(function(r){return{
-      pedido:  r[0]?r[0].toString().trim():'',
-      sku:     r[1]?r[1].toString().trim():'',
-      desc:    r[2]?r[2].toString().trim():'',
-      cantidad:r[3]?Number(r[3]):0,
-    };});
-    logHoja('Compra',rawTotal,DB.compra.length,rawTotal-DB.compra.length,DB.compra);
-
-  } else if(hoja==='Importaciones'){
-    var carg=raw.filter(function(r){return filaValida(r[0],50)&&r[1];});
-    DB.importaciones=carg.map(function(r){return{
-      pedido:  r[0]?r[0].toString().trim():'',
-      sku:     r[1]?r[1].toString().trim():'',
-      desc:    r[2]?r[2].toString().trim():'',
-      cantidad:r[3]?Number(r[3]):0,
-    };});
-    logHoja('Importaciones',rawTotal,DB.importaciones.length,rawTotal-DB.importaciones.length,DB.importaciones);
-
-  } else if(hoja==='C.Barra'){
-    // Cols: SKU(0), Descripcion(1), Un(2), Cód.BarrasUnidad(3), Un/CJ(4), Cód.BarrasCaja(5)
-    DB.codigosBarra=[];
-    var carg=raw.filter(function(r){return filaValida(r[0],50);});
-    carg.forEach(function(r){
-      var sku =r[0]?r[0].toString().trim():'';
-      var desc=r[1]?r[1].toString().trim():'';
-      var cbU =r[3]?r[3].toString().trim():'';
-      var uncj=r[4]?Number(r[4]):1;
-      var cbC =r[5]?r[5].toString().trim():'';
-      if(cbU) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbU,tipo:'Unidad',factor:1});
-      if(cbC) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbC,tipo:'Caja',factor:uncj||1});
-    });
-    logHoja('C.Barra',rawTotal,DB.codigosBarra.length,rawTotal-carg.length,DB.codigosBarra);
-
-  } else if(hoja==='Asignaciones'){
-    // Cols: FechaAsignacion(0), Supervisor(1), Pedido(2), TipoAsignacion(3),
-    //       Operario(4), Status(5)
-    // Workbook API devuelve encabezado en values[0] — ya mapeamos por nombre arriba
-    // Para Asignaciones también mapear por nombre para robustez
-    var hdrA=data.values[0].map(function(v){return v?v.toString().trim().toLowerCase():'';});
-    console.log('[EXCEL] Asignaciones — columnas:',hdrA.join(' | '));
-    var iA_fecha=hdrA.findIndex(function(h){return h.indexOf('fecha')>-1&&h.indexOf('asig')>-1;});
-    var iA_sup  =hdrA.findIndex(function(h){return h.indexOf('superv')>-1;});
-    var iA_ped  =hdrA.findIndex(function(h){return h.indexOf('pedido')>-1;});
-    var iA_tipo =hdrA.findIndex(function(h){return h.indexOf('tipo')>-1;});
-    var iA_op   =hdrA.findIndex(function(h){return h.indexOf('operari')>-1||h.indexOf('operador')>-1;});
-    var iA_stat =hdrA.findIndex(function(h){return h==='status'||h==='estado';});
-    console.log('[EXCEL] Asignaciones índices: fecha='+iA_fecha+' sup='+iA_sup+
-      ' ped='+iA_ped+' tipo='+iA_tipo+' op='+iA_op+' stat='+iA_stat);
-
-    // Log de valores de Status para diagnóstico
-    var statusVals=raw.filter(function(r){return r[iA_op>=0?iA_op:4];})
-      .map(function(r){return'"'+(iA_stat>=0&&r[iA_stat]?r[iA_stat].toString().trim():'(vacío)')+'"';});
-    console.log('[EXCEL] Asignaciones — valores de Status encontrados:',statusVals.join(', '));
-
-    // Filtro: Operario no vacío + Status = Activo (case-insensitive, trim)
-    var carg=raw.filter(function(r){
-      var opVal=iA_op>=0&&r[iA_op]?r[iA_op].toString().trim():'';
-      if(!opVal) return false;
-      var stVal=iA_stat>=0&&r[iA_stat]?r[iA_stat].toString().trim().toLowerCase():'';
-      return stVal==='activo';
-    });
-    DB.asignaciones=carg.map(function(r){
-      return{
-        fechaAsignacion:iA_fecha>=0&&r[iA_fecha]?r[iA_fecha].toString():'',
-        supervisor:     iA_sup>=0&&r[iA_sup]?r[iA_sup].toString().trim():'',
-        pedido:         iA_ped>=0&&r[iA_ped]?r[iA_ped].toString().trim():'',
-        tipo:           iA_tipo>=0&&r[iA_tipo]?r[iA_tipo].toString().trim():'',
-        operario:       iA_op>=0&&r[iA_op]?r[iA_op].toString().trim():'',
-        status:         iA_stat>=0&&r[iA_stat]?r[iA_stat].toString().trim():'',
-      };
-    });
-    logHoja('Asignaciones',rawTotal,DB.asignaciones.length,rawTotal-DB.asignaciones.length,DB.asignaciones);
-    if(DB.asignaciones.length===0){
-      console.error('[EXCEL] Asignaciones — 0 activas. Verifica que Status="Activo" (con A mayúscula, sin espacios).');
-    }
+  if (cSt==='pendiente') return { etapa:'CHECKING', evento:'INICIO' };
+  if (cSt==='iniciada') {
+    var a2=accionDisponibleParaOperador(ordenId,'CHECKING');
+    var pkOverride = o['PACKING'] && o['PACKING']._overrideAprobado;
+    if (pkOverride && estadoEtapa(ordenId,'PACKING')==='pendiente') return null;
+    return (a2==='INICIO'||a2==='FIN')?{ etapa:'CHECKING',evento:a2 }:{ etapa:'CHECKING',evento:'ESPERA' };
   }
+  return null;
 }
 
+// ============================================================
+// 10. INIT y UI base
+// ============================================================
+function refrescoAutomatico() {
+  // El estado de ordenes se refresca al escanear cada orden individualmente.
+  // El refresco automatico solo actualiza actividades varias pendientes.
+  if (!msalAccount || !estado.operadorActual) return;
+  refrescarActividadVaria().catch(function(){});
+}
 
-function parsear(hoja,data){
-  if(!data||!data.values||data.values.length<2) return;
-  var raw=data.values.slice(1);
-  if(hoja==='Operadores'){
-    DB.operadores=raw.filter(function(r){return filaValida(r[0]);})
-      .map(function(r){return r[0].toString().trim();});
-  } else if(hoja==='Supervisores'){
-    DB.supervisores=raw.filter(function(r){return filaValida(r[0]);})
-      .map(function(r){return r[0].toString().trim();});
-  } else if(hoja==='Pedidos'){
-    // Cols: Pedido(A),Tipo(B),ContenedoresTotal(C),Status(D),Observaciones(E)
-    DB.pedidos=raw.filter(function(r){return filaValida(r[0],50);})
-      .map(function(r){return{
-        pedido:r[0].toString().trim(),
-        tipo:r[1]?r[1].toString().trim():'',
-        contsTotal:r[2]?Number(r[2]):1,
-        status:r[3]?r[3].toString().trim():'Pendiente',
-        obs:r[4]?r[4].toString().trim():'',
-      };});
-  } else if(hoja==='Contenedores'){
-    // Cols confirmadas: A=Pedido(0), B=FechaProgramada(1), C=#Contenedor(2),
-    // D=#Sello(3), E=PalletsReportados(4), F=Status(5), G=FechaRecepcion(6), H=Obs(7)
-    // Log detallado de las primeras 3 filas para diagnosticar índices
-    console.log('[INIT] Contenedores raw — encabezado esperado: Pedido|FechaProg|Contenedor|Sello|Pallets|Status');
-    for(var _i=0;_i<Math.min(raw.length,3);_i++){
-      console.log('[INIT] Fila '+_i+':',
-        raw[_i].slice(0,8).map(function(v,idx){
-          return 'col'+idx+'='+(v===null?'null':(v===undefined?'undef':(v===''?'vacío':String(v).substring(0,20))));
-        }).join(' | '));
-    }
-    DB.contenedores=raw.filter(function(r){return filaValida(r[0],50);})
-      .map(function(r){
-        // Mapeo fijo por índice confirmado desde Excel:
-        // col0=Pedido | col1=FechaProg | col2=#Contenedor | col3=#Sello | col4=Pallets | col5=Status | col6=FechaRec
-        var _fp   = normalizarFecha(r[1]);
-        var _cont = r[2]!==null&&r[2]!==undefined&&r[2]!==''?r[2].toString().trim():'';
-        var _sell = r[3]!==null&&r[3]!==undefined&&r[3]!==''?r[3].toString().trim():'';
-        var _pallV= r[4];
-        var _pall = (_pallV!==null&&_pallV!==undefined&&_pallV!=='')?(isNaN(Number(_pallV))?0:Number(_pallV)):0;
-        var _stat = r[5]?r[5].toString().trim():'Pendiente';
-        var _frec = normalizarFecha(r[6]);
-        return{
-          pedido:    r[0]?r[0].toString().trim():'',
-          fechaProg: _fp,
-          contenedor:_cont,
-          sello:     _sell,
-          pallets:   _pall,
-          status:    _stat,
-          fechaRec:  _frec,
-          obs:       r[7]?r[7].toString().trim():'',
+function init() {
+  setInterval(reloj,1000); reloj();
+  document.getElementById('fecha-hoy').textContent=fechaHoy();
+  poblarOperadores('sel-operador');
+  poblarOperadores('sel-op-accion');
+  setInterval(refrescoAutomatico, 3 * 60 * 1000);
+  intentarSesionSilenciosa();
+}
+function poblarOperadores(selId) {
+  var sel=document.getElementById(selId);
+  sel.innerHTML='<option value="">— Selecciona operador —</option>';
+  DB.operadores.forEach(function(op){
+    var o=document.createElement('option'); o.value=op; o.textContent=op; sel.appendChild(o);
+  });
+}
+
+// ============================================================
+// 11. LOGIN OPERADOR
+// ============================================================
+function loginContinuar() {
+  var op=document.getElementById('sel-operador').value;
+  if (!op){ toast('Selecciona tu nombre primero','err'); return; }
+  estado.operadorActual=op;
+  document.getElementById('header-sub').textContent=op+' · CND';
+  // Recuperar actividad varia activa desde SP al seleccionar operador
+  // Cubre el caso en que el timeout de inactividad regresó a s-login
+  refrescarActividadVaria().catch(function(){});
+  mostrar('s-tipo');
+}
+function selTipo(tipo) {
+  if (tipo==='orden') { mostrar('s-scan'); setTimeout(function(){ document.getElementById('inp-orden').focus(); },100); }
+  else { abrirActVarias(); }
+}
+
+// ============================================================
+// 12. FLUJO ORDEN DE TRABAJO
+// ============================================================
+// Consulta RF_Estado_OT filtrando por OrdenId — solo el registro de esa orden
+// Aplica el estado de un item de RF_Estado_OT a DB.ordenes
+function aplicarEstadoDesdeItem(item, ordenId) {
+  var f = item.fields;
+  if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
+  var o = DB.ordenes[ordenId];
+  o._spItemId = item.id;
+  var mapaEtapas = {
+    PICKING:     f['Picking']           || '',
+    CHECKING:    f['Checking']          || '',
+    PACKING:     f['Packing']           || '',
+    FACTURACION: f['Facturaci_x00f3_n'] || '',
+  };
+  Object.keys(mapaEtapas).forEach(function(et) {
+    if (mapaEtapas[et] === 'finalizada') {
+      if (!o[et]) o[et] = { totalPersonas:1, personas:{} };
+      if (!o[et].personas['_cargado']) {
+        o[et].personas['_cargado'] = {
+          inicio:{ hora:'--', ts:'--', fecha:'--' },
+          fin:   { hora:'--', ts:'--', fecha:'--' },
         };
+      }
+    } else if (mapaEtapas[et] === 'iniciada') {
+      // Etapa iniciada en SP — marcar la etapa como existente con _spIniciada=true.
+      // NO creamos persona ficticia para no bloquear el cupo.
+      // estadoEtapa() detecta _spIniciada y devuelve 'iniciada' (muestra EN CURSO).
+      // El operador que escanee puede registrar FIN libremente.
+      if (!o[et]) o[et] = { totalPersonas:1, personas:{} };
+      o[et]._spIniciada = true;
+    }
+  });
+}
+
+function refrescarEstadoOrden(ordenId) {
+  var listId = DB.listIds['estado'];
+  if (!listId) return Promise.resolve();
+  var baseUrl = urlLista(listId)+'/items?$orderby=ID%20desc&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
+
+  function buscarEnPagina(url) {
+    return graphGet(url).then(function(data) {
+      if (!data.value || data.value.length === 0) return false;
+      var encontrado = false;
+      data.value.forEach(function(item) {
+        var f = item.fields;
+        if (!f || !f.OrdenId) return;
+        var id = f.OrdenId.toString().trim();
+        aplicarEstadoDesdeItem(item, id);
+        if (id === ordenId) encontrado = true;
       });
-    console.log('[CONT] Total cargados:',DB.contenedores.length);
-    console.log('[CONT] ── PRIMERAS 10 FILAS PARSEADAS ──────────────────');
-    DB.contenedores.slice(0,10).forEach(function(c,i){
-      console.log('[CONT] Fila '+(i+1)+':'+
-        ' Pedido="'+c.pedido+'"'+
-        ' | FechaProg="'+c.fechaProg+'"'+
-        ' | Contenedor="'+c.contenedor+'"'+
-        ' | Sello="'+c.sello+'"'+
-        ' | Pallets='+c.pallets+
-        ' | Status="'+c.status+'"');
+      if (encontrado) {
+        console.log('Estado refrescado desde SP para orden:', ordenId);
+        return true;
+      }
+      // Si no encontrado y hay mas paginas, seguir buscando
+      if (data['@odata.nextLink']) {
+        return buscarEnPagina(data['@odata.nextLink']);
+      }
+      console.log('refrescarEstadoOrden: orden nueva sin estado en SP:', ordenId);
+      return false;
     });
-    console.log('[CONT] ── RAW PRIMERAS 5 FILAS (índices exactos) ────────');
-    raw.slice(0,5).forEach(function(r,i){
-      console.log('[CONT] raw['+i+']: col0="'+(r[0]||'')+'" col1="'+(r[1]||'')+'" col2="'+(r[2]||'')+'" col3="'+(r[3]||'')+'" col4="'+(r[4]||'')+'" col5="'+(r[5]||'')+'"]');
-    });
-  } else if(hoja==='Compra'){
-    // Cols: Pedido(A),SKU(B),Descripcion(C),Cantidad(D)
-    DB.compra=raw.filter(function(r){return filaValida(r[0],50)&&r[1];})
-      .map(function(r){return{
-        pedido:r[0].toString().trim(),
-        sku:r[1].toString().trim(),
-        desc:r[2]?r[2].toString().trim():'',
-        cantidad:r[3]?Number(r[3]):0,
-      };});
-  } else if(hoja==='Importaciones'){
-    DB.importaciones=raw.filter(function(r){return filaValida(r[0],50)&&r[1];})
-      .map(function(r){return{
-        pedido:r[0].toString().trim(),
-        sku:r[1].toString().trim(),
-        desc:r[2]?r[2].toString().trim():'',
-        cantidad:r[3]?Number(r[3]):0,
-      };});
-  } else if(hoja==='C.Barra'){
-    // Cols: SKU(A),Descripcion(B),Un(C),Cód.BarrasUnidad(D),Un/CJ(E),Cód.BarrasCaja(F)
-    DB.codigosBarra=[];
-    raw.filter(function(r){return filaValida(r[0],50);}).forEach(function(r){
-      var sku=r[0]?r[0].toString().trim():'';
-      var desc=r[1]?r[1].toString().trim():'';
-      var cbUnd=r[3]?r[3].toString().trim():'';
-      var uncj=r[4]?Number(r[4]):1;
-      var cbCaj=r[5]?r[5].toString().trim():'';
-      if(cbUnd) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbUnd,tipo:'Unidad',factor:1});
-      if(cbCaj) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbCaj,tipo:'Caja',factor:uncj||1});
+  }
+
+  return buscarEnPagina(baseUrl).catch(function(e) {
+    console.warn('refrescarEstadoOrden error (no critico):', e.message);
+  });
+}
+
+function buscarOrden() {
+  var val=document.getElementById('inp-orden').value.trim().toUpperCase();
+  if (!val){ toast('Escanea o ingresa un numero de orden','err'); return; }
+  estado.ordenActual=val;
+  document.getElementById('inp-orden').value='';
+  if (estado.accionPendiente&&estado.accionPendiente.etapa==='PICKING'&&estado.accionPendiente.evento==='INICIO') {
+    prepararAccion(val,'PICKING','INICIO');
+  } else {
+    // Mostrar mensaje de verificación y refrescar estado antes de renderizar
+    var aviso = document.getElementById('aviso-scan');
+    aviso.textContent = '🔄 Verificando estado...';
+    aviso.classList.add('show');
+    refrescarEstadoOrden(val).then(function() {
+      aviso.classList.remove('show');
+      mostrarDetalle(val);
     });
   }
 }
+function volverScan() {
+  estado.accionPendiente=null;
+  mostrar('s-scan');
+  setTimeout(function(){ document.getElementById('inp-orden').focus(); },100);
+}
+function mostrarDetalle(ordenId) {
+  var o=DB.ordenes[ordenId];
+  document.getElementById('d-orden-num').textContent=ordenId;
+  var ultimoTexto='Sin actividad registrada';
+  if (o) {
+    var eventos=[];
+    ETAPAS.forEach(function(et){
+      if (o[et]) {
+        Object.entries(o[et].personas).forEach(function(entry){
+          var op2=entry[0],p=entry[1];
+          // Ignorar personas internas cargadas desde SP (empiezan con _)
+          if (op2.charAt(0) === '_') return;
+          if (p.fin)    eventos.push({ts:p.fin.ts,    label:et+' finalizado por '+op2});
+          if (p.inicio) eventos.push({ts:p.inicio.ts, label:et+' iniciado por '+op2});
+        });
+      }
+    });
+    if (eventos.length){ eventos.sort(function(a,b){ return b.ts.localeCompare(a.ts); }); ultimoTexto='Ultimo: '+eventos[0].label; }
+  }
+  document.getElementById('d-orden-meta').textContent=ultimoTexto;
+  var tracker=document.getElementById('etapas-tracker'); tracker.innerHTML='';
+  ETAPAS.forEach(function(et){
+    var st=estadoEtapa(ordenId,et), div=document.createElement('div');
+    div.className='etapa-item etapa-'+ETAPA_COLOR[et];
+    var bCls='badge-pend',bTxt='Pendiente',det='';
+    if (st==='iniciada'){ bCls='badge-init'; bTxt='En curso'; var o2=DB.ordenes[ordenId]; det=personasIniciadas(o2,et)+'/'+totalPersonas(o2,et)+' personas'; }
+    else if (st==='finalizada'){ bCls='badge-ok'; bTxt='Listo'; }
+    div.innerHTML='<div class="etapa-nombre">'+ETAPA_ICONO[et]+' '+et+'</div>'+
+                  '<span class="badge '+bCls+'">'+bTxt+'</span>'+
+                  (det?'<div class="etapa-det" style="margin-top:4px">'+det+'</div>':'');
+    tracker.appendChild(div);
+  });
+  renderAcciones(ordenId);
+  actualizarBtnOverride(ordenId);
+  mostrar('s-detalle');
+}
+// ============================================================
+// OVERRIDE SUPERVISORIAL
+// ============================================================
+var OVERRIDE_PASS = '123789';
+var overrideEtapaPendiente = null; // etapa que espera aprobacion
 
-// ═══════════════════════════════════════════════════════════════════
-// 9. ESCRITURA EN SP LISTS
-// ═══════════════════════════════════════════════════════════════════
-function escribirEvento(tipo,hora,contenedor){
-  if(!DB.listIds.eventos) return Promise.resolve();
+function actualizarBtnOverride(ordenId) {
+  var btn = document.getElementById('btn-override');
+  if (!btn) return;
+  // Habilitar si hay alguna etapa En Curso (iniciada pero no finalizada)
+  var hayEnCurso = ETAPAS.some(function(et) {
+    return estadoEtapa(ordenId, et) === 'iniciada';
+  });
+  btn.disabled = !hayEnCurso;
+  btn.style.opacity = hayEnCurso ? '1' : '.35';
+}
+
+function abrirOverride() {
+  var ordenId = estado.ordenActual;
+  // Mostrar etapas que se pueden adelantar (siguiente a una En Curso)
+  var opciones = [];
+  ETAPAS.forEach(function(et, i) {
+    var st = estadoEtapa(ordenId, et);
+    // Una etapa es candidata si la anterior está En Curso
+    if (i > 0) {
+      var anterior = ETAPAS[i-1];
+      if (estadoEtapa(ordenId, anterior) === 'iniciada' && st === 'pendiente') {
+        opciones.push(et);
+      }
+    }
+  });
+  if (opciones.length === 0) return;
+  overrideEtapaPendiente = opciones[0]; // por default la primera disponible
+  document.getElementById('override-desc').innerHTML =
+    'Adelantar inicio de <b>' + opciones.join(', ') + '</b> en orden <b>' + ordenId + '</b><br>' +
+    '<span style="color:var(--warn);font-size:11px">La etapa anterior no ha finalizado.</span>';
+  document.getElementById('override-pass').value = '';
+  document.getElementById('aviso-override').classList.remove('show');
+  document.getElementById('modal-override').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('override-pass').focus(); }, 100);
+}
+
+function cerrarOverride() {
+  document.getElementById('modal-override').style.display = 'none';
+  overrideEtapaPendiente = null;
+}
+
+function confirmarOverride() {
+  var pass = document.getElementById('override-pass').value;
+  var av   = document.getElementById('aviso-override');
+  if (pass !== OVERRIDE_PASS) {
+    av.textContent = 'Contrasena incorrecta.';
+    av.classList.add('show');
+    document.getElementById('override-pass').value = '';
+    return;
+  }
+  cerrarOverride();
+  // Habilitar todas las etapas candidatas para esta orden en esta sesion
+  var ordenId = estado.ordenActual;
+  if (!DB.ordenes[ordenId]) DB.ordenes[ordenId] = {};
+  // Marcar override aprobado para las etapas pendientes con anterior En Curso
+  ETAPAS.forEach(function(et, i) {
+    if (i > 0) {
+      var anterior = ETAPAS[i-1];
+      if (estadoEtapa(ordenId, anterior) === 'iniciada' && estadoEtapa(ordenId, et) === 'pendiente') {
+        if (!DB.ordenes[ordenId][et]) DB.ordenes[ordenId][et] = { totalPersonas:1, personas:{} };
+        DB.ordenes[ordenId][et]._overrideAprobado = true;
+      }
+    }
+  });
+  toast('Override aprobado para ' + ordenId, 'warn', 3000);
+  mostrarDetalle(ordenId); // re-renderizar con override activo
+}
+
+function renderAcciones(ordenId) {
+  var cont=document.getElementById('acciones-container'); cont.innerHTML='';
+  var sig=siguienteAccion(ordenId);
+  if (sig&&sig.evento!=='ESPERA') {
+    var div=document.createElement('div'); div.className='card';
+    div.innerHTML='<div class="card-title">Proxima accion</div>';
+    var btn=document.createElement('button');
+    btn.className='btn btn-'+ETAPA_COLOR[sig.etapa];
+    btn.textContent=(sig.evento==='INICIO'?'▶ Iniciar ':'■ Finalizar ')+sig.etapa;
+    btn.onclick=(function(e,v){ return function(){ prepararAccion(ordenId,e,v); }; })(sig.etapa,sig.evento);
+    div.appendChild(btn); cont.appendChild(div);
+  } else if (sig&&sig.evento==='ESPERA') {
+    var div2=document.createElement('div'); div2.className='card';
+    div2.innerHTML='<div class="card-title">Proxima accion</div>'+
+                   '<div style="font-size:13px;color:var(--warn);padding:8px 0">⏳ Esperando que las demas personas completen '+sig.etapa+'...</div>';
+    cont.appendChild(div2);
+  } else {
+    var div3=document.createElement('div'); div3.className='card';
+    div3.innerHTML='<div class="card-title">Acciones disponibles</div>';
+    ['PACKING','FACTURACION'].forEach(function(et){
+      var ac=accionDisponibleParaOperador(ordenId,et);
+      var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-bottom:8px;';
+      var btn2=document.createElement('button');
+      if (ac==='ESPERA'||estadoEtapa(ordenId,et)==='finalizada'){
+        btn2.className='btn btn-gris'; btn2.disabled=true;
+        btn2.textContent=estadoEtapa(ordenId,et)==='finalizada'?et+' Completado':'⏳ '+et+' — esperando';
+      } else {
+        btn2.className='btn btn-'+ETAPA_COLOR[et];
+        btn2.textContent=(ac==='INICIO'?'▶ Iniciar ':'■ Finalizar ')+et;
+        btn2.onclick=(function(e,a){ return function(){ prepararAccion(ordenId,e,a); }; })(et,ac);
+      }
+      btn2.style.flex='1'; row.appendChild(btn2); div3.appendChild(row);
+    });
+    cont.appendChild(div3);
+  }
+}
+function prepararAccion(ordenId,etapa,evento) {
+  estado.accionPendiente={ etapa:etapa, evento:evento };
+  document.getElementById('conf-titulo').textContent =(evento==='INICIO'?'Iniciar ':'Finalizar ')+etapa;
+  document.getElementById('conf-orden').textContent  =ordenId;
+  document.getElementById('conf-accion').textContent =ETAPA_ICONO[etapa]+' '+etapa+' — '+evento;
+  var btnConf=document.getElementById('btn-confirmar-accion');
+  btnConf.className='btn btn-'+ETAPA_COLOR[etapa];
+  btnConf.textContent=(evento==='INICIO'?'▶ Iniciar ':'■ Finalizar ')+etapa;
+  var etapasMulti=['PICKING','PACKING'];
+  document.getElementById('toggle-multi-row').style.display=(etapasMulti.includes(etapa)&&evento==='INICIO')?'flex':'none';
+  document.getElementById('chk-multi').checked=false; toggleMulti();
+  document.getElementById('sel-op-accion').value=estado.operadorActual;
+  document.getElementById('aviso-conf').classList.remove('show');
+  mostrar('s-confirmar');
+}
+function volverDetalle() { mostrarDetalle(estado.ordenActual); }
+function toggleMulti() {
+  var activo=document.getElementById('chk-multi').checked;
+  document.getElementById('bloque-num-personas').style.display=activo?'block':'none';
+  document.getElementById('label-op-accion').textContent=activo?'Tu nombre (primera persona en registrar)':'Quien realiza esta accion?';
+  document.getElementById('nota-multi').style.display=activo?'block':'none';
+  if (activo){
+    document.getElementById('sel-num-personas').value='';
+    document.getElementById('nota-multi').innerHTML='👥 <b>Modo multipersonas:</b> Registras el inicio ahora. Las demas personas escanean la misma orden. La etapa avanza cuando <b>todos</b> hayan finalizado.';
+  }
+}
+function ejecutarAccion() {
+  var etapa=estado.accionPendiente.etapa, evento=estado.accionPendiente.evento;
+  var ordenId=estado.ordenActual, t=ahora();
+  var multiActivo=document.getElementById('chk-multi').checked;
+  if (multiActivo&&evento==='INICIO'){
+    var num=parseInt(document.getElementById('sel-num-personas').value)||null;
+    if (!num){ document.getElementById('aviso-conf').textContent='Selecciona cuantas personas trabajaran esta etapa.'; document.getElementById('aviso-conf').classList.add('show'); return; }
+  }
+  var op=document.getElementById('sel-op-accion').value;
+  if (!op){ document.getElementById('aviso-conf').textContent='Selecciona tu nombre.'; document.getElementById('aviso-conf').classList.add('show'); return; }
+
+  // Restriccion: Picking -> Checking bloqueado para la misma persona
+  var RESTRICCIONES={ 'CHECKING':'PICKING' };
+  var etapaRestringida=RESTRICCIONES[etapa];
+  if (etapaRestringida&&evento==='INICIO'){
+    var oCheck=DB.ordenes[ordenId];
+    if (oCheck&&oCheck[etapaRestringida]&&oCheck[etapaRestringida].personas[op]){
+      document.getElementById('aviso-conf').textContent='⛔ '+op+' realizo '+etapaRestringida+' en esta orden. No puede hacer '+etapa+'.';
+      document.getElementById('aviso-conf').classList.add('show'); return;
+    }
+  }
+
+  if (!DB.ordenes[ordenId]) DB.ordenes[ordenId]={};
+  var o=DB.ordenes[ordenId];
+  if (evento==='INICIO'&&!o[etapa]){
+    var numP=multiActivo?parseInt(document.getElementById('sel-num-personas').value):1;
+    initEtapa(o,etapa,numP);
+  }
+  if (evento==='INICIO'&&o[etapa]&&o[etapa].personas[op]&&o[etapa].personas[op].inicio){
+    document.getElementById('aviso-conf').textContent=op+' ya inicio '+etapa+' en esta orden.'; document.getElementById('aviso-conf').classList.add('show'); return;
+  }
+  if (evento==='FIN'&&o[etapa]&&o[etapa].personas[op]&&o[etapa].personas[op].fin){
+    document.getElementById('aviso-conf').textContent=op+' ya finalizo '+etapa+' en esta orden.'; document.getElementById('aviso-conf').classList.add('show'); return;
+  }
+  if (!o[etapa].personas[op]) o[etapa].personas[op]={};
+  var p=o[etapa].personas[op], duracion=null;
+  if (evento==='INICIO'){ p.inicio={ hora:t.hora, ts:t.ts, fecha:t.fecha }; }
+  else {
+    p.fin={ hora:t.hora, ts:t.ts, fecha:t.fecha };
+    if (p.inicio){ duracion=Math.round((new Date(t.ts.replace(' ','T'))-new Date(p.inicio.ts.replace(' ','T')))/60000); p.duracion=duracion; }
+  }
+  var tot=totalPersonas(o,etapa), fin2=personasFinalizadas(o,etapa), esMulti=tot>1;
+  var fila={
+    Fecha:t.fecha, Hora:t.hora, Sesion:estado.sesionId,
+    Orden:ordenId, Etapa:etapa, Evento:evento, Operador:op,
+    Multipersona:esMulti?'SI':'NO', Total_Personas:tot,
+    Timestamp:t.ts, Duracion_min:duracion!==null?duracion:'',
+    Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
+    Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(), Novedades:'',
+  };
+  escribirEnExcel(fila);
+  actualizarEstadoOrden(ordenId,etapa,(evento==='FIN'&&etapaCompleta(DB.ordenes[ordenId],etapa))?'finalizada':'iniciada');
+
+  var mExtra='';
+  if (esMulti&&evento==='INICIO'){ var ini2=personasIniciadas(o,etapa); mExtra='<b>Progreso:</b> '+ini2+' de '+tot+' han iniciado'+(ini2<tot?'<br><span style="color:var(--warn)">⏳ Faltan '+(tot-ini2)+'</span>':''); }
+  if (esMulti&&evento==='FIN'){    mExtra='<b>Progreso:</b> '+fin2+' de '+tot+' han finalizado'+(fin2<tot?'<br><span style="color:var(--warn)">⏳ Faltan '+(tot-fin2)+'</span>':'<br><span style="color:var(--pick)">✅ Etapa completada</span>'); }
+
+  document.getElementById('ok-titulo').textContent =(evento==='INICIO'?'▶ Iniciado':'■ Finalizado')+': '+etapa;
+  document.getElementById('ok-detalle').textContent=ordenId+' · '+t.hora+' · '+op;
+  document.getElementById('ok-resumen').innerHTML  =
+    '<b>Orden:</b> '+ordenId+'<br><b>Etapa:</b> '+ETAPA_ICONO[etapa]+' '+etapa+(esMulti?' ('+tot+' personas)':'')+'<br>'+
+    '<b>Evento:</b> '+evento+'<br><b>Operador:</b> '+op+'<br><b>Hora:</b> '+t.hora+'<br>'+
+    (duracion!==null?'<b>Duracion:</b> '+duracion+' min<br>':'')+mExtra;
+
+  var contSig=document.getElementById('ok-siguiente'); contSig.innerHTML='';
+  var sigNext=siguienteAccion(ordenId);
+  if (sigNext&&sigNext.evento!=='ESPERA'){
+    var bn=document.createElement('button');
+    bn.className='btn btn-'+ETAPA_COLOR[sigNext.etapa];
+    bn.textContent=(sigNext.evento==='INICIO'?'▶ Iniciar ':'■ Finalizar ')+sigNext.etapa;
+    bn.onclick=(function(e,v){ return function(){ prepararAccion(ordenId,e,v); }; })(sigNext.etapa,sigNext.evento);
+    contSig.appendChild(bn);
+  } else if (!sigNext){
+    ['PACKING','FACTURACION'].forEach(function(et){
+      var ac=accionDisponibleParaOperador(ordenId,et);
+      if (ac==='INICIO'||ac==='FIN'){
+        var bn2=document.createElement('button');
+        bn2.className='btn btn-'+ETAPA_COLOR[et]; bn2.style.marginBottom='8px';
+        bn2.textContent=(ac==='INICIO'?'▶ Iniciar ':'■ Finalizar ')+et;
+        bn2.onclick=(function(e,a){ return function(){ prepararAccion(ordenId,e,a); }; })(et,ac);
+        contSig.appendChild(bn2);
+      }
+    });
+  }
+
+  var btnAddPick=document.getElementById('btn-add-picking');
+  btnAddPick.style.display=(etapa==='PICKING'&&evento==='INICIO')?'block':'none';
+  mostrar('s-ok');
+  toast(etapa+' '+(evento==='INICIO'?'iniciado':'finalizado')+' ✓','ok');
+}
+
+// ============================================================
+// 13. FLUJO ACTIVIDADES VARIAS
+// ============================================================
+function parsearRegistroActVaria(item, op) {
+  if (!item.fields || item.fields.Operador !== op) return null;
+  var tsRaw = item.fields.TimestampEvento || '';
+  var tsLocal = '';
+  if (tsRaw) {
+    var d = new Date(tsRaw);
+    var pad = function(n){ return String(n).padStart(2,'0'); };
+    tsLocal = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+
+              ' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+  }
+  return { actividad: item.fields.Actividad||'', evento: item.fields.Evento||'', ts: tsLocal };
+}
+
+function refrescarActividadVaria() {
+  var listId = DB.listIds['varias'];
+  var op = estado.operadorActual;
+  if (!listId || !op) return Promise.resolve();
+  console.log('[ActVaria] Refrescando para operador:', op);
+
+  var todosRegistros = [];
+
+  function cargarPagina(url) {
+    return graphGet(url).then(function(data) {
+      if (data.value) {
+        data.value.forEach(function(item) {
+          var r = parsearRegistroActVaria(item, op);
+          if (r) todosRegistros.push(r);
+        });
+      }
+      if (data['@odata.nextLink']) {
+        return cargarPagina(data['@odata.nextLink']);
+      }
+    });
+  }
+
+  var baseUrl = urlLista(listId)+'/items?$orderby=ID%20desc&$expand=fields($select=Actividad,Evento,Operador,Sesi_x00f3_n,TimestampEvento)&$top=500';
+  return cargarPagina(baseUrl).then(function() {
+    var registros = todosRegistros.sort(function(a,b){ return a.ts.localeCompare(b.ts); });
+    console.log('[ActVaria] Registros del operador:', registros.length);
+    registros.forEach(function(r){ console.log('[ActVaria]  ', r.ts, r.actividad, r.evento); });
+
+    // Agrupar por actividad
+    var mapaActs = {};
+    registros.forEach(function(r){
+      if (!mapaActs[r.actividad]) mapaActs[r.actividad] = [];
+      mapaActs[r.actividad].push(r);
+    });
+
+    // Para cada actividad, procesar ciclos INICIO->FIN en secuencia por timestamp
+    // Un INICIO sin FIN posterior = actividad pendiente
+    var activa = null;
+    Object.keys(mapaActs).forEach(function(nombre) {
+      var evts = mapaActs[nombre]; // ya ordenados por ts
+      var pendiente = null;
+      evts.forEach(function(r) {
+        if (r.evento === 'Iniciada' || r.evento === 'INICIO') {
+          pendiente = r; // abre ciclo
+        } else if ((r.evento === 'Finalizada' || r.evento === 'FIN') && pendiente) {
+          // Solo cerrar si este FIN es posterior al INICIO
+          if (r.ts > pendiente.ts) {
+            pendiente = null; // ciclo cerrado
+          }
+        }
+      });
+      // Si quedo un INICIO sin FIN posterior, es la actividad activa
+      if (pendiente) {
+        activa = {
+          id:    'act_sp_' + nombre.replace(/\s+/g, '_').toLowerCase(),
+          lbl:   nombre,
+          icon:  '!',
+          inicio: pendiente.ts ? pendiente.ts.substring(11,16) : '--',
+          ts:    pendiente.ts,
+        };
+      }
+    });
+
+    if (activa && !activasVarias[op]) {
+      activasVarias[op] = activa;
+      console.log('Actividad recuperada desde SP:', activa.lbl, 'para', op);
+    } else if (!activa && activasVarias[op] && activasVarias[op].id.startsWith('act_sp_')) {
+      // Si habia una activa cargada desde SP pero ya tiene FIN, limpiarla
+      delete activasVarias[op];
+      console.log('Actividad SP ya finalizada, limpiada para:', op);
+    }
+  }).catch(function(e){ console.warn('refrescarActividadVaria:', e.message); });
+}
+
+function abrirActVarias() {
+  var op=estado.operadorActual;
+  var banner=document.getElementById('banner-activa');
+  var grid=document.getElementById('varias-grid');
+  banner.style.display='none';
+  grid.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">Verificando actividades...</div>';
+  mostrar('s-varias');
+  refrescarActividadVaria().then(function(){
+    var activa=activasVarias[op];
+    if (activa){ banner.style.display='flex'; document.getElementById('banner-activa-det').textContent=activa.lbl+' — iniciada a las '+activa.inicio+'. Debes finalizarla primero.'; }
+    else { banner.style.display='none'; }
+    grid.innerHTML='';
+  var lista=DB.actividades.length>0?DB.actividades:[
+    { id:'inventario',    lbl:'Inventario',                  color:'var(--fact)'  },
+    { id:'etiquetar',     lbl:'Etiquetar',                   color:'var(--warn)'  },
+    { id:'danados',       lbl:'Danados',                     color:'var(--danger)'},
+    { id:'mkt',           lbl:'MKT',                         color:'#FF6AD2'      },
+    { id:'destruccion',   lbl:'Destruccion',                 color:'#FF8C42'      },
+    { id:'embPallets',    lbl:'Embarque Pallets',            color:'var(--teal)'  },
+    { id:'embDanados',    lbl:'Embarque Danados',            color:'var(--pack)'  },
+    { id:'stock',         lbl:'Stock',                       color:'var(--fact)'  },
+    { id:'diario',        lbl:'Diario',                      color:'var(--pick)'  },
+    { id:'perchado',      lbl:'Perchado',                    color:'var(--warn)'  },
+    { id:'abastecimiento',lbl:'Abastecimiento',              color:'var(--teal)'  },
+    { id:'recepTransf',   lbl:'Recepcion de Transferencias', color:'#FF8C42'      },
+    { id:'recepDevol',    lbl:'Recepcion de Devoluciones',   color:'var(--pack)'  },
+    { id:'procDevol',     lbl:'Procesar Devoluciones',       color:'var(--danger)'},
+    { id:'recepCont',     lbl:'Recepcion de Contenedores',   color:'var(--fact)'  },
+    { id:'revImport',     lbl:'Revision de Importaciones',   color:'var(--warn)'  },
+    { id:'sepImport',     lbl:'Separacion de Importaciones', color:'#FF6AD2'      },
+    { id:'desalojo',      lbl:'Desalojo de Materiales',      color:'#FF8C42'      },
+    { id:'infImport',     lbl:'Informe de Importaciones',    color:'var(--pick)'  },
+  ];
+  lista.forEach(function(av){
+    // Comparar por nombre (lbl) porque el id puede tener prefijo distinto si viene de SP
+    var estaActiva=activa&&activa.lbl===av.lbl;
+    var bloqueada=activa&&!estaActiva;
+    if (bloqueada) return;
+    var div=document.createElement('div'); div.className='var-card';
+    div.style.borderColor=av.color; div.style.color=av.color;
+    div.innerHTML='<div class="v-lbl">'+av.lbl+(estaActiva?' ⏳':'')+'</div>';
+    div.onclick=(function(a,e){ return function(){ selActVaria(a,e); }; })(av,estaActiva);
+    grid.appendChild(div);
+  });
+  }); // fin then
+}
+function selActVaria(av,estaActiva) {
+  variaSeleccionada=av;
+  if (estaActiva){ mostrarVariaActiva(); return; }
+  document.getElementById('vc-icon').textContent=av.icon||'⚡';
+  document.getElementById('vc-act').textContent =av.lbl;
+  document.getElementById('vc-op').textContent  =estado.operadorActual;
+  document.getElementById('aviso-vc').classList.remove('show');
+  mostrar('s-varias-confirmar');
+}
+function iniciarActividadVaria() {
+  var op=estado.operadorActual, av=variaSeleccionada;
+  if (activasVarias[op]) {
+    toast('Ya tienes una actividad activa: '+activasVarias[op].lbl,'warn',3000);
+    mostrarVariaActiva();
+    return;
+  }
   var t=ahora();
-  var fields={
-    Title:       S.recId+'-'+tipo,
-    RecepcionId: S.recId,
-    Pedido:      S.pedido,
-    Contenedor:  contenedor||S.contenedor||'',
-    TipoEvento:  tipo,
-    Operario:    S.operario,
-    Hora:        hora||t.hora,
-    Fecha:       t.fecha,
-    Timestamp:   t.ts,
-  };
-  return gPost(urlLista(DB.listIds.eventos)+'/items',{fields:fields})
-    .then(function(r){console.log('[SP] Evento '+tipo+' OK');return r;})
-    .catch(function(e){console.error('[SP] Evento '+tipo+' error:',e.message);});
+  activasVarias[op]={ id:av.id, lbl:av.lbl, icon:av.icon||'⚡', inicio:t.hora, ts:t.ts };
+  logearActVaria('Iniciada',av.lbl,t,null);
+  toast(av.lbl+' iniciada ✓','ok');
+  mostrarVariaActiva();
 }
-
-function escribirSKU(reg){
-  if(!DB.listIds.recepciones) return Promise.resolve();
-  var fields={
-    Title:          S.recId+'-'+reg.sku+'-'+Date.now(),
-    Sesion:         S.recId,
-    Operario:       S.operario,
-    Solicitante:    S.operario,
-    Subtipo:        S.subtipo,
-    Pedido:         S.pedido,
-    Contenedor:     S.contenedor,
-    Sello:          S.sello||'',
-    Pallets:        Number(S.pallets)||0,
-    H_Llegada:      S.eventos.llegada||'',
-    H_Apertura:     S.eventos.apertura||'',
-    H_Cierre:       '',
-    H_Salida:       '',
-    LPN:            '',
-    LPN_OK:         true,
-    CodProducto:    reg.sku,
-    CodInterno:     reg.sku,
-    Nombre:         reg.desc,
-    UnXCaja:        Number(reg.factor)||1,
-    NumCajas:       Number(reg.numCajas)||1,
-    Cantidad:       Number(reg.cantidad)||0,
-    Estado:         reg.estado||'OK',
-    Novedades:      reg.novedad||'',
-    Personas:       0,
-    AlertaProducto: false,
-    Fecha:          ahora().fecha,
-    Hora:           ahora().hora,
-  };
-  return gPost(urlLista(DB.listIds.recepciones)+'/items',{fields:fields})
-    .then(function(r){console.log('[SP] SKU '+reg.sku+' OK');return r;})
-    .catch(function(e){console.error('[SP] SKU error:',e.message);});
+function mostrarVariaActiva() {
+  var op=estado.operadorActual, activa=activasVarias[op];
+  document.getElementById('va-act-lbl').textContent    =activa.lbl;
+  document.getElementById('va-op-val').textContent     =op;
+  document.getElementById('va-inicio-sub').textContent ='Inicio: '+activa.inicio;
+  document.getElementById('va-op').textContent         =op;
+  document.getElementById('va-act').textContent        =activa.lbl;
+  document.getElementById('va-inicio').textContent     =activa.inicio;
+  document.getElementById('va-fin-row').style.display  ='none';
+  document.getElementById('btn-va-fin').style.display  ='block';
+  mostrar('s-varias-activa');
 }
-
-function escribirAsignacion(pedido,tipo,operario){
-  if(!DB.listIds.asignaciones) return Promise.resolve();
-  var t=ahora();
-  var fields={
-    Title:          pedido+'-'+tipo,
-    Pedido:         pedido,
-    TipoAsignacion: tipo,
-    Operario:       operario,
-    Supervisor:     S.operario,
-    FechaAsignacion:t.fecha,
-    Status:         'Activo',
-  };
-  return gPost(urlLista(DB.listIds.asignaciones)+'/items',{fields:fields})
-    .then(function(r){console.log('[SP] Asignación OK');return r;})
-    .catch(function(e){console.error('[SP] Asignación error:',e.message);});
+function finActividadVaria() {
+  var op=estado.operadorActual, activa=activasVarias[op];
+  if (!activa) return;
+  // Deshabilitar boton inmediatamente para evitar doble tap
+  var btnFin = document.getElementById('btn-va-fin');
+  if (btnFin) { btnFin.disabled = true; btnFin.style.display = 'none'; }
+  var t=ahora(), dur=Math.round((new Date(t.ts.replace(' ','T'))-new Date(activa.ts.replace(' ','T')))/60000);
+  // Borrar de memoria ANTES de loguear para evitar re-entradas
+  delete activasVarias[op];
+  logearActVaria('Finalizada',activa.lbl,t,dur);
+  document.getElementById('va-fin').textContent       =t.hora;
+  document.getElementById('va-fin-row').style.display ='flex';
+  toast(activa.lbl+' finalizada · '+dur+' min','ok');
+  setTimeout(function(){ mostrar('s-tipo'); },1800);
 }
-
-function cargarAsignacionesSP(){
-  if(!DB.listIds.asignaciones) return Promise.resolve([]);
-  return gGet(urlLista(DB.listIds.asignaciones)+'/items?$expand=fields&$top=500')
-    .then(function(d){return(d.value||[]).map(function(i){return i.fields;});})
-    .catch(function(){return[];});
-}
-function cargarEventosSP(pedido){
-  if(!DB.listIds.eventos) return Promise.resolve([]);
-  return gGet(urlLista(DB.listIds.eventos)+'/items?$expand=fields&$top=500')
-    .then(function(d){
-      return(d.value||[])
-        .map(function(i){return i.fields;})
-        .filter(function(f){return f.Pedido===pedido;});
-    }).catch(function(){return[];});
-}
-function cargarSKUsSP(pedido,contenedor){
-  if(!DB.listIds.recepciones) return Promise.resolve([]);
-  return gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500')
-    .then(function(d){
-      return(d.value||[])
-        .map(function(i){return i.fields;})
-        .filter(function(f){return f.Pedido===pedido&&(!contenedor||f.Contenedor===contenedor);});
-    }).catch(function(){return[];});
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 10. BÚSQUEDA DE CÓDIGO DE BARRAS
-// ═══════════════════════════════════════════════════════════════════
-function buscarCodigo(cb){
-  var norm=cb.trim().toUpperCase();
-  return DB.codigosBarra.filter(function(r){
-    return r.cb.trim().toUpperCase()===norm;
-  });
-}
-function getPacingList(pedido,subtipo){
-  var lista=subtipo==='IMPORTACION'?DB.importaciones:DB.compra;
-  return lista.filter(function(r){return r.pedido===pedido;});
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 11. PANTALLAS — HOME Y ROL
-// ═══════════════════════════════════════════════════════════════════
-function showHome(){
-  S.step='home';
-  var lista=S.rol==='supervisor'?DB.supervisores:DB.operadores;
-  render(
-    '<div class="lbl">¿con qué rol ingresas?</div>'+
-    '<div class="grid2">'+
-      '<div class="card-t'+(S.rol==='supervisor'?' sel':'')+'" onclick="S.rol=\'supervisor\';S.operario=\'\';showHome()">'+
-        '<div class="card-t-icon">👔</div><div class="card-t-lbl">SUPERVISOR</div></div>'+
-      '<div class="card-t'+(S.rol==='operario'?' sel':'')+'" onclick="S.rol=\'operario\';S.operario=\'\';showHome()">'+
-        '<div class="card-t-icon">👷</div><div class="card-t-lbl">OPERARIO</div></div>'+
-    '</div>'+
-    '<div class="lbl" style="margin-top:10px">'+(S.rol==='supervisor'?'supervisor':'operario')+'</div>'+
-    '<select class="inp" id="sel-quien" onchange="S.operario=this.value;updateFtr()">'+
-      '<option value="">— seleccionar —</option>'+
-      lista.map(function(o){return'<option'+(S.operario===o?' selected':'')+'>'+o+'</option>';}).join('')+
-    '</select>'+
-    '<div class="btn-row" style="margin-top:12px">'+
-      '<button class="btn btn-rec btn-big" onclick="iniciarSesion()">ENT → INGRESAR</button>'+
-    '</div>'
-  );
-}
-
-function iniciarSesion(){
-  S.operario=document.getElementById('sel-quien').value;
-  if(!S.rol){toast('Selecciona tu rol');return;}
-  if(!S.operario){toast('Selecciona '+(S.rol==='supervisor'?'el supervisor':'el operario'));return;}
-  updateFtr();
-  if(S.rol==='supervisor') showMenuSup();
-  else showMenuOp();
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 12. MENÚ SUPERVISOR
-// ═══════════════════════════════════════════════════════════════════
-function showMenuSup(){
-  S.step='menu-sup';
-  render(
-    '<div class="badge badge-sup">👔 '+S.operario+'</div>'+
-    '<div class="lbl" style="margin-top:4px">¿qué deseas hacer?</div>'+
-    '<div class="grid2" style="margin-top:8px">'+
-      '<div class="card-t" onclick="showCalendario()">'+
-        '<div class="card-t-icon">📅</div><div class="card-t-lbl">CALENDARIO</div></div>'+
-      '<div class="card-t" onclick="showPedidosSup()">'+
-        '<div class="card-t-icon">📦</div><div class="card-t-lbl">PEDIDOS</div></div>'+
-    '</div>'+
-    '<div class="grid2" style="margin-top:8px">'+
-      '<div class="card-t" onclick="showAsignarSup()">'+
-        '<div class="card-t-icon">👤</div><div class="card-t-lbl">ASIGNAR</div></div>'+
-      '<div class="card-t" onclick="showEstadoPedidos()">'+
-        '<div class="card-t-icon">📊</div><div class="card-t-lbl">ESTADO</div></div>'+
-    '</div>'
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 13. MENÚ OPERARIO
-// ═══════════════════════════════════════════════════════════════════
-function showMenuOp(){
-  S.step='menu-op';
-  render('<div class="loading"><div class="loading-icon">⏳</div>'+
-    '<div class="loading-txt">Cargando pedidos...</div></div>');
-  cargarAsignacionesSP().then(function(asigs){
-    var misAsigs=asigs.filter(function(a){
-      return normStr(a.Operario)===normStr(S.operario)&&
-             normStr(a.Status)==='ACTIVO';
-    });
-    var html='<div class="badge badge-rec">👷 '+S.operario+'</div>'+
-      '<div class="grid2" style="margin-bottom:10px">'+
-        '<div class="card-t" onclick="showCalendario()">'+
-          '<div class="card-t-icon">📅</div><div class="card-t-lbl">CALENDARIO</div></div>'+
-        '<div class="card-t" onclick="showMenuOp()">'+
-          '<div class="card-t-icon">🔄</div><div class="card-t-lbl">ACTUALIZAR</div></div>'+
-      '</div>';
-    if(!misAsigs.length){
-      html+='<div class="alert-w">No tienes pedidos asignados hoy.<br>Consulta con tu supervisor.</div>';
-    } else {
-      html+='<div class="lbl">tus pedidos asignados</div>';
-      misAsigs.forEach(function(a){
-        var ped=DB.pedidos.find(function(p){return normStr(p.pedido)===normStr(a.Pedido);})||{};
-        html+='<div class="card-item" onclick="iniciarFlujo(\''+a.Pedido+'\',\''+a.TipoAsignacion+'\')">'+
-          '<div class="card-item-title">'+a.Pedido+'</div>'+
-          '<div class="card-item-sub">'+(ped.tipo||a.TipoAsignacion)+' · '+a.TipoAsignacion+'</div>'+
-          '<div class="card-item-badge status-act">'+a.TipoAsignacion+'</div>'+
-        '</div>';
-      });
-    }
-    render(html);
+function logearActVaria(evento,actividadLbl,t,duracion) {
+  escribirActVaria({
+    Fecha:t.fecha, Hora:t.hora, Sesion:estado.sesionId,
+    Tipo:'ACT_VARIA', Actividad:actividadLbl, Evento:evento,
+    Operador:estado.operadorActual, Timestamp:t.ts,
+    Duracion_min:duracion!==null?duracion:0,
+    Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
+    Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(),
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// 14. CALENDARIO
-// ═══════════════════════════════════════════════════════════════════
-function showCalendario(){
-  S.step='calendario';
-  var hoy=ahora().raw;
-  var anio=hoy.getFullYear();
-  var mes=hoy.getMonth();
-  var fechaHoy=ahora().fecha;
-  if(!S.calFecha) S.calFecha=fechaHoy;
-
-  // Generar grid del mes
-  var primerDia=new Date(anio,mes,1).getDay();
-  var diasMes=new Date(anio,mes+1,0).getDate();
-  var meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-  // Log para diagnóstico de fechas
-  console.log('[CAL] Mes buscado:',anio+'-'+pad(mes+1));
-  console.log('[CAL] Contenedores total:',DB.contenedores.length);
-  console.log('[CAL] Muestra fechasProg:',DB.contenedores.slice(0,5).map(function(c){return c.pedido+':'+c.fechaProg;}).join(' | '));
-
-  // Contenedores del mes con fecha programada
-  var contsMes=DB.contenedores.filter(function(c){
-    if(!c.fechaProg) return false;
-    var fp=c.fechaProg.substring(0,7); // YYYY-MM
-    return fp===anio+'-'+pad(mes+1);
-  });
-  console.log('[CAL] Contenedores del mes:',contsMes.length);
-  var diasConData={};
-  contsMes.forEach(function(c){
-    var d=c.fechaProg.substring(8,10);
-    if(!diasConData[d]) diasConData[d]=0;
-    diasConData[d]++;
-  });
-
-  var html='<div class="badge badge-sup">📅 CALENDARIO DE RECEPCIÓN</div>'+
-    '<div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:8px;text-align:center">'+
-      meses[mes]+' '+anio+'</div>'+
-    '<div class="cal-hdr"><div class="cal-hdr-d">Do</div><div class="cal-hdr-d">Lu</div>'+
-    '<div class="cal-hdr-d">Ma</div><div class="cal-hdr-d">Mi</div>'+
-    '<div class="cal-hdr-d">Ju</div><div class="cal-hdr-d">Vi</div><div class="cal-hdr-d">Sa</div></div>'+
-    '<div class="cal-grid">';
-
-  // Celdas vacías antes del primer día
-  for(var i=0;i<primerDia;i++) html+='<div class="cal-day vacio"></div>';
-
-  for(var d=1;d<=diasMes;d++){
-    var dStr=pad(d);
-    var fechaD=anio+'-'+pad(mes+1)+'-'+dStr;
-    var cls='cal-day';
-    if(fechaD===fechaHoy) cls+=' hoy';
-    if(fechaD===S.calFecha) cls+=' sel';
-    if(diasConData[dStr]) cls+=' has-data';
-    html+='<div class="'+cls+'" onclick="selCalDia(\''+fechaD+'\')">'+d+
-      (diasConData[dStr]?'<div style="font-size:8px;color:var(--rec)">'+diasConData[dStr]+'</div>':'')+'</div>';
-  }
-  html+='</div>';
-
-  // Contenedores del día seleccionado
-  var diaConts=DB.contenedores.filter(function(c){return c.fechaProg===S.calFecha;});
-  html+='<div class="lbl" style="margin-top:12px">'+fechaDisplay(S.calFecha)+
-    ' · '+diaConts.length+' contenedor'+(diaConts.length!==1?'es':'')+'</div>';
-
-  if(!diaConts.length){
-    html+='<div class="alert-w" style="margin-top:6px">Sin contenedores programados para este día.</div>';
-  } else {
-    diaConts.forEach(function(c){
-      var statusCls=c.status==='Recibido'?'status-ok':c.status==='En proceso'?'status-act':'status-pend';
-      html+='<div class="card-item">'+
-        '<div class="card-item-title">'+c.pedido+' · '+c.contenedor+'</div>'+
-        '<div class="card-item-sub">'+c.pallets+' pallets'+'</div>'+
-        '<div class="card-item-badge '+statusCls+'">'+c.status+'</div>'+
-      '</div>';
-    });
-  }
-
-  html+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver</button>';
-  render(html);
+// ============================================================
+// 14. NAV
+// ============================================================
+function otraOrden() { mostrar('s-scan'); setTimeout(function(){ document.getElementById('inp-orden').focus(); },100); }
+function agregarOrdenAlPicking() { estado.accionPendiente={ etapa:'PICKING', evento:'INICIO' }; mostrar('s-scan'); setTimeout(function(){ document.getElementById('inp-orden').focus(); },100); }
+function irInicio() {
+  if (!msalAccount){ mostrar('s-msal'); return; }
+  mostrar('s-login');
+  document.getElementById('header-sub').textContent='Inverneg · CND';
+  estado.operadorActual=''; estado.ordenActual=''; estado.accionPendiente=null;
+  document.getElementById('sel-operador').value='';
 }
 
-function selCalDia(fecha){
-  S.calFecha=fecha;
-  showCalendario();
-}
+// Exponer al scope global
+window.msalLogin             = msalLogin;
+window.msalLogout            = msalLogout;
+window.loginContinuar        = loginContinuar;
+window.selTipo               = selTipo;
+window.buscarOrden           = buscarOrden;
+window.volverScan            = volverScan;
+window.volverDetalle         = volverDetalle;
+window.toggleMulti           = toggleMulti;
+window.ejecutarAccion        = ejecutarAccion;
+window.otraOrden             = otraOrden;
+window.agregarOrdenAlPicking = agregarOrdenAlPicking;
+window.irInicio              = irInicio;
+window.iniciarActividadVaria = iniciarActividadVaria;
+window.finActividadVaria     = finActividadVaria;
+window.mostrar               = mostrar;
+window.abrirOverride         = abrirOverride;
+window.cerrarOverride        = cerrarOverride;
+window.confirmarOverride     = confirmarOverride;
+window.selActVaria           = selActVaria;
 
-// ═══════════════════════════════════════════════════════════════════
-// 15. SUPERVISOR — PEDIDOS Y ESTADO
-// ═══════════════════════════════════════════════════════════════════
-function showPedidosSup(){
-  S.step='pedidos-sup';
-  var html='<div class="badge badge-sup">📦 PEDIDOS</div>';
-  if(!DB.pedidos.length){
-    html+='<div class="alert-w">Sin pedidos en el Excel. Verifica la hoja Pedidos.</div>';
-  } else {
-    DB.pedidos.forEach(function(p){
-      var sc=p.status==='Cerrado'?'status-ok':'status-pend';
-      var conts=DB.contenedores.filter(function(c){return c.pedido===p.pedido;});
-      html+='<div class="card-item">'+
-        '<div class="card-item-title">'+p.pedido+'</div>'+
-        '<div class="card-item-sub">'+p.tipo+' · '+conts.length+'/'+p.contsTotal+' contenedores'+
-          (p.obs?' · '+p.obs:'')+'</div>'+
-        '<div class="card-item-badge '+sc+'">'+p.status+'</div>'+
-      '</div>';
-    });
-  }
-  html+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showMenuSup()">← Volver</button>';
-  render(html);
-}
+init();
 
-function showEstadoPedidos(){
-  S.step='estado-pedidos';
-  render('<div class="loading"><div class="loading-icon">⏳</div>'+
-    '<div class="loading-txt">Cargando estado...</div></div>');
-  cargarAsignacionesSP().then(function(asigs){
-    var html='<div class="badge badge-sup">📊 ESTADO DE PEDIDOS</div>';
-    if(!DB.pedidos.length){
-      html+='<div class="alert-w">Sin pedidos en el Excel.</div>';
-    } else {
-      DB.pedidos.forEach(function(p){
-        var asigRec=asigs.find(function(a){return a.Pedido===p.pedido&&a.TipoAsignacion==='RECEPCION';});
-        var asigPerch=asigs.find(function(a){return a.Pedido===p.pedido&&a.TipoAsignacion==='PERCHADO';});
-        var contsRec=DB.contenedores.filter(function(c){return c.pedido===p.pedido&&c.status==='Recibido';}).length;
-        var sc=p.status==='Cerrado'?'status-ok':'status-pend';
-        html+='<div class="card-item">'+
-          '<div class="card-item-title">'+p.pedido+'</div>'+
-          '<div class="card-item-sub">'+p.tipo+
-            ' · Contenedores: '+contsRec+'/'+p.contsTotal+
-            '<br>Recepción: '+(asigRec?asigRec.Operario:'Sin asignar')+
-            ' · Perchado: '+(asigPerch?asigPerch.Operario:'Sin asignar')+'</div>'+
-          '<div class="card-item-badge '+sc+'">'+p.status+'</div>'+
-        '</div>';
-      });
-    }
-    html+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showMenuSup()">← Volver</button>';
-    render(html);
-  });
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 16. SUPERVISOR — ASIGNAR
-// ═══════════════════════════════════════════════════════════════════
-var _asigPedido='',_asigTipo='',_asigOp='';
-function showAsignarSup(){
-  S.step='asignar';
-  _asigPedido='';_asigTipo='';_asigOp='';
-  var pedOps=DB.pedidos.filter(function(p){return p.status!=='Cerrado';});
-  render(
-    '<div class="badge badge-sup">👤 ASIGNAR PEDIDO</div>'+
-    '<div class="lbl">pedido</div>'+
-    '<select class="inp inp-sm" id="asig-ped" onchange="_asigPedido=this.value">'+
-      '<option value="">— seleccionar —</option>'+
-      pedOps.map(function(p){return'<option>'+p.pedido+'</option>';}).join('')+
-    '</select>'+
-    '<div class="lbl" style="margin-top:8px">tipo de asignación</div>'+
-    '<div class="grid2">'+
-      '<div class="card-t" id="at-rec" onclick="selTipoAsig(\'RECEPCION\')">'+
-        '<div class="card-t-icon">📦</div><div class="card-t-lbl">RECEPCIÓN</div></div>'+
-      '<div class="card-t" id="at-per" onclick="selTipoAsig(\'PERCHADO\')">'+
-        '<div class="card-t-icon">🗄️</div><div class="card-t-lbl">PERCHADO</div></div>'+
-    '</div>'+
-    '<div class="lbl" style="margin-top:8px">operario</div>'+
-    '<select class="inp inp-sm" id="asig-op" onchange="_asigOp=this.value">'+
-      '<option value="">— seleccionar —</option>'+
-      DB.operadores.map(function(o){return'<option>'+o+'</option>';}).join('')+
-    '</select>'+
-    '<div class="btn-row" style="margin-top:12px">'+
-      '<button class="btn btn-sec" onclick="showMenuSup()">← ATR</button>'+
-      '<button class="btn btn-ok btn-big" onclick="confAsignar()">✓ ASIGNAR</button>'+
-    '</div>'
-  );
-}
-function selTipoAsig(t){
-  _asigTipo=t;
-  document.getElementById('at-rec').className='card-t'+(t==='RECEPCION'?' sel':'');
-  document.getElementById('at-per').className='card-t'+(t==='PERCHADO'?' sel':'');
-}
-function confAsignar(){
-  _asigPedido=document.getElementById('asig-ped').value;
-  _asigOp=document.getElementById('asig-op').value;
-  if(!_asigPedido){toast('Selecciona el pedido');return;}
-  if(!_asigTipo){toast('Selecciona el tipo');return;}
-  if(!_asigOp){toast('Selecciona el operario');return;}
-  render('<div class="loading"><div class="loading-icon">⏳</div>'+
-    '<div class="loading-txt">Guardando asignación...</div></div>');
-  escribirAsignacion(_asigPedido,_asigTipo,_asigOp).then(function(){
-    toast('✓ Asignado: '+_asigOp+' → '+_asigPedido+' ('+_asigTipo+')');
-    showMenuSup();
-  }).catch(function(){
-    toast('Error al guardar asignación');showMenuSup();
-  });
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 17. FLUJO PRINCIPAL — RECEPCIÓN O PERCHADO
-// ═══════════════════════════════════════════════════════════════════
-function iniciarFlujo(pedido,tipo){
-  S.pedido=pedido;
-  var pedInfo=DB.pedidos.find(function(p){return normStr(p.pedido)===normStr(pedido);})||{};
-  S.subtipo=pedInfo.tipo&&pedInfo.tipo.toLowerCase().indexOf('import')>-1?'IMPORTACION':'COMPRA LOCAL';
-  if(tipo==='PERCHADO') showFlujoPerchado();
-  else showSeleccionarContenedor();
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 18. RECEPCIÓN — SELECCIONAR CONTENEDOR
-// ═══════════════════════════════════════════════════════════════════
-function showSeleccionarContenedor(){
-  S.step='sel-cont';
-  var contsPend=DB.contenedores.filter(function(c){
-    return normStr(c.pedido)===normStr(S.pedido)&&
-           normStr(c.status)!=='RECIBIDO';
-  });
-  var html=stepsBar(1,6)+
-    '<div class="badge badge-rec">'+S.pedido+' · '+S.subtipo+'</div>'+
-    '<div class="lbl">selecciona el contenedor</div>';
-
-  if(contsPend.length){
-    contsPend.forEach(function(c){
-      html+='<div class="card-item" onclick="selContRow(\''+c.contenedor+'\',\''+c.sello+'\','+c.pallets+')">'+
-        '<div class="card-item-title">'+c.contenedor+'</div>'+
-        '<div class="card-item-sub">'+
-          (c.fechaProg?'Prog: '+fechaDisplay(c.fechaProg)+' · ':'')+'Pallets: '+c.pallets+
-        '</div>'+
-        '<div class="card-item-badge status-pend">PENDIENTE</div>'+
-      '</div>';
-    });
-  } else {
-    html+='<div class="alert-w">No hay contenedores pendientes para este pedido.</div>';
-  }
-
-  html+='<div class="lbl" style="margin-top:4px">¿contenedor no listado?</div>'+
-    '<div class="card-item" onclick="showNuevoContenedor()">'+
-      '<div class="card-item-title">+ Registrar nuevo contenedor</div>'+
-      '<div class="card-item-sub">Para contenedores no programados</div>'+
-    '</div>'+
-    '<button class="btn btn-sec btn-big" style="margin-top:8px" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver</button>';
-  render(html);
-}
-
-function selContRow(cont,sello,pallets){
-  S.contenedor=cont;S.sello=sello||'';S.pallets=pallets||0;
-  S.skusRegistrados=[];
-  // Consultar SP si ya hay eventos para este contenedor+pedido
-  render('<div class="loading"><div class="loading-icon">⏳</div>'+
-    '<div class="loading-txt">Verificando estado...</div></div>');
-  cargarEventosSP(S.pedido).then(function(evts){
-    // Filtrar por contenedor
-    var evtsCont=evts.filter(function(e){return e.Contenedor===cont;});
-    // Reconstituir eventos registrados
-    S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
-    var tieneId=false;
-    evtsCont.forEach(function(e){
-      var t=e.TipoEvento?e.TipoEvento.toLowerCase():'';
-      if(t==='llegada')   {S.eventos.llegada=e.Hora;if(e.RecepcionId){S.recId=e.RecepcionId;tieneId=true;}}
-      if(t==='apertura')  S.eventos.apertura=e.Hora;
-      if(t==='cierre')    S.eventos.cierre=e.Hora;
-      if(t==='salida')    S.eventos.salida=e.Hora;
-    });
-    if(!tieneId) S.recId=generarRecId();
-    // Cargar SKUs ya registrados para este contenedor
-    cargarSKUsSP(S.pedido,cont).then(function(skus){
-      S.skusRegistrados=skus.map(function(f){return{
-        sku:f.CodProducto||'',desc:f.Nombre||'',
-        cantidad:Number(f.Cantidad)||0,estado:f.Estado||'OK',novedad:f.Novedades||'',
-      };});
-      // Navegar al paso correcto según eventos ya registrados
-      if(S.eventos.salida)       showResumenContenedor('','');
-      else if(S.eventos.cierre)  showEventoSalida();
-      else if(S.eventos.llegada) showEscaneo();  // llegada registrada → ir a escaneo
-      else                       showEventoLlegada();
-    });
-  }).catch(function(){
-    S.recId=generarRecId();
-    S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
-    showEventoLlegada();
-  });
-}
-
-function showNuevoContenedor(){
-  S.step='nuevo-cont';
-  render(
-    stepsBar(1,6)+
-    '<div class="badge badge-rec">'+S.pedido+' · NUEVO CONTENEDOR</div>'+
-    '<div class="lbl">número de contenedor</div>'+
-    '<input class="inp" id="nc-cont" type="text" placeholder="Ej: TCNU1234567" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase">'+
-    '<div class="lbl" style="margin-top:6px"># pallets</div>'+
-    '<input class="inp inp-sm" id="nc-pall" type="number" min="0" placeholder="0" autocomplete="off">'+
-    '<div class="btn-row" style="margin-top:10px">'+
-      '<button class="btn btn-sec" onclick="showSeleccionarContenedor()">← ATR</button>'+
-      '<button class="btn btn-rec" onclick="confNuevoContenedor()">ENT →</button>'+
-    '</div>'
-  );
-  setTimeout(function(){var el=document.getElementById('nc-cont');if(el)el.focus();},100);
-}
-function confNuevoContenedor(){
-  var cont=document.getElementById('nc-cont').value.trim().toUpperCase();
-  var pall=parseInt(document.getElementById('nc-pall').value)||0;
-  if(!cont){toast('Ingresa el número de contenedor');return;}
-  S.contenedor=cont;S.sello='';S.pallets=pall;
-  S.recId=generarRecId();
-  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
-  S.skusRegistrados=[];
-  showEventoLlegada();
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 19. RECEPCIÓN — EVENTOS
-// ═══════════════════════════════════════════════════════════════════
-function showEventoLlegada(){
-  S.step='ev-llegada';
-  render(
-    stepsBar(2,6)+
-    '<div class="badge badge-rec">'+S.contenedor+' · '+S.pedido+'</div>'+
-    '<div class="evt-card">'+
-      '<div class="evt-icon">🚛</div>'+
-      '<div class="evt-body">'+
-        '<div class="evt-title">LLEGADA DEL CONTENEDOR</div>'+
-        '<div class="evt-pend">Registra la hora de llegada</div>'+
-      '</div>'+
-    '</div>'+
-    '<div class="lbl"># sello del contenedor</div>'+
-    '<input class="inp inp-sm" id="ev-sello" type="text" placeholder="Ingresa el sello físico del contenedor" value="" autocomplete="off" autocorrect="off" spellcheck="false">'+
-    '<div class="lbl" style="margin-top:6px">hora de llegada</div>'+
-    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
-    '<div class="btn-row" style="margin-top:10px">'+
-      '<button class="btn btn-sec" onclick="showSeleccionarContenedor()">← ATR</button>'+
-      '<button class="btn btn-rec btn-big" onclick="confEvento(\'llegada\',\'ev-hora\',showEventoApertura)">✓ REGISTRAR LLEGADA</button>'+
-    '</div>'
-  );
-}
-function confEvento(tipo,inputId,nextFn){
-  var hora=document.getElementById(inputId).value;
-  if(!hora){toast('Ingresa la hora');return;}
-  // Capturar sello si está en pantalla
-  var selEl=document.getElementById('ev-sello');
-  if(selEl) S.sello=selEl.value.trim();
-  S.eventos[tipo]=hora;
-  escribirEvento(tipo.toUpperCase(),hora);
-  if(nextFn) nextFn();
-}
-
-function showEventoApertura(){
-  S.step='ev-apertura';
-  render(
-    stepsBar(3,6)+
-    '<div class="badge badge-rec">'+S.contenedor+' · '+S.pedido+'</div>'+
-    '<div class="evt-card">'+
-      '<div class="evt-icon">🔓</div>'+
-      '<div class="evt-body">'+
-        '<div class="evt-title">APERTURA DEL CONTENEDOR</div>'+
-        '<div class="evt-pend">Registra la hora de apertura</div>'+
-      '</div>'+
-    '</div>'+
-    '<div class="lbl">hora de apertura</div>'+
-    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
-    '<div class="btn-row" style="margin-top:10px">'+
-      '<button class="btn btn-sec" onclick="showEventoLlegada()">← ATR</button>'+
-      '<button class="btn btn-rec btn-big" onclick="confEvento(\'apertura\',\'ev-hora\',showEscaneo)">✓ REGISTRAR APERTURA</button>'+
-    '</div>'+
-    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="showEscaneo()">Registrar después →</button>'
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 20. RECEPCIÓN — ESCANEO DE SKUs
-// ═══════════════════════════════════════════════════════════════════
-function showEscaneo(){
-  S.step='escaneo';
-  var nSkus=S.skusRegistrados.length;
-  var html=stepsBar(4,6)+
-    '<div class="badge badge-rec">'+S.contenedor+' · '+nSkus+' SKUs</div>'+
-    '<div class="lbl">escanea o ingresa código</div>'+
-    '<input class="inp" id="inp-scan" type="text" placeholder="Código de barras o SKU" autocomplete="off" autocorrect="off" spellcheck="false">'+
-    '<div class="btn-row" style="margin-top:8px">'+
-      '<button class="btn btn-rec btn-big" onclick="confScan()">🔍 BUSCAR</button>'+
-    '</div>';
-
-  if(nSkus>0){
-    html+='<div class="lbl" style="margin-top:12px">registrados en este contenedor</div>'+
-      '<div style="max-height:200px;overflow-y:auto">';
-    S.skusRegistrados.slice(-5).reverse().forEach(function(r){
-      html+='<div style="background:var(--sur2);border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:11px;display:flex;justify-content:space-between">'+
-        '<span style="color:var(--acc)">'+r.sku+'</span>'+
-        '<span style="color:var(--txt)">'+r.cantidad+' un</span>'+
-        '<span style="color:'+(r.estado==='DAÑADO'?'var(--dan)':'var(--ok)')+'">'+r.estado+'</span>'+
-      '</div>';
-    });
-    html+='</div>';
-  }
-
-  html+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
-    '<button class="btn btn-sec btn-big" onclick="showEventoCierre()">🔒 CERRAR CONTENEDOR</button>'+
-    '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">💾 Guardar y salir</button>'+
-  '</div>';
-
-  render(html);
-  setTimeout(function(){var el=document.getElementById('inp-scan');if(el)el.focus();},100);
-}
-
-function confScan(){
-  var v=document.getElementById('inp-scan').value.trim();
-  if(!v){toast('Ingresa un código');return;}
-  var hits=buscarCodigo(v);
-  if(hits.length===0){
-    // No encontrado — continuar con ingreso manual
-    S.skuActual={sku:v,desc:'No encontrado en catálogo',factor:1,tipo:'Unidad',noEncontrado:true};
-    showIngresoCantidad();
-  } else if(hits.length===1){
-    S.skuActual=hits[0];
-    showIngresoCantidad();
-  } else {
-    showSeleccionSKU(hits);
-  }
-}
-
-function showSeleccionSKU(hits){
-  S.step='sel-sku';
-  var html=stepsBar(4,6)+
-    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
-    '<div class="lbl">múltiples coincidencias — selecciona el SKU</div>';
-  hits.forEach(function(h,i){
-    html+='<div class="sku-item" onclick="selSKU('+i+')">'+
-      '<div class="sku-cod">'+h.sku+' · '+h.tipo+'</div>'+
-      '<div class="sku-desc">'+h.desc+'</div>'+
-    '</div>';
-  });
-  html+='<button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">← Volver</button>';
-  render(html);
-  // guardar hits para selección
-  window._hitsTemp=hits;
-}
-function selSKU(i){
-  S.skuActual=window._hitsTemp[i];
-  showIngresoCantidad();
-}
-
-function showIngresoCantidad(){
-  S.step='cant-sku';
-  var sk=S.skuActual;
-  var html=stepsBar(4,6)+
-    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
-    (sk.noEncontrado?'<div class="alert">⚠ SKU no encontrado en catálogo C.Barra. Puedes continuar.</div>':'')+
-    '<div class="lbl">producto</div>'+
-    '<div style="background:var(--sur2);border-radius:6px;padding:10px 12px;margin-bottom:8px">'+
-      '<div style="font-size:13px;font-weight:700;color:var(--acc)">'+sk.sku+'</div>'+
-      '<div style="font-size:12px;color:var(--txt);margin-top:2px">'+sk.desc+'</div>'+
-      '<div style="font-size:11px;color:var(--mut);margin-top:2px">Tipo: '+sk.tipo+'</div>'+
-    '</div>'+
-    '<div class="lbl">cantidad (unidades)</div>'+
-    '<input class="inp" id="inp-cant" type="number" min="0" placeholder="0" style="font-size:24px;font-weight:700;text-align:center" autocomplete="off">'+
-    '<div class="lbl" style="margin-top:8px">estado</div>'+
-    '<div class="grid2">'+
-      '<div class="card-t sel" id="est-ok" onclick="selEstado(\'OK\')">✓ OK</div>'+
-      '<div class="card-t" id="est-dan" onclick="selEstado(\'DAÑADO\')">⚠ DAÑADO</div>'+
-    '</div>'+
-    '<div id="novedad-wrap" style="display:none">'+
-      '<div class="lbl" style="margin-top:8px">descripción de la novedad</div>'+
-      '<textarea class="inp" id="inp-novedad" rows="2" style="font-size:13px;resize:none" placeholder="Ej: Cajas aplastadas, producto mojado..."></textarea>'+
-    '</div>'+
-    '<div class="btn-row" style="margin-top:10px">'+
-      '<button class="btn btn-sec" onclick="showEscaneo()">← ATR</button>'+
-      '<button class="btn btn-ok btn-big" onclick="confCantidad()">✓ CONFIRMAR</button>'+
-    '</div>';
-  render(html);
-  setTimeout(function(){var el=document.getElementById('inp-cant');if(el)el.focus();},100);
-  window._estadoActual='OK';
-}
-function selEstado(e){
-  window._estadoActual=e;
-  document.getElementById('est-ok').className='card-t'+(e==='OK'?' sel':'');
-  document.getElementById('est-dan').className='card-t'+(e==='DAÑADO'?' sel':'');
-  var nw=document.getElementById('novedad-wrap');
-  if(nw) nw.style.display=e==='DAÑADO'?'block':'none';
-}
-function confCantidad(){
-  var cant=parseInt(document.getElementById('inp-cant').value);
-  if(isNaN(cant)||cant<0){toast('Ingresa una cantidad válida');return;}
-  var novEl=document.getElementById('inp-novedad');
-  var nov=novEl?novEl.value.trim():'';
-  var sk=S.skuActual;
-  var reg={
-    sku:sk.sku,desc:sk.desc,factor:sk.factor||1,
-    numCajas:1,cantidad:cant,
-    estado:window._estadoActual||'OK',
-    novedad:nov,
-  };
-  S.skusRegistrados.push(reg);
-  escribirSKU(reg).catch(function(e){console.warn('[SP] SKU async:',e.message);});
-  toast('✓ '+sk.sku+' — '+cant+' un registradas');
-  showEscaneo();
-}
-
-function guardarYSalir(){
-  toast('Sesión guardada. Puedes retomar desde Mis Pedidos.');
-  if(S.rol==='supervisor') showMenuSup();
-  else showMenuOp();
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 21. RECEPCIÓN — CIERRE Y SALIDA
-// ═══════════════════════════════════════════════════════════════════
-function showEventoCierre(){
-  S.step='ev-cierre';
-  render(
-    stepsBar(5,6)+
-    '<div class="badge badge-rec">'+S.contenedor+' · '+S.skusRegistrados.length+' SKUs</div>'+
-    '<div class="evt-card">'+
-      '<div class="evt-icon">🔒</div>'+
-      '<div class="evt-body">'+
-        '<div class="evt-title">CIERRE DEL CONTENEDOR</div>'+
-        '<div class="evt-pend">Registra la hora de cierre</div>'+
-      '</div>'+
-    '</div>'+
-    '<div class="lbl">hora de cierre</div>'+
-    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
-    '<div class="btn-row" style="margin-top:10px">'+
-      '<button class="btn btn-sec" onclick="showEscaneo()">← Volver</button>'+
-      '<button class="btn btn-rec btn-big" onclick="confEvento(\'cierre\',\'ev-hora\',showEventoSalida)">✓ REGISTRAR CIERRE</button>'+
-    '</div>'
-  );
-}
-
-function showEventoSalida(){
-  S.step='ev-salida';
-  render(
-    stepsBar(6,6)+
-    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
-    '<div class="evt-card">'+
-      '<div class="evt-icon">🚛</div>'+
-      '<div class="evt-body">'+
-        '<div class="evt-title">SALIDA DEL CONTENEDOR</div>'+
-        '<div class="evt-pend">Registra la hora de salida</div>'+
-      '</div>'+
-    '</div>'+
-    '<div class="lbl">hora de salida</div>'+
-    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
-    '<div class="lbl" style="margin-top:8px">novedades generales (opcional)</div>'+
-    '<textarea class="inp inp-sm" id="ev-nov" rows="2" style="resize:none" placeholder="Observaciones del contenedor..."></textarea>'+
-    '<div class="lbl" style="margin-top:6px"># personas en cuadrilla</div>'+
-    '<input class="inp inp-sm" id="ev-pers" type="number" min="0" placeholder="0">'+
-    '<div class="btn-row" style="margin-top:10px">'+
-      '<button class="btn btn-sec" onclick="showEventoCierre()">← ATR</button>'+
-      '<button class="btn btn-ok btn-big" onclick="confSalida()">✓ FINALIZAR RECEPCIÓN</button>'+
-    '</div>'
-  );
-}
-function confSalida(){
-  var hora=document.getElementById('ev-hora').value;
-  if(!hora){toast('Ingresa la hora de salida');return;}
-  S.eventos.salida=hora;
-  var nov=document.getElementById('ev-nov').value.trim();
-  var pers=parseInt(document.getElementById('ev-pers').value)||0;
-  escribirEvento('SALIDA',hora);
-  // Mostrar resumen + opción cerrar pedido
-  showResumenContenedor(nov,pers);
-}
-
-function showResumenContenedor(nov,pers){
-  S.step='resumen-cont';
-  var totalPend=DB.contenedores.filter(function(c){
-    return normStr(c.pedido)===normStr(S.pedido)&&normStr(c.status)!=='RECIBIDO';
-  }).length;
-  var esUltimo=totalPend<=1; // este contenedor es el último pendiente
-
-  render(
-    '<div class="badge badge-ok">✓ CONTENEDOR COMPLETADO</div>'+
-    '<div class="val ok">✓ OK</div>'+
-    '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin:10px 0">'+
-      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
-        '<span style="font-size:12px;color:var(--mut)">Contenedor</span>'+
-        '<span style="font-size:13px;font-weight:700">'+S.contenedor+'</span></div>'+
-      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
-        '<span style="font-size:12px;color:var(--mut)">SKUs registrados</span>'+
-        '<span style="font-size:13px;font-weight:700">'+S.skusRegistrados.length+'</span></div>'+
-      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
-        '<span style="font-size:12px;color:var(--mut)">Dañados</span>'+
-        '<span style="font-size:13px;font-weight:700;color:'+(S.skusRegistrados.filter(function(r){return r.estado==='DAÑADO';}).length>0?'var(--dan)':'var(--ok)')+'">'+
-          S.skusRegistrados.filter(function(r){return r.estado==='DAÑADO';}).length+'</span></div>'+
-      (nov?'<div style="font-size:11px;color:var(--mut);margin-top:4px">Novedades: '+nov+'</div>':'')+
-    '</div>'+
-    '<div style="display:flex;flex-direction:column;gap:8px">'+
-      '<button class="btn btn-rec btn-big" onclick="nuevoContenedorMismoPedido()">🔄 Siguiente contenedor</button>'+
-      (esUltimo
-        ?'<button class="btn btn-warn btn-big" onclick="cerrarPedido()">🔐 CERRAR PEDIDO</button>'
-        :'<button class="btn btn-sec btn-big" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver al menú</button>')+
-    '</div>'
-  );
-}
-
-function nuevoContenedorMismoPedido(){
-  S.contenedor='';S.sello='';S.pallets=0;
-  S.recId=generarRecId();
-  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
-  S.skusRegistrados=[];
-  showSeleccionarContenedor();
-}
-
-function cerrarPedido(){
-  if(!confirm('¿Cerrar el pedido '+S.pedido+'? Esta acción marca el pedido como completado.')) return;
-  // En live: se actualizaría el status en SP / Excel
-  toast('Pedido '+S.pedido+' cerrado');
-  S.pedido='';S.contenedor='';
-  if(S.rol==='supervisor') showMenuSup();
-  else showMenuOp();
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 22. PERCHADO
-// ═══════════════════════════════════════════════════════════════════
-function showFlujoPerchado(){
-  S.step='perchado';
-  S.recId=generarRecId();
-  render(
-    '<div class="badge badge-rec">🗄️ PERCHADO — '+S.pedido+'</div>'+
-    '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin-bottom:10px">'+
-      '<div style="font-size:11px;color:var(--mut);margin-bottom:4px">PEDIDO ASIGNADO</div>'+
-      '<div style="font-size:18px;font-weight:700;color:var(--rec)">'+S.pedido+'</div>'+
-      '<div style="font-size:11px;color:var(--mut);margin-top:4px">'+S.subtipo+'</div>'+
-    '</div>'+
-    '<div class="lbl">hora de inicio de perchado</div>'+
-    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
-    '<button class="btn btn-rec btn-big" style="margin-top:10px" onclick="confPerchadoInicio()">▶ INICIAR PERCHADO</button>'+
-    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver</button>'
-  );
-}
-function confPerchadoInicio(){
-  var hora=document.getElementById('ev-hora').value;
-  if(!hora){toast('Ingresa la hora');return;}
-  S.eventos.llegada=hora;
-  escribirEvento('PERCHADO_INICIO',hora);
-  showPerchadoActivo();
-}
-function showPerchadoActivo(){
-  S.step='perchado-activo';
-  render(
-    '<div class="badge badge-rec">🗄️ PERCHADO EN CURSO</div>'+
-    '<div class="val rec">▶ ACTIVO</div>'+
-    '<div style="font-size:13px;color:var(--mut);text-align:center;margin-bottom:16px">'+S.pedido+' · inicio: '+S.eventos.llegada+'</div>'+
-    '<div class="lbl">hora de fin de perchado</div>'+
-    '<input class="inp inp-sm" id="ev-hora-fin" type="time" value="'+horaActual()+'">'+
-    '<button class="btn btn-ok btn-big" style="margin-top:10px" onclick="confPerchadoFin()">✓ FINALIZAR PERCHADO</button>'
-  );
-}
-function confPerchadoFin(){
-  var hora=document.getElementById('ev-hora-fin').value;
-  if(!hora){toast('Ingresa la hora de fin');return;}
-  escribirEvento('PERCHADO_FIN',hora);
-  toast('✓ Perchado completado: '+S.pedido);
-  if(S.rol==='supervisor') showMenuSup();
-  else showMenuOp();
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 23. RESET
-// ═══════════════════════════════════════════════════════════════════
-function goHome(){
-  if(S.skusRegistrados&&S.skusRegistrados.length>0){
-    if(!confirm('¿Salir? Hay '+S.skusRegistrados.length+' SKUs en sesión activa.')) return;
-  }
-  S.rol='';S.operario='';S.pedido='';S.contenedor='';S.sello='';
-  S.pallets=0;S.subtipo='';S.recId='';S.step='home';
-  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
-  S.skusRegistrados=[];S.skuActual=null;
-  updateFtr();showHome();
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 24. MSAL — LOGIN / INIT
-// ═══════════════════════════════════════════════════════════════════
-function msalLogin(){msalInst.loginRedirect({scopes:SCOPES});}
-
-function postLogin(){
-  console.log('[INIT] RF Recepción — cuenta:',msalAcc?msalAcc.username:'?');
-  // Mostrar home inmediatamente — carga en background
-  showHome();
-  // Carga paralela en background
-  Promise.all([
-    descubrirListas(),
-    leerCatalogos(),
-  ]).then(function(res){
-    var listasOk=res[0];
-    setConn(listasOk?'ok':'err');
-    document.getElementById('hdr-sub').textContent=
-      'Inverneg · CND'+(listasOk?'':' · sin SP');
-    console.log('[INIT] Listo — ops:'+DB.operadores.length+' sups:'+DB.supervisores.length+
-      ' pedidos:'+DB.pedidos.length+' conts:'+DB.contenedores.length);
-    // Refrescar home si el usuario sigue ahí para mostrar operadores/supervisores reales
-    if(S.step==='home') showHome();
-  }).catch(function(e){
-    console.error('[INIT] postLogin error:',e.message);
-    setConn('err');
-  });
-}
-
-function showPantallaLogin(){
-  render(
-    '<div class="loading">'+
-      '<div class="loading-icon">📦</div>'+
-      '<div style="font-size:16px;font-weight:700;color:var(--rec);margin-bottom:8px">RF Recepción</div>'+
-      '<div style="font-size:12px;color:var(--mut);margin-bottom:24px">Inverneg · Centro de Distribución Nacional</div>'+
-      '<button class="btn btn-rec btn-big" onclick="msalLogin()">🔐 Iniciar sesión Microsoft</button>'+
-    '</div>'
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 25. EXPONER AL SCOPE GLOBAL
-// ═══════════════════════════════════════════════════════════════════
-window.S=S;window.DB=DB;
-window.goHome=goHome;
-window.showHome=showHome;
-window.iniciarSesion=iniciarSesion;
-window.msalLogin=msalLogin;
-window.updateFtr=updateFtr;
-window.selCalDia=selCalDia;
-window.selTipoAsig=selTipoAsig;
-window.confAsignar=confAsignar;
-window.selContRow=selContRow;
-window.selSKU=selSKU;
-window.selEstado=selEstado;
-window.confScan=confScan;
-window.confCantidad=confCantidad;
-window.confEvento=confEvento;
-window.confSalida=confSalida;
-window.confNuevoContenedor=confNuevoContenedor;
-window.confPerchadoInicio=confPerchadoInicio;
-window.confPerchadoFin=confPerchadoFin;
-window.guardarYSalir=guardarYSalir;
-window.cerrarPedido=cerrarPedido;
-window.nuevoContenedorMismoPedido=nuevoContenedorMismoPedido;
-window.iniciarFlujo=iniciarFlujo;
-window.showMenuSup=showMenuSup;
-window.showMenuOp=showMenuOp;
-window.showCalendario=showCalendario;
-window.showPedidosSup=showPedidosSup;
-window.showEstadoPedidos=showEstadoPedidos;
-window.showAsignarSup=showAsignarSup;
-window.showSeleccionarContenedor=showSeleccionarContenedor;
-window.showNuevoContenedor=showNuevoContenedor;
-window.showEventoLlegada=showEventoLlegada;
-window.showEventoApertura=showEventoApertura;
-window.showEscaneo=showEscaneo;
-window.showSeleccionSKU=showSeleccionSKU;
-window.showIngresoCantidad=showIngresoCantidad;
-window.showEventoCierre=showEventoCierre;
-window.showEventoSalida=showEventoSalida;
-window.showFlujoPerchado=showFlujoPerchado;
-window.showPerchadoActivo=showPerchadoActivo;
-
-// ═══════════════════════════════════════════════════════════════════
-// 26. ARRANCAR — CARGAR MSAL Y EJECUTAR
-// ═══════════════════════════════════════════════════════════════════
-var s=document.createElement('script');
-s.src='https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
-s.onload=function(){
-  msalInst=new msal.PublicClientApplication(msalCfg);
-  msalInst.handleRedirectPromise().then(function(result){
-    if(result&&result.account){
-      msalAcc=result.account;postLogin();
-    } else {
-      var acc=msalInst.getAllAccounts();
-      if(acc.length>0){msalAcc=acc[0];postLogin();}
-      else showPantallaLogin();
-    }
-  }).catch(function(e){
-    console.error('[MSAL]',e.message);showPantallaLogin();
-  });
-};
-s.onerror=function(){
-  render('<div class="alert" style="margin-top:20px">Error cargando MSAL. Verifica tu conexión.</div>');
-};
-document.head.appendChild(s);
-
+  }; // fin onload
+  document.head.appendChild(s);
 })();
 </script>
 </body>
