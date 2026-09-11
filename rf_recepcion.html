@@ -451,51 +451,86 @@ function parsear(hoja,data,err){
       DB.supervisores.map(function(v){return{Supervisor:v};}));
 
   } else if(hoja==='Pedidos'){
-    // Cols: Pedido(0), Tipo(1), ContenedoresTotal(2), Status(3), Observaciones(4)
-    var carg=raw.filter(function(r){return filaValida(r[0],50);});
+    // Mapeo por nombre de encabezado real del API
+    var hdrP=data.values[0].map(function(v){return v?v.toString().trim().toLowerCase():'';});
+    console.log('[EXCEL] Pedidos encabezado real:',hdrP.map(function(v,i){return i+'='+v;}).join(' | '));
+    var iP_ped =hdrP.findIndex(function(h){return h==='pedido';});
+    var iP_tipo=hdrP.findIndex(function(h){return h==='tipo';});
+    var iP_cont=hdrP.findIndex(function(h){return h.indexOf('contenedor')>-1;});
+    var iP_stat=hdrP.findIndex(function(h){return h==='status'||h==='estado';});
+    var iP_obs =hdrP.findIndex(function(h){return h.indexOf('observ')>-1;});
+    console.log('[EXCEL] Pedidos índices: ped='+iP_ped+' tipo='+iP_tipo+' conts='+iP_cont+' stat='+iP_stat+' obs='+iP_obs);
+    if(iP_ped<0){
+      console.error('[EXCEL] Pedidos — columna Pedido no encontrada en encabezado');
+      return;
+    }
+    var rawTotal=raw.length;
+    var descartadas=0;
+    var carg=raw.filter(function(r){
+      var v=r[iP_ped];
+      if(v===null||v===undefined||v===''){descartadas++;return false;}
+      var s=v.toString().trim();
+      if(s.length===0){descartadas++;return false;}
+      return true;
+    });
     DB.pedidos=carg.map(function(r){return{
-      pedido:    r[0]?r[0].toString().trim():'',
-      tipo:      r[1]?r[1].toString().trim():'',
-      contsTotal:r[2]?Number(r[2]):1,
-      status:    r[3]?r[3].toString().trim():'Pendiente',
-      obs:       r[4]?r[4].toString().trim():'',
+      pedido:    r[iP_ped]?r[iP_ped].toString().trim():'',
+      tipo:      iP_tipo>=0&&r[iP_tipo]?r[iP_tipo].toString().trim():'',
+      contsTotal:iP_cont>=0&&r[iP_cont]?Number(r[iP_cont]):1,
+      status:    iP_stat>=0&&r[iP_stat]?r[iP_stat].toString().trim():'Pendiente',
+      obs:       iP_obs>=0&&r[iP_obs]?r[iP_obs].toString().trim():'',
     };});
-    logHoja('Pedidos',rawTotal,DB.pedidos.length,rawTotal-DB.pedidos.length,DB.pedidos);
+    console.log('[EXCEL] Pedidos — filas brutas:'+rawTotal+' | cargadas:'+DB.pedidos.length+' | descartadas:'+descartadas);
+    DB.pedidos.slice(0,10).forEach(function(p,i){
+      console.log('[EXCEL] Pedidos['+i+']:',JSON.stringify(p));
+    });
 
   } else if(hoja==='Contenedores'){
-    // Workbook API omite celdas vacías desplazando índices.
-    // Detectar estructura real mirando la fila de encabezado (values[0])
-    // y mapear dinámicamente por nombre de columna.
-    var hdrRow=data.values[0].map(function(v){return v?v.toString().trim().toLowerCase():'';});
-    console.log('[EXCEL] Contenedores — columnas detectadas:',hdrRow.join(' | '));
-    var iped=hdrRow.indexOf('pedido');
-    var ifp= hdrRow.findIndex(function(h){return h.indexOf('fechaprog')>-1||h.indexOf('fecha_prog')>-1||h==='fechaprogramada';});
-    var icont=hdrRow.findIndex(function(h){return h.indexOf('contenedor')>-1;});
-    var isell=hdrRow.findIndex(function(h){return h.indexOf('sello')>-1;});
-    var ipall=hdrRow.findIndex(function(h){return h.indexOf('pallet')>-1;});
-    var istat=hdrRow.findIndex(function(h){return h==='status'||h==='estado';});
-    var ifrec=hdrRow.findIndex(function(h){return h.indexOf('fecharec')>-1||h.indexOf('fecha_rec')>-1;});
-    var iobs =hdrRow.findIndex(function(h){return h.indexOf('observ')>-1;});
-    console.log('[EXCEL] Contenedores — índices mapeados:',
-      'ped='+iped+' fp='+ifp+' cont='+icont+' sell='+isell+
-      ' pall='+ipall+' stat='+istat+' frec='+ifrec);
+    // Mapeo 100% por nombre de encabezado real del API
+    // El API omite columnas con todos los valores vacíos (ej: FechaProgramada vacía)
+    var hdrC=data.values[0].map(function(v){return v?v.toString().trim().toLowerCase():'';});
+    console.log('[EXCEL] Contenedores encabezado real:',hdrC.map(function(v,i){return i+'="'+v+'"';}).join(' | '));
+    var iC_ped =hdrC.findIndex(function(h){return h==='pedido';});
+    var iC_fp  =hdrC.findIndex(function(h){return h.indexOf('fechaprog')>-1||h==='fechaprogramada'||h==='fecha_programada';});
+    var iC_cont=hdrC.findIndex(function(h){return h.indexOf('contenedor')>-1;});
+    var iC_sell=hdrC.findIndex(function(h){return h.indexOf('sello')>-1;});
+    var iC_pall=hdrC.findIndex(function(h){return h.indexOf('pallet')>-1;});
+    var iC_stat=hdrC.findIndex(function(h){return h==='status'||h==='estado';});
+    var iC_frec=hdrC.findIndex(function(h){return h.indexOf('fecharec')>-1||h==='fecharecepcion'||h==='fecha_recepcion';});
+    var iC_obs =hdrC.findIndex(function(h){return h.indexOf('observ')>-1;});
+    console.log('[EXCEL] Contenedores índices:'+
+      ' ped='+iC_ped+' fp='+iC_fp+' cont='+iC_cont+' sell='+iC_sell+
+      ' pall='+iC_pall+' stat='+iC_stat+' frec='+iC_frec+' obs='+iC_obs);
+    if(iC_ped<0||iC_cont<0){
+      console.error('[EXCEL] Contenedores — faltan columnas esenciales (Pedido o Contenedor)');
+      return;
+    }
+    var rawTotal=raw.length;
+    var descartadas=0;
     var carg=raw.filter(function(r){
-      return iped>=0&&r[iped]&&filaValida(r[iped],50);
+      var v=r[iC_ped];
+      if(v===null||v===undefined||v===''){descartadas++;return false;}
+      var s=v.toString().trim();
+      if(s.length===0){descartadas++;return false;}
+      return true;
     });
     DB.contenedores=carg.map(function(r){
-      var pv=ipall>=0&&r[ipall]!==null&&r[ipall]!==''&&r[ipall]!==undefined?Number(r[ipall]):0;
+      var pv=iC_pall>=0&&r[iC_pall]!==null&&r[iC_pall]!==undefined&&r[iC_pall]!==''?Number(r[iC_pall]):0;
       return{
-        pedido:    iped>=0&&r[iped]?r[iped].toString().trim():'',
-        fechaProg: ifp>=0?normalizarFecha(r[ifp]):'',
-        contenedor:icont>=0&&r[icont]?r[icont].toString().trim():'',
-        sello:     isell>=0&&r[isell]?r[isell].toString().trim():'',
+        pedido:    r[iC_ped]?r[iC_ped].toString().trim():'',
+        fechaProg: iC_fp>=0?normalizarFecha(r[iC_fp]):'',
+        contenedor:iC_cont>=0&&r[iC_cont]?r[iC_cont].toString().trim():'',
+        sello:     iC_sell>=0&&r[iC_sell]?r[iC_sell].toString().trim():'',
         pallets:   isNaN(pv)?0:pv,
-        status:    istat>=0&&r[istat]?r[istat].toString().trim():'Pendiente',
-        fechaRec:  ifrec>=0?normalizarFecha(r[ifrec]):'',
-        obs:       iobs>=0&&r[iobs]?r[iobs].toString().trim():'',
+        status:    iC_stat>=0&&r[iC_stat]?r[iC_stat].toString().trim():'Pendiente',
+        fechaRec:  iC_frec>=0?normalizarFecha(r[iC_frec]):'',
+        obs:       iC_obs>=0&&r[iC_obs]?r[iC_obs].toString().trim():'',
       };
     });
-    logHoja('Contenedores',rawTotal,DB.contenedores.length,rawTotal-DB.contenedores.length,DB.contenedores);
+    console.log('[EXCEL] Contenedores — filas brutas:'+rawTotal+' | cargadas:'+DB.contenedores.length+' | descartadas:'+descartadas);
+    DB.contenedores.slice(0,10).forEach(function(c,i){
+      console.log('[EXCEL] Contenedores['+i+']:',JSON.stringify(c));
+    });
 
   } else if(hoja==='Compra'){
     // Cols: Pedido(0), SKU(1), Descripcion(2), Cantidad(3)
