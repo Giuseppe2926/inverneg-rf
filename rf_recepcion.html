@@ -1132,6 +1132,18 @@ function showSeleccionarContenedor(){
     return normStr(c.pedido)===normStr(S.pedido)&&
            normStr(c.status)!=='RECIBIDO';
   });
+
+  // ── LOG DIAGNÓSTICO ──────────────────────────────────────────────
+  console.log('[RENDER] Pedido seleccionado:',JSON.stringify(
+    DB.pedidos.find(function(p){return normStr(p.pedido)===normStr(S.pedido);})||null
+  ));
+  console.log('[RENDER] DB.contenedores total:',DB.contenedores.length);
+  console.log('[RENDER] Contenedores de este pedido (todos):',
+    JSON.stringify(DB.contenedores.filter(function(c){return normStr(c.pedido)===normStr(S.pedido);}))
+  );
+  console.log('[RENDER] Contenedores pendientes (para tarjetas):',JSON.stringify(contsPend));
+  // ─────────────────────────────────────────────────────────────────
+
   var html=stepsBar(1,6)+
     '<div class="badge badge-rec">'+S.pedido+' · '+S.subtipo+'</div>'+
     '<div class="lbl">selecciona el contenedor</div>';
