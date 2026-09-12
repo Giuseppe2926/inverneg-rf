@@ -321,16 +321,55 @@ function descubrirListas(){
 
 function descubrirExcel(){
   var nom=CFG.catalogoNombre;
-  var url=GRAPH+'/me/drive/root/search(q='+encodeURIComponent("'"+nom+"'")+')';
-  return gGet(url).then(function(d){
-    if(!d.value||!d.value.length){console.warn('[INIT] Excel no encontrado:',nom);return false;}
-    var f=d.value.find(function(x){return x.name===nom;});
-    if(!f){console.warn('[INIT] Sin coincidencia exacta:',nom);return false;}
+  // Buscar primero en SharePoint Team Site (fuente maestra)
+  // Si no se encuentra, intentar OneDrive personal como fallback
+  var urlSP=GRAPH+'/sites/'+CFG.siteId+'/drive/root/search(q='+encodeURIComponent("'"+nom+"'")+')';
+  var urlOD=GRAPH+'/me/drive/root/search(q='+encodeURIComponent("'"+nom+"'")+')';
+  console.log('[ARCHIVO] Buscando en SharePoint Team Site primero...');
+  return gGet(urlSP).then(function(d){
+    var f=d.value&&d.value.find(function(x){return x.name===nom;});
+    if(f){
+      console.log('[ARCHIVO] ✓ Encontrado en SharePoint Team Site');
+      return f;
+    }
+    console.warn('[ARCHIVO] No encontrado en SP Team Site — intentando OneDrive personal...');
+    return gGet(urlOD).then(function(d2){
+      var f2=d2.value&&d2.value.find(function(x){return x.name===nom;});
+      if(f2){console.log('[ARCHIVO] ⚠ Encontrado en OneDrive Personal (no es la fuente maestra)');return f2;}
+      return null;
+    });
+  }).then(function(f){
+    if(!f){console.error('[ARCHIVO] ✗ Excel no encontrado en ninguna ubicación:',nom);return false;}
     DB.catalogoDriveId=f.parentReference&&f.parentReference.driveId?f.parentReference.driveId:null;
     DB.catalogoItemId=f.id;
-    console.log('[INIT] Excel:',nom,'| webUrl:',f.webUrl);
-    console.log('[INIT]   driveType:',f.parentReference&&f.parentReference.driveType);
-    console.log('[INIT]   path:',f.parentReference&&f.parentReference.path);
+
+    // ── LOG IDENTIFICACIÓN DEL ARCHIVO ───────────────────────────
+    var driveType=f.parentReference&&f.parentReference.driveType?f.parentReference.driveType:'?';
+    console.log('[ARCHIVO] ═══════════════════════════════════════');
+    console.log('[ARCHIVO] Nombre exacto:    ',f.name);
+    console.log('[ARCHIVO] DriveId:          ',DB.catalogoDriveId);
+    console.log('[ARCHIVO] ItemId:           ',DB.catalogoItemId);
+    console.log('[ARCHIVO] WebUrl:           ',f.webUrl||'(sin webUrl)');
+    console.log('[ARCHIVO] Última modificación:',f.lastModifiedDateTime||'(sin fecha)');
+    console.log('[ARCHIVO] Modificado por:   ',f.lastModifiedBy&&f.lastModifiedBy.user?f.lastModifiedBy.user.displayName:'(sin info)');
+    console.log('[ARCHIVO] Drive tipo:       ',driveType,driveType==='personal'?'→ OneDrive Personal':driveType==='documentLibrary'?'→ SharePoint Team Site':'→ tipo desconocido');
+    console.log('[ARCHIVO] Path:             ',f.parentReference&&f.parentReference.path?f.parentReference.path:'(sin path)');
+    console.log('[ARCHIVO] ═══════════════════════════════════════');
+    // Leer primeras 10 filas de Pedidos para confirmar contenido
+    getToken().then(function(tk){
+      return fetch('https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
+        '/items/'+DB.catalogoItemId+"/workbook/worksheets('Pedidos')/usedRange",
+        {headers:{'Authorization':'Bearer '+tk.accessToken}});
+    }).then(function(r){return r.json();}).then(function(d){
+      console.log('[ARCHIVO] Hoja Pedidos — filas totales:',(d.values?d.values.length:0));
+      if(d.values&&d.values.length>0){
+        d.values.slice(0,11).forEach(function(row,i){
+          console.log('[ARCHIVO] Pedidos['+i+']:',JSON.stringify(row));
+        });
+      }
+    }).catch(function(e){console.error('[ARCHIVO] Error leyendo Pedidos:',e.message);});
+    // ─────────────────────────────────────────────────────────────
+
     return true;
   }).catch(function(e){console.error('[INIT] descubrirExcel:',e.message);return false;});
 }
