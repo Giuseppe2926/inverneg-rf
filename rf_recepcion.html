@@ -767,6 +767,36 @@ function getPacingList(pedido,subtipo){
 // ═══════════════════════════════════════════════════════════════════
 // 11. PANTALLAS — HOME Y ROL
 // ═══════════════════════════════════════════════════════════════════
+
+// ── Helpers pendiente por pedido ────────────────────────────────
+function saldoSKU(pedido,sku){
+  var t=0;
+  S.skusRegistrados.forEach(function(r){
+    if(normStr(r.sku)===normStr(sku)&&normStr(r.pedido||S.pedido)===normStr(pedido))
+      t+=Number(r.cantidad)||0;
+  });
+  return t;
+}
+function esperadoSKU(sku){
+  var lista=S.subtipo==='IMPORTACION'?DB.importaciones:DB.compra;
+  var it=lista.find(function(r){
+    return normStr(r.pedido)===normStr(S.pedido)&&normStr(r.sku)===normStr(sku);
+  });
+  return it?it.cantidad:null;
+}
+function htmlPendiente(sku){
+  var esp=esperadoSKU(sku);
+  if(esp===null) return '<div class="alert-w" style="font-size:11px;margin:6px 0">SKU no en packing list.</div>';
+  var reg=saldoSKU(S.pedido,sku);
+  var pend=esp-reg;
+  var col=pend>0?'var(--ok)':pend===0?'var(--acc)':'var(--dan)';
+  var lbl=pend>0?'Pendiente':pend===0?'Completo':'Sobrante';
+  return '<div style="background:var(--sur2);border-radius:6px;padding:8px 12px;margin:6px 0;font-size:12px">'+
+    '<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--mut)">Esperado</span><span style="font-weight:700">'+esp+'</span></div>'+
+    '<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--mut)">Registrado</span><span style="font-weight:700">'+reg+'</span></div>'+
+    '<div style="display:flex;justify-content:space-between;border-top:1px solid var(--bor);padding-top:3px"><span style="color:'+col+';font-weight:700">'+lbl+'</span><span style="color:'+col+';font-weight:700">'+Math.abs(pend)+'</span></div>'+
+  '</div>';
+}
 function showHome(){
   S.step='home';
   var lista=S.rol==='supervisor'?DB.supervisores:DB.operadores;
@@ -1261,6 +1291,7 @@ function showEscaneo(){
 
   html+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
     '<button class="btn btn-sec btn-big" onclick="showEventoCierre()">🔒 CERRAR CONTENEDOR</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="showCorreccion()">Corregir registro anterior</button>'+
     '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">💾 Guardar y salir</button>'+
   '</div>';
 
@@ -1308,34 +1339,61 @@ function selSKU(i){
 function showIngresoCantidad(){
   S.step='cant-sku';
   var sk=S.skuActual;
-  var html=stepsBar(4,6)+
-    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
-    (sk.noEncontrado?'<div class="alert">⚠ SKU no encontrado en catálogo C.Barra. Puedes continuar.</div>':'')+
-    '<div class="lbl">producto</div>'+
-    '<div style="background:var(--sur2);border-radius:6px;padding:10px 12px;margin-bottom:8px">'+
-      '<div style="font-size:13px;font-weight:700;color:var(--acc)">'+sk.sku+'</div>'+
-      '<div style="font-size:12px;color:var(--txt);margin-top:2px">'+sk.desc+'</div>'+
-      '<div style="font-size:11px;color:var(--mut);margin-top:2px">Tipo: '+sk.tipo+'</div>'+
-    '</div>'+
-    '<div class="lbl">cantidad (unidades)</div>'+
-    '<input class="inp" id="inp-cant" type="number" min="0" placeholder="0" style="font-size:24px;font-weight:700;text-align:center" autocomplete="off">'+
-    '<div class="lbl" style="margin-top:8px">estado</div>'+
-    '<div class="grid2">'+
-      '<div class="card-t sel" id="est-ok" onclick="selEstado(\'OK\')">✓ OK</div>'+
-      '<div class="card-t" id="est-dan" onclick="selEstado(\'DAÑADO\')">⚠ DAÑADO</div>'+
-    '</div>'+
-    '<div id="novedad-wrap" style="display:none">'+
-      '<div class="lbl" style="margin-top:8px">descripción de la novedad</div>'+
-      '<textarea class="inp" id="inp-novedad" rows="2" style="font-size:13px;resize:none" placeholder="Ej: Cajas aplastadas, producto mojado..."></textarea>'+
-    '</div>'+
-    '<div class="btn-row" style="margin-top:10px">'+
-      '<button class="btn btn-sec" onclick="showEscaneo()">← ATR</button>'+
-      '<button class="btn btn-ok btn-big" onclick="confCantidad()">✓ CONFIRMAR</button>'+
-    '</div>';
-  render(html);
+  var h=stepsBar(4,6);
+  h+='<div class="badge badge-rec">'+S.contenedor+'</div>';
+  if(sk.noEncontrado) h+='<div class="alert">SKU no en catálogo. Puedes continuar.</div>';
+  h+='<div class="lbl">producto</div>';
+  h+='<div style="background:var(--sur2);border-radius:6px;padding:10px 12px;margin-bottom:6px">';
+  h+='<div style="font-size:13px;font-weight:700;color:var(--acc)">'+sk.sku+'</div>';
+  h+='<div style="font-size:12px;color:var(--txt);margin-top:2px">'+sk.desc+'</div>';
+  h+='<div style="font-size:11px;color:var(--mut)">Tipo: '+sk.tipo+'</div></div>';
+  h+=htmlPendiente(sk.sku);
+  h+='<details style="margin:8px 0">';
+  h+='<summary style="font-size:11px;color:var(--acc);cursor:pointer">Calculadora de unidades</summary>';
+  h+='<div style="background:var(--sur2);border-radius:6px;padding:10px;margin-top:6px">';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">';
+  h+='<div><div class="lbl" style="margin-top:0">Un/Caja</div>';
+  h+='<input class="inp inp-sm" id="calc-uxc" type="number" min="0" placeholder="0" oninput="calcCantidad()" autocomplete="off"></div>';
+  h+='<div><div class="lbl" style="margin-top:0">Caj/Pall</div>';
+  h+='<input class="inp inp-sm" id="calc-cxp" type="number" min="0" placeholder="0" oninput="calcCantidad()" autocomplete="off"></div>';
+  h+='<div><div class="lbl" style="margin-top:0">Pallets</div>';
+  h+='<input class="inp inp-sm" id="calc-np" type="number" min="0" placeholder="0" oninput="calcCantidad()" autocomplete="off"></div></div>';
+  h+='<div style="font-size:11px;color:var(--mut);text-align:center">= <span id="calc-res" style="color:var(--acc);font-weight:700">0</span> un</div>';
+  h+='<button class="btn btn-sec btn-big" style="margin-top:6px;font-size:12px" onclick="aplicarCalculo()">Aplicar a cantidad</button>';
+  h+='</div></details>';
+  h+='<div class="lbl">cantidad (unidades)</div>';
+  h+='<input class="inp" id="inp-cant" type="number" min="0" placeholder="0" style="font-size:24px;font-weight:700;text-align:center" autocomplete="off">';
+  h+='<div class="lbl" style="margin-top:8px">estado</div>';
+  h+='<div class="grid2">';
+  h+='<div class="card-t sel" id="est-ok" onclick="selEstado(' + "'OK'" + ')">OK</div>';
+  h+='<div class="card-t" id="est-dan" onclick="selEstado(' + "'DA\u00d1ADO'" + ')">DANADO</div>';
+  h+='</div>';
+  h+='<div id="novedad-wrap" style="display:none">';
+  h+='<div class="lbl" style="margin-top:8px">descripcion de la novedad</div>';
+  h+='<textarea class="inp" id="inp-novedad" rows="2" style="font-size:13px;resize:none"></textarea></div>';
+  h+='<div class="btn-row" style="margin-top:10px">';
+  h+='<button class="btn btn-sec" onclick="showEscaneo()">ATR</button>';
+  h+='<button class="btn btn-ok btn-big" onclick="confCantidad()">CONFIRMAR</button></div>';
+  render(h);
   setTimeout(function(){var el=document.getElementById('inp-cant');if(el)el.focus();},100);
   window._estadoActual='OK';
 }
+function calcCantidad(){
+  var a=parseFloat(document.getElementById('calc-uxc').value)||0;
+  var b=parseFloat(document.getElementById('calc-cxp').value)||0;
+  var c=parseFloat(document.getElementById('calc-np').value)||0;
+  var el=document.getElementById('calc-res');
+  if(el) el.textContent=Math.round(a*b*c)||0;
+}
+function aplicarCalculo(){
+  var a=parseFloat(document.getElementById('calc-uxc').value)||0;
+  var b=parseFloat(document.getElementById('calc-cxp').value)||0;
+  var c=parseFloat(document.getElementById('calc-np').value)||0;
+  var res=Math.round(a*b*c);
+  if(res>0){document.getElementById('inp-cant').value=res;toast(''+res+' unidades aplicadas');}
+  else toast('Ingresa valores en la calculadora');
+}
+
 function selEstado(e){
   window._estadoActual=e;
   document.getElementById('est-ok').className='card-t'+(e==='OK'?' sel':'');
@@ -1354,6 +1412,7 @@ function confCantidad(){
     numCajas:1,cantidad:cant,
     estado:window._estadoActual||'OK',
     novedad:nov,
+    pedido:S.pedido,
   };
   S.skusRegistrados.push(reg);
   escribirSKU(reg).catch(function(e){console.warn('[SP] SKU async:',e.message);});
@@ -1361,6 +1420,118 @@ function confCantidad(){
   showEscaneo();
 }
 
+
+function showCorreccion(){
+  S.step='correccion';
+  render('<div class="loading"><div class="loading-icon">...</div><div class="loading-txt">Cargando registros...</div></div>');
+  cargarSKUsSP(S.pedido,null).then(function(spRegs){
+    window._regsCorreccion=spRegs;
+    renderCorreccion(spRegs,'','');
+  }).catch(function(){
+    window._regsCorreccion=S.skusRegistrados;
+    renderCorreccion(S.skusRegistrados,'','');
+  });
+}
+function renderCorreccion(regs,filtSKU,filtCont){
+  var filtrados=regs.filter(function(r){
+    if((r.Estado||r.estado||'')==='CORRECCION') return false;
+    var sku=(r.CodProducto||r.sku||'').toUpperCase();
+    var cont=(r.Contenedor||r.contenedor||'').toUpperCase();
+    if(filtSKU&&sku.indexOf(filtSKU.toUpperCase())<0) return false;
+    if(filtCont&&cont.indexOf(filtCont.toUpperCase())<0) return false;
+    return true;
+  });
+  window._filtrados=filtrados;
+  var h='<div class="badge badge-rec">CORREGIR REGISTRO</div>';
+  h+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Pedido: <strong>'+S.pedido+'</strong>';
+  h+=' '+filtrados.length+' registros</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">';
+  h+='<input class="inp inp-sm" id="filt-sku" placeholder="Filtrar SKU" value="'+filtSKU+'" ';
+  h+='oninput="renderCorreccion(window._regsCorreccion,this.value,document.getElementById(\'filt-cont\').value)">';
+  h+='<input class="inp inp-sm" id="filt-cont" placeholder="Filtrar contenedor" value="'+filtCont+'" ';
+  h+='oninput="renderCorreccion(window._regsCorreccion,document.getElementById(\'filt-sku\').value,this.value)">'+
+  '</div><div style="max-height:50vh;overflow-y:auto">';
+  if(!filtrados.length){
+    h+='<div class="alert-w">Sin registros.</div>';
+  } else {
+    filtrados.slice().reverse().slice(0,50).forEach(function(r,i){
+      var sku=r.CodProducto||r.sku||'';
+      var desc=r.Nombre||r.desc||'';
+      var cant=Number(r.Cantidad!==undefined?r.Cantidad:r.cantidad)||0;
+      var cont=r.Contenedor||r.contenedor||'';
+      var op=r.Operario||r.operario||'';
+      h+='<div class="card-item" style="margin-bottom:6px" onclick="iniciarCorreccion('+i+',\'' +sku+ '\','+cant+')">';
+      h+='<div style="display:flex;justify-content:space-between">';
+      h+='<div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--acc)">'+sku+'</div>';
+      h+='<div style="font-size:11px;color:var(--txt)">'+desc+'</div>';
+      h+='<div style="font-size:10px;color:var(--mut)">'+cont+(op?' · '+op:'')+'</div></div>';
+      h+='<div style="text-align:right;margin-left:10px">';
+      h+='<div style="font-size:16px;font-weight:700">'+cant+'</div>';
+      h+='<div style="font-size:10px;color:var(--mut)">un</div></div></div></div>';
+    });
+  }
+  h+='</div><button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">Volver</button>';
+  render(h);
+}
+function iniciarCorreccion(idx,sku,cantOrig){
+  window._corrSKU=sku; window._corrOriginal=cantOrig; window._corrIdx=idx;
+  var reg=window._filtrados[idx]||{};
+  var desc=reg.Nombre||reg.desc||sku;
+  var h='<div class="badge badge-rec">CORREGIR</div>';
+  h+='<div style="background:var(--sur2);border-radius:8px;padding:12px;margin-bottom:10px">';
+  h+='<div style="font-size:12px;font-weight:700;color:var(--acc)">'+sku+'</div>';
+  h+='<div style="font-size:12px;color:var(--txt)">'+desc+'</div>';
+  h+='<div style="font-size:11px;color:var(--mut);margin-top:4px">Original: <strong>'+cantOrig+'</strong></div></div>';
+  h+='<div class="lbl">cantidad correcta</div>';
+  h+='<input class="inp" id="inp-corr-real" type="number" placeholder="Ej: 90" ';
+  h+='style="font-size:24px;font-weight:700;text-align:center" autocomplete="off">';
+  h+='<div id="corr-preview" style="font-size:12px;color:var(--mut);margin-top:6px;text-align:center">Se registra la diferencia</div>';
+  h+='<div class="lbl" style="margin-top:8px">observacion (requerida)</div>';
+  h+='<textarea class="inp inp-sm" id="inp-corr-obs" rows="2" style="resize:none" placeholder="Motivo..."></textarea>';
+  h+='<div class="btn-row" style="margin-top:10px">';
+  h+='<button class="btn btn-sec" onclick="showCorreccion()">ATR</button>';
+  h+='<button class="btn btn-warn btn-big" onclick="confCorreccion()">APLICAR CORRECCION</button></div>';
+  render(h);
+  setTimeout(function(){
+    var el=document.getElementById('inp-corr-real');
+    if(el){el.focus();el.addEventListener('input',function(){
+      var real=parseFloat(el.value);
+      var prev=document.getElementById('corr-preview');
+      if(!isNaN(real)&&prev){
+        var d=real-window._corrOriginal;
+        prev.textContent='Ajuste: '+(d>=0?'+':'')+d+' ('+window._corrOriginal+' a '+real+')';
+        prev.style.color=d<0?'var(--ok)':d>0?'var(--dan)':'var(--mut)';
+      }
+    });}
+  },100);
+}
+function confCorreccion(){
+  var real=parseFloat(document.getElementById('inp-corr-real').value);
+  if(isNaN(real)){toast('Ingresa la cantidad correcta');return;}
+  var obs=document.getElementById('inp-corr-obs').value.trim();
+  if(!obs){toast('Ingresa una observacion');return;}
+  var diff=real-window._corrOriginal;
+  if(diff===0){toast('Sin cambios');return;}
+  var reg=window._filtrados[window._corrIdx]||{};
+  var regCorr={
+    sku:window._corrSKU,
+    desc:reg.Nombre||reg.desc||window._corrSKU,
+    factor:1,numCajas:1,
+    cantidad:diff,
+    estado:'CORRECCION',
+    novedad:'Correccion de '+window._corrOriginal+' a '+real+' - '+obs,
+    pedido:S.pedido,
+  };
+  S.skusRegistrados.push(regCorr);
+  escribirSKU(regCorr).then(function(){
+    toast('Correccion aplicada: '+(diff>=0?'+':'')+diff+' unidades');
+    showEscaneo();
+  }).catch(function(e){
+    console.warn('[SP]',e.message);
+    toast('Correccion en memoria');
+    showEscaneo();
+  });
+}
 function guardarYSalir(){
   toast('Sesión guardada. Puedes retomar desde Mis Pedidos.');
   if(S.rol==='supervisor') showMenuSup();
@@ -1481,19 +1652,55 @@ function cerrarPedido(){
 function showFlujoPerchado(){
   S.step='perchado';
   S.recId=generarRecId();
-  render(
-    '<div class="badge badge-rec">🗄️ PERCHADO — '+S.pedido+'</div>'+
-    '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin-bottom:10px">'+
-      '<div style="font-size:11px;color:var(--mut);margin-bottom:4px">PEDIDO ASIGNADO</div>'+
-      '<div style="font-size:18px;font-weight:700;color:var(--rec)">'+S.pedido+'</div>'+
-      '<div style="font-size:11px;color:var(--mut);margin-top:4px">'+S.subtipo+'</div>'+
-    '</div>'+
-    '<div class="lbl">hora de inicio de perchado</div>'+
-    '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
-    '<button class="btn btn-rec btn-big" style="margin-top:10px" onclick="confPerchadoInicio()">▶ INICIAR PERCHADO</button>'+
-    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">← Volver</button>'
-  );
+  render('<div class="loading"><div class="loading-icon">...</div><div class="loading-txt">Cargando resumen de recepcion...</div></div>');
+  cargarSKUsSP(S.pedido,null).then(function(spRegs){
+    var consol={};
+    spRegs.forEach(function(r){
+      var sku=r.CodProducto||'';
+      if(!sku) return;
+      if(!consol[sku]) consol[sku]={desc:r.Nombre||sku,total:0};
+      consol[sku].total+=Number(r.Cantidad)||0;
+    });
+    var packing=getPacingList(S.pedido,S.subtipo);
+    packing.forEach(function(p){
+      if(!consol[p.sku]) consol[p.sku]={desc:p.desc,total:0};
+    });
+    var rows=Object.keys(consol).map(function(sku){
+      var c=consol[sku];
+      var pack=packing.find(function(p){return normStr(p.sku)===normStr(sku);});
+      var esp=pack?pack.cantidad:null;
+      var pend=esp!==null?esp-c.total:null;
+      var col=pend===null?'var(--txt)':pend>0?'var(--warn)':pend===0?'var(--ok)':'var(--dan)';
+      var lbl=pend===null?'':pend>0?' Pend:'+pend:pend===0?' OK':' Sobr:'+Math.abs(pend);
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor)">'+
+        '<div><div style="font-size:12px;font-weight:700;color:var(--acc)">'+sku+'</div>'+
+        '<div style="font-size:11px;color:var(--mut)">'+c.desc+'</div></div>'+
+        '<div style="text-align:right">'+
+          '<div style="font-size:14px;font-weight:700">'+c.total+' un</div>'+
+          '<div style="font-size:10px;color:'+col+'">'+( esp!==null?'Esp:'+esp:'')+lbl+'</div>'+
+        '</div></div>';
+    }).join('');
+    var men=S.rol==='supervisor'?'showMenuSup':'showMenuOp';
+    render('<div class="badge badge-rec">PERCHADO - '+S.pedido+'</div>'+
+      '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin-bottom:10px">'+
+        '<div style="font-size:11px;color:var(--mut);margin-bottom:6px">RESUMEN RECIBIDO - '+S.subtipo+'</div>'+
+        (rows?'<div style="max-height:35vh;overflow-y:auto">'+rows+'</div>':'<div class="alert-w">Sin registros de recepcion.</div>')+
+      '</div>'+
+      '<div class="lbl">hora de inicio de perchado</div>'+
+      '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+      '<button class="btn btn-rec btn-big" style="margin-top:10px" onclick="confPerchadoInicio()">INICIAR PERCHADO</button>'+
+      '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="'+men+'()">Volver</button>');
+  }).catch(function(){
+    var men=S.rol==='supervisor'?'showMenuSup':'showMenuOp';
+    render('<div class="badge badge-rec">PERCHADO - '+S.pedido+'</div>'+
+      '<div class="alert-w" style="margin-bottom:10px">Sin conexion. Continuando sin resumen.</div>'+
+      '<div class="lbl">hora de inicio</div>'+
+      '<input class="inp inp-sm" id="ev-hora" type="time" value="'+horaActual()+'">'+
+      '<button class="btn btn-rec btn-big" style="margin-top:10px" onclick="confPerchadoInicio()">INICIAR</button>'+
+      '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="'+men+'()">Volver</button>');
+  });
 }
+
 function confPerchadoInicio(){
   var hora=document.getElementById('ev-hora').value;
   if(!hora){toast('Ingresa la hora');return;}
@@ -1579,6 +1786,14 @@ function showPantallaLogin(){
 // ═══════════════════════════════════════════════════════════════════
 window.S=S;window.DB=DB;
 window.goHome=goHome;
+window.showCorreccion=showCorreccion;
+window.renderCorreccion=renderCorreccion;
+window.iniciarCorreccion=iniciarCorreccion;
+window.confCorreccion=confCorreccion;
+window.calcCantidad=calcCantidad;
+window.aplicarCalculo=aplicarCalculo;
+window.saldoSKU=saldoSKU;
+window.esperadoSKU=esperadoSKU;
 window.showHome=showHome;
 window.iniciarSesion=iniciarSesion;
 window.msalLogin=msalLogin;
