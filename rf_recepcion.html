@@ -862,43 +862,32 @@ function actualizarStatusContenedorExcel(pedido, contenedor, nuevoStatus){
   }
   var rowExcel=idx+2; // fila Excel: +1 por encabezado, +1 por base-1
 
-  // Paso 2: leer fila 1 (encabezado) de la hoja para obtener columna física real
-  // El usedRange omite columnas vacías → el índice del array != columna física
-  // Se necesita leer el encabezado de la hoja Contenedores para mapear nombre→columna física
+  // Paso 2: leer encabezado con range(address='A1:Z1') — más compatible que rows/itemAt
+  // Esto devuelve la fila 1 completa incluyendo columnas vacías
   var urlHdr='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
     '/items/'+DB.catalogoItemId+
-    "/workbook/worksheets('Contenedores')/rows/itemAt(index=0)/range";
+    "/workbook/worksheets('Contenedores')/range(address='A1:Z1')";
 
   return gGet(urlHdr).then(function(hdrData){
-    // hdrData.values es [[col1,col2,...]] — incluye TODAS las columnas físicas incluso vacías
     var hdrs=hdrData.values&&hdrData.values[0]?hdrData.values[0]:[];
-    console.log('[PATCH-CONT] Encabezado fila 1 ('+hdrs.length+' cols):',
-      hdrs.map(function(v,i){return i+'="'+(v||'')+'"]';}).join(' '));
+    console.log('[PATCH-CONT] Encabezado ('+hdrs.length+' cols):',
+      hdrs.map(function(v,i){return i+'="'+(v||'')+'"]';}).join(' | '));
 
-    // Buscar columna Status y FechaRecepcion por nombre (base-0)
-    var colStatIdx=-1, colFrecIdx=-1;
+    var colStatIdx=-1;
     hdrs.forEach(function(v,i){
       var n=(v||'').toString().trim().toLowerCase();
       if(n==='status'||n==='estado') colStatIdx=i;
-      if(n.indexOf('fecharec')>-1||n==='fecharecepcion') colFrecIdx=i;
     });
 
-    // Columna física Excel = índice base-0 + 1 (base-1)
-    var colStat=colStatIdx>=0?colStatIdx+1:6; // fallback: F (columna 6)
-    var colFrec=colFrecIdx>=0?colFrecIdx+1:7; // fallback: G (columna 7)
+    // Columna física = índice base-0 + 1 (Graph API usa base-1 para cell())
+    var colStat=colStatIdx>=0?colStatIdx+1:6; // fallback col F si no se encuentra
+    var colLetra=colStat<=26?String.fromCharCode(64+colStat):'col'+colStat;
 
-    console.log('[PATCH-CONT] Fila='+rowExcel+
-      ' ColStatus='+colStat+'('+String.fromCharCode(64+colStat)+')'+
-      ' ColFechaRec='+colFrec+'('+String.fromCharCode(64+colFrec)+')'+
-      ' Destino='+String.fromCharCode(64+colStat)+rowExcel+
-      ' Valor='+nuevoStatus);
+    console.log('[PATCH-CONT] Fila='+rowExcel+' ColStatus='+colStat+'('+colLetra+')'+
+      ' Destino='+colLetra+rowExcel+' Valor="'+nuevoStatus+'"'+
+      (colStatIdx<0?' ADVERTENCIA:Status no encontrado en encabezado,usando fallback':''));
 
-    if(colStatIdx<0){
-      console.error('[PATCH-CONT] Columna Status no encontrada en encabezado. Abortando PATCH.');
-      return Promise.resolve();
-    }
-
-    // Paso 3: PATCH sobre la celda correcta
+    // Paso 3: PATCH sobre la celda
     var urlCell='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
       '/items/'+DB.catalogoItemId+
       "/workbook/worksheets('Contenedores')/cell(row="+rowExcel+",column="+colStat+")";
@@ -910,15 +899,35 @@ function actualizarStatusContenedorExcel(pedido, contenedor, nuevoStatus){
     }).then(function(res){
       if(res.ok){
         DB.contenedores[idx].status=nuevoStatus;
-        console.log('[PATCH-CONT] OK — '+String.fromCharCode(64+colStat)+rowExcel+' = '+nuevoStatus);
+        console.log('[PATCH-CONT] OK — '+colLetra+rowExcel+' = "'+nuevoStatus+'"');
       } else {
-        res.text().then(function(t){
-          console.error('[PATCH-CONT] Error HTTP '+res.status+':',t.slice(0,150));
+        return res.text().then(function(t){
+          console.error('[PATCH-CONT] Error HTTP '+res.status+':',t.slice(0,200));
         });
       }
     });
   }).catch(function(e){
     console.error('[PATCH-CONT] Error leyendo encabezado:',e.message);
+    // Intentar con índice de window._iC_stat como último recurso
+    var colFallback=(window._iC_stat>=0?window._iC_stat+1:6);
+    console.warn('[PATCH-CONT] Intentando fallback con col='+colFallback);
+    var urlFallback='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
+      '/items/'+DB.catalogoItemId+
+      "/workbook/worksheets('Contenedores')/cell(row="+rowExcel+",column="+colFallback+")";
+    return getToken().then(function(r){
+      return fetch(urlFallback,{method:'PATCH',
+        headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
+        body:JSON.stringify({values:[[nuevoStatus]]})});
+    }).then(function(res){
+      if(res.ok){
+        DB.contenedores[idx].status=nuevoStatus;
+        console.log('[PATCH-CONT] Fallback OK col='+colFallback);
+      } else {
+        return res.text().then(function(t){
+          console.error('[PATCH-CONT] Fallback error:',t.slice(0,100));
+        });
+      }
+    });
   });
 }
 
@@ -1923,33 +1932,45 @@ function escribirHoras(datos){
     Estado:       datos.estado||'En Proceso',
     Timestamp:    t.ts,
   };
-  // Buscar si ya existe un registro para este contenedor (upsert)
-  return gGet(urlLista(DB.listIds.horas)+
-    "/items?$filter=fields/Title eq '"+titulo+"'&$expand=fields&$top=1")
+  // Title no se puede filtrar en SP via $filter — buscar en JS
+  // Traer items del pedido y filtrar por Contenedor en JS
+  return buscarItemHorasSP(S.pedido,S.contenedor).then(function(existing){
+    if(existing){
+      console.log('[LHoras] PATCH existente id='+existing._spId);
+      return gPatch(urlLista(DB.listIds.horas)+'/items/'+existing._spId,{fields:fields})
+        .then(function(){console.log('[LHoras] PATCH OK:',titulo);});
+    } else {
+      return gPost(urlLista(DB.listIds.horas)+'/items',{fields:fields})
+        .then(function(){console.log('[LHoras] POST OK:',titulo);});
+    }
+  }).catch(function(e){console.error('[LHoras] Error:',e.message);});
+}
+
+// Buscar ítem en LHoras por Pedido+Contenedor (sin $filter en Title)
+function buscarItemHorasSP(pedido,contenedor){
+  if(!DB.listIds.horas) return Promise.resolve(null);
+  // Traer hasta 500 ítems y filtrar en JS (LHoras tiene pocos registros)
+  return gGet(urlLista(DB.listIds.horas)+'/items?$expand=fields&$top=500')
     .then(function(d){
-      if(d.value&&d.value.length>0){
-        var spId=d.value[0].id;
-        return gPatch(urlLista(DB.listIds.horas)+'/items/'+spId,{fields:fields})
-          .then(function(){console.log('[LHoras] PATCH OK:',titulo);});
-      } else {
-        return gPost(urlLista(DB.listIds.horas)+'/items',{fields:fields})
-          .then(function(){console.log('[LHoras] POST OK:',titulo);});
+      var items=d.value||[];
+      var found=items.find(function(i){
+        var f=i.fields||{};
+        return normStr(f.Pedido||'')===normStr(pedido)&&
+               normStr(f.Contenedor||'')===normStr(contenedor);
+      });
+      if(found){
+        found.fields._spId=found.id;
+        return found.fields;
       }
+      return null;
     })
-    .catch(function(e){console.error('[LHoras] Error:',e.message);});
+    .catch(function(e){console.error('[LHoras] buscar error:',e.message);return null;});
 }
 
 // Cargar horas existentes de un contenedor desde LHoras
 function cargarHorasContenedor(pedido,contenedor){
   if(!DB.listIds.horas) return Promise.resolve(null);
-  var titulo=pedido+'-'+contenedor;
-  return gGet(urlLista(DB.listIds.horas)+
-    "/items?$filter=fields/Title eq '"+titulo+"'&$expand=fields&$top=1")
-    .then(function(d){
-      if(d.value&&d.value.length>0) return d.value[0].fields;
-      return null;
-    })
-    .catch(function(){return null;});
+  return buscarItemHorasSP(pedido,contenedor);
 }
 
 // ── Pantalla de opciones al seleccionar contenedor ────────────────
