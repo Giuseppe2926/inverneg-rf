@@ -765,7 +765,7 @@ function cargarAsignacionesSP(){
   }
   return gGet(urlLista(DB.listIds.asignaciones)+'/items?$expand=fields&$top=500')
     .then(function(d){
-      var items=(d.value||[]).map(function(i){return i.fields;});
+      var items=(d.value||[]).map(function(i){var f=i.fields||{};f._spId=i.id;return f;});
       console.log('[ASIG] Total ítems en SP:',items.length);
       // Log primeros 10 para ver campos reales
       items.slice(0,10).forEach(function(f,i){
@@ -957,14 +957,11 @@ function showAnularAsignacion(){
     '<div class="loading-txt">Cargando asignaciones...</div></div>');
   cargarAsignacionesSP().then(function(asigs){
     // Mostrar TODAS las asignaciones no anuladas
-    var activas=asigs.filter(function(a){
-      return normStr(a.Status||'')==='ACTIVO'||
-             normStr(a.Status||'')==='ASIGNADO'||
-             normStr(a.Status||'')==='TOMADA'||
-             normStr(a.Status||'')==='EN PROCESO'||
-             normStr(a.Status||'')==='ACTIVO'||
-             (a.Status&&normStr(a.Status)!=='ANULADA'&&normStr(a.Status)!=='CERRADA');
-    });
+    var _todas=asigs.filter(function(a){return a.Status&&normStr(a.Status)!=='ANULADA'&&normStr(a.Status)!=='CERRADA';});
+    _todas.sort(function(a,b){return(b.FechaAsignacion||'').localeCompare(a.FechaAsignacion||'');});
+    var _vis={};var activas=[];
+    _todas.forEach(function(a){var k=normStr(a.Pedido||'')+'|'+normStr(a.TipoAsignacion||'');if(!_vis[k]){_vis[k]=true;activas.push(a);}});
+    console.log('[ANULAR] SP:'+_todas.length+' dedup:'+activas.length);
     var h='<div class="badge badge-sup">ANULAR ASIGNACION</div>';
     if(!activas.length){
       h+='<div class="alert-w">No hay asignaciones activas.</div>';
@@ -994,7 +991,9 @@ function confirmarAnularAsig(){
   if(!a){toast('Error: asignacion no encontrada');return;}
   var pedido=a.Pedido||'?';
   var tipo=a.TipoAsignacion||'?';
-  var spId=a.ID;
+  var spId=a._spId;
+  console.log('[ANULAR]',{pedido:pedido,tipo:tipo,operario:a.Operario,_spId:a._spId,ID:a.ID});
+  if(!spId){toast('Error: id SP faltante. Ver consola F12.');console.error('[ANULAR] _spId undefined. Keys:',Object.keys(a));return;}
   if(!confirm('Anular asignacion de "'+tipo+'" para "'+pedido+'"?\nQuedara registrado.')) return;
   var t=ahora();
   gPatch(urlLista(DB.listIds.asignaciones)+'/items/'+spId,{
@@ -1057,12 +1056,14 @@ function showMenuOp(){
         '" Op="'+(a.Operario||'?')+'" normOp="'+normStr(a.Operario||'')+
         '" Status="'+(a.Status||'?')+'" normStatus="'+normStr(a.Status||'')+'"');
     });
-    var misAsigs=asigs.filter(function(a){
-      var opMatch=normStr(a.Operario)===normStr(S.operario);
-      var stMatch=normStr(a.Status||'')==='ACTIVO';
-      if(opMatch) console.log('[MENU-OP] Mi asignación: Pedido='+(a.Pedido||'?')+' stMatch='+stMatch+' Status="'+(a.Status||'?')+'"');
-      return opMatch&&stMatch;
+    var _mAll=asigs.filter(function(a){
+      var oM=normStr(a.Operario)===normStr(S.operario);
+      if(oM) console.log('[MENU-OP] Pedido='+(a.Pedido||'?')+' Status="'+(a.Status||'?')+'"');
+      return oM&&normStr(a.Status||'')!=='ANULADA'&&normStr(a.Status||'')!=='CERRADA';
     });
+    var _vmis={};var misAsigs=[];
+    _mAll.forEach(function(a){var k=normStr(a.Pedido||'')+'|'+normStr(a.TipoAsignacion||'');if(!_vmis[k]){_vmis[k]=true;misAsigs.push(a);}});
+    console.log('[MENU-OP] Asigs dedup:',misAsigs.length,'de',_mAll.length);
     var html='<div class="badge badge-rec">👷 '+S.operario+'</div>'+
       '<div class="grid2" style="margin-bottom:10px">'+
         '<div class="card-t" onclick="showCalendario()">'+
@@ -1299,9 +1300,11 @@ function confAsignar(){
 }
 function reasignarExistente(){
   var ex=window._asigExistente;
-  if(!ex||!ex.ID) return;
+  if(!ex){toast('Error: no encontrado');return;}
+  var spId=ex._spId;
+  if(!spId){toast('Error: id SP faltante');return;}
   var t=ahora();
-  gPatch(urlLista(DB.listIds.asignaciones)+'/items/'+ex.ID,{
+  gPatch(urlLista(DB.listIds.asignaciones)+'/items/'+spId,{
     fields:{Operario:_asigOp,Supervisor:S.operario,FechaAsignacion:t.fecha,Status:'Activo'}
   }).then(function(){
     toast('Reasignado: '+_asigOp+' -> '+_asigPedido);
@@ -1346,7 +1349,13 @@ function _renderSeleccionarContenedor(){
       var esPend=normStr(c.status)!=='RECIBIDO';
       console.log('[RENDER] Cont="'+c.contenedor+'" Excel_Status="'+c.status+'" normStatus="'+normStr(c.status)+'" ¿Pendiente?='+(esPend?'SI':'NO'));
     });
-  console.log('[RENDER] Tarjetas a mostrar:',contsPend.length);
+  var _tp=DB.contenedores.filter(function(c){return normStr(c.pedido)===normStr(S.pedido);});
+  console.log('[RENDER] Pedido="'+S.pedido+'" DB:'+DB.contenedores.length+' delPedido:'+_tp.length+' tarjetas:'+contsPend.length);
+  _tp.forEach(function(c){
+    var norm=normStr(c.status);
+    var aparece=norm!=='RECIBIDO';
+    console.log('[RENDER] Cont="'+c.contenedor+'" ExcelStatus="'+c.status+'" norm="'+norm+'" Aparece='+aparece+' Motivo='+(aparece?'pendiente':'filtrado-norm='+norm));
+  });
   console.log('[RENDER] ========================================');
   // ──────────────────────────────────────
 
