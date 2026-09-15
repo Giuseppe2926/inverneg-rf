@@ -1015,6 +1015,56 @@ function confirmarAnularAsig(){
     toast('Error anulando: '+e.message.slice(0,50));
   });
 }
+
+// ── Reaperturar contenedor (supervisor) ───────────────────────────
+function showReopenarContenedor(){
+  S.step='reopenar';
+  // Mostrar contenedores Recibidos del pedido activo, o de todos los pedidos
+  var cerrados=DB.contenedores.filter(function(c){
+    return normStr(c.status)==='RECIBIDO';
+  });
+  var h='<div class="badge badge-sup">REAPERTURAR CONTENEDOR</div>';
+  if(!cerrados.length){
+    h+='<div class="alert-w">No hay contenedores con status Recibido.</div>';
+  } else {
+    h+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+cerrados.length+' contenedores Recibidos. Toca para reaperturar.</div>';
+    cerrados.forEach(function(c,i){
+      h+='<div class="card-item" style="margin-bottom:6px">'+
+        '<div style="flex:1">'+
+          '<div style="font-size:13px;font-weight:700">'+c.contenedor+'</div>'+
+          '<div style="font-size:11px;color:var(--mut)">'+c.pedido+(c.fechaProg?' · '+fechaDisplay(c.fechaProg):'')+'</div>'+
+        '</div>'+
+        '<button class="btn btn-warn" style="font-size:11px;padding:4px 10px;flex-shrink:0" '+
+          'onclick="window._reopIdx='+i+';confirmarReopenar()">Reaperturar</button>'+
+      '</div>';
+    });
+    window._cerradosList=cerrados;
+  }
+  h+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showMenuSup()">Volver</button>';
+  render(h);
+}
+
+function confirmarReopenar(){
+  var idx=window._reopIdx;
+  var c=window._cerradosList&&window._cerradosList[idx];
+  if(!c){toast('Error: contenedor no encontrado');return;}
+  if(!confirm('Reaperturar "'+c.contenedor+'" del pedido "'+c.pedido+'"?\nEl status cambiara a Pendiente.')) return;
+  var t=ahora();
+  actualizarStatusContenedorExcel(c.pedido,c.contenedor,'Pendiente').then(function(){
+    // Auditar en LEventos
+    if(DB.listIds.eventos){
+      gPost(urlLista(DB.listIds.eventos)+'/items',{fields:{
+        Title:     c.pedido+'-'+c.contenedor+'-REAPERTURA',
+        RecepcionId:'', Pedido:c.pedido, Contenedor:c.contenedor,
+        TipoEvento:'REAPERTURA_SUP',
+        Operario:  S.operario,
+        Hora:t.hora, Fecha:t.fecha, Timestamp:t.ts,
+      }}).catch(function(e){console.warn('[SP] Auditoria reapertura:',e.message);});
+    }
+    toast('Contenedor reaperturado: '+c.contenedor);
+    showReopenarContenedor(); // recargar lista
+  }).catch(function(e){toast('Error: '+e.message.slice(0,50));});
+}
 function showMenuSup(){
   S.step='menu-sup';
   render(
@@ -1035,8 +1085,12 @@ function showMenuSup(){
     '<div class="grid2" style="margin-top:8px">'+
       '<div class="card-t" onclick="showAnularAsignacion()">'+
         '<div class="card-t-icon">🚫</div><div class="card-t-lbl">ANULAR ASIG.</div></div>'+
+      '<div class="card-t" onclick="showReopenarContenedor()">'+
+        '<div class="card-t-icon">🔓</div><div class="card-t-lbl">REAPERTURAR</div></div>'+
+    '</div>'+
+    '<div style="margin-top:8px">'+
       '<div class="card-t" onclick="recargarCatalogos()">'+
-        '<div class="card-t-icon">🔄</div><div class="card-t-lbl">ACTUALIZAR</div></div>'+
+        '<div class="card-t-icon">🔄</div><div class="card-t-lbl">ACTUALIZAR DATOS</div></div>'+
     '</div>'
   );
 }
@@ -1389,40 +1443,65 @@ function _renderSeleccionarContenedor(){
 function selContRow(cont,sello,pallets){
   S.contenedor=cont;S.sello=sello||'';S.pallets=pallets||0;
   S.skusRegistrados=[];
-  // Consultar SP si ya hay eventos para este contenedor+pedido
-  render('<div class="loading"><div class="loading-icon">⏳</div>'+
-    '<div class="loading-txt">Verificando estado...</div></div>');
-  cargarEventosSP(S.pedido).then(function(evts){
-    // Filtrar por contenedor
-    var evtsCont=evts.filter(function(e){return e.Contenedor===cont;});
-    // Reconstituir eventos registrados
-    S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
-    var tieneId=false;
-    evtsCont.forEach(function(e){
-      var t=e.TipoEvento?e.TipoEvento.toLowerCase():'';
-      if(t==='llegada')   {S.eventos.llegada=e.Hora;if(e.RecepcionId){S.recId=e.RecepcionId;tieneId=true;}}
-      if(t==='apertura')  S.eventos.apertura=e.Hora;
-      if(t==='cierre')    S.eventos.cierre=e.Hora;
-      if(t==='salida')    S.eventos.salida=e.Hora;
-    });
-    if(!tieneId) S.recId=generarRecId();
-    // Cargar SKUs ya registrados para este contenedor
+  S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
+
+  // Obtener status del contenedor desde Excel (fuente única de verdad)
+  var contExcel=DB.contenedores.find(function(c){
+    return normStr(c.pedido)===normStr(S.pedido)&&normStr(c.contenedor)===normStr(cont);
+  });
+  var statusExcel=contExcel?normStr(contExcel.status||''):'PENDIENTE';
+  console.log('[SEL-CONT] Cont="'+cont+'" Excel_Status="'+(contExcel?contExcel.status:'(no encontrado en DB)')+'" normStatus="'+statusExcel+'"');
+
+  // Si Excel dice Recibido → mostrar resumen (contenedor ya procesado)
+  // Si Excel dice Pendiente (o cualquier otro) → flujo normal de recepción
+  if(statusExcel==='RECIBIDO'){
+    console.log('[SEL-CONT] Excel=RECIBIDO → cargar SKUs y mostrar resumen');
+    S.recId=generarRecId();
     cargarSKUsSP(S.pedido,cont).then(function(skus){
       S.skusRegistrados=skus.map(function(f){return{
         sku:f.CodProducto||'',desc:f.Nombre||'',
         cantidad:Number(f.Cantidad)||0,estado:f.Estado||'OK',novedad:f.Novedades||'',
       };});
-      // Navegar al paso correcto según eventos ya registrados
-      if(S.eventos.salida)       showResumenContenedor('','');
-      else if(S.eventos.cierre)  showEventoSalida();
-      else if(S.eventos.llegada) showEscaneo();  // llegada registrada → ir a escaneo
-      else                       showEventoLlegada();
+      // Reconstruir horas desde eventos SP solo para mostrar en resumen
+      cargarEventosSP(S.pedido).then(function(evts){
+        evts.filter(function(e){return e.Contenedor===cont;}).forEach(function(e){
+          var t=e.TipoEvento?e.TipoEvento.toLowerCase():'';
+          if(t==='llegada')  S.eventos.llegada=e.Hora;
+          if(t==='apertura') S.eventos.apertura=e.Hora;
+          if(t==='cierre')   S.eventos.cierre=e.Hora;
+          if(t==='salida')   S.eventos.salida=e.Hora;
+          if(e.RecepcionId)  S.recId=e.RecepcionId;
+        });
+        showResumenContenedor('','');
+      }).catch(function(){showResumenContenedor('','');});
     });
-  }).catch(function(){
+  } else {
+    // Excel dice Pendiente → flujo normal
+    console.log('[SEL-CONT] Excel='+statusExcel+' → flujo normal de recepcion');
     S.recId=generarRecId();
-    S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
-    showEventoLlegada();
-  });
+    // Cargar eventos SP para retomar donde quedó (apertura, escaneo)
+    render('<div class="loading"><div class="loading-icon">...</div>'+
+      '<div class="loading-txt">Cargando...</div></div>');
+    cargarEventosSP(S.pedido).then(function(evts){
+      evts.filter(function(e){return e.Contenedor===cont;}).forEach(function(e){
+        var t=e.TipoEvento?e.TipoEvento.toLowerCase():'';
+        if(t==='llegada')  {S.eventos.llegada=e.Hora;if(e.RecepcionId)S.recId=e.RecepcionId;}
+        if(t==='apertura') S.eventos.apertura=e.Hora;
+        if(t==='cierre')   S.eventos.cierre=e.Hora;
+        // IGNORAR evento SALIDA si Excel dice Pendiente
+      });
+      cargarSKUsSP(S.pedido,cont).then(function(skus){
+        S.skusRegistrados=skus.map(function(f){return{
+          sku:f.CodProducto||'',desc:f.Nombre||'',
+          cantidad:Number(f.Cantidad)||0,estado:f.Estado||'OK',novedad:f.Novedades||'',
+        };});
+        // Navegar según eventos parciales (retomar donde quedó)
+        if(S.eventos.cierre)       showEventoSalida();
+        else if(S.eventos.llegada) showEscaneo();
+        else                       showEventoLlegada();
+      });
+    }).catch(function(){showEventoLlegada();});
+  }
 }
 
 function showNuevoContenedor(){
@@ -2039,6 +2118,8 @@ function showPantallaLogin(){
 window.S=S;window.DB=DB;
 window.goHome=goHome;
 window.showAnularAsignacion=showAnularAsignacion;
+window.showReopenarContenedor=showReopenarContenedor;
+window.confirmarReopenar=confirmarReopenar;
 window.confirmarAnularAsig=confirmarAnularAsig;
 window.reasignarExistente=reasignarExistente;
 window.recargarCatalogos=recargarCatalogos;
