@@ -540,6 +540,7 @@ function parsear(hoja,data,err){
     console.log('[EXCEL] Contenedores índices:'+
       ' ped='+iC_ped+' fp='+iC_fp+' cont='+iC_cont+' sell='+iC_sell+
       ' pall='+iC_pall+' stat='+iC_stat+' frec='+iC_frec+' obs='+iC_obs);
+    window._iC_stat=iC_stat; // guardar para PATCH posterior
     if(iC_ped<0||iC_cont<0){
       console.error('[EXCEL] Contenedores — faltan columnas esenciales (Pedido o Contenedor)');
       return;
@@ -710,19 +711,51 @@ function escribirSKU(reg){
 
 function escribirAsignacion(pedido,tipo,operario){
   if(!DB.listIds.asignaciones) return Promise.resolve();
-  var t=ahora();
-  var fields={
-    Title:          pedido+'-'+tipo,
-    Pedido:         pedido,
-    TipoAsignacion: tipo,
-    Operario:       operario,
-    Supervisor:     S.operario,
-    FechaAsignacion:t.fecha,
-    Status:         'Activo',
-  };
-  return gPost(urlLista(DB.listIds.asignaciones)+'/items',{fields:fields})
-    .then(function(r){console.log('[SP] Asignación OK');return r;})
-    .catch(function(e){console.error('[SP] Asignación error:',e.message);});
+  // Verificar duplicados ANTES de crear: Pedido + TipoAsignacion deben ser únicos
+  return cargarAsignacionesSP().then(function(asigs){
+    var existentes=asigs.filter(function(a){
+      return normStr(a.Pedido)===normStr(pedido)&&
+             normStr(a.TipoAsignacion)===normStr(tipo)&&
+             normStr(a.Status||'')!=='ANULADA'&&
+             normStr(a.Status||'')!=='CERRADA';
+    });
+    if(existentes.length>0){
+      var ex=existentes[0];
+      console.warn('[SP] Asignación duplicada detectada:',pedido,tipo,'->',ex.Operario,'Status:',ex.Status);
+      // Retornar objeto especial indicando duplicado
+      return {_duplicado:true, asignacion:ex};
+    }
+    // No existe — crear nueva
+    var t=ahora();
+    var fields={
+      Title:          pedido+'-'+tipo,
+      Pedido:         pedido,
+      TipoAsignacion: tipo,
+      Operario:       operario||'',
+      Supervisor:     S.operario,
+      FechaAsignacion:t.fecha,
+      Status:         'Activo',
+    };
+    return gPost(urlLista(DB.listIds.asignaciones)+'/items',{fields:fields})
+      .then(function(r){console.log('[SP] Asignacion creada OK:',pedido,tipo,operario);return r;})
+      .catch(function(e){console.error('[SP] Asignacion error:',e.message);});
+  });
+}
+
+// Actualizar status de asignación existente (PATCH por Title)
+function actualizarStatusAsignacion(pedido,tipo,nuevoStatus,nuevoOperario){
+  if(!DB.listIds.asignaciones) return Promise.resolve();
+  return cargarAsignacionesSP().then(function(asigs){
+    var ex=asigs.find(function(a){
+      return normStr(a.Pedido)===normStr(pedido)&&normStr(a.TipoAsignacion)===normStr(tipo);
+    });
+    if(!ex||!ex.ID) return;
+    var fields={Status:nuevoStatus};
+    if(nuevoOperario) fields.Operario=nuevoOperario;
+    return gPatch(urlLista(DB.listIds.asignaciones)+'/items/'+ex.ID,{fields:fields})
+      .then(function(){console.log('[SP] Asignacion actualizada:',pedido,tipo,'->',nuevoStatus);})
+      .catch(function(e){console.error('[SP] PATCH asignacion:',e.message);});
+  });
 }
 
 function cargarAsignacionesSP(){
@@ -797,6 +830,62 @@ function htmlPendiente(sku){
     '<div style="display:flex;justify-content:space-between;border-top:1px solid var(--bor);padding-top:3px"><span style="color:'+col+';font-weight:700">'+lbl+'</span><span style="color:'+col+';font-weight:700">'+Math.abs(pend)+'</span></div>'+
   '</div>';
 }
+
+// ── Actualizar status de contenedor en Excel ──────────────────────
+function actualizarStatusContenedorExcel(pedido, contenedor, nuevoStatus){
+  if(!DB.catalogoDriveId||!DB.catalogoItemId) return Promise.resolve();
+  // Buscar índice de fila en DB.contenedores (base 0 de datos = fila 2 en Excel)
+  var idx=DB.contenedores.findIndex(function(c){
+    return normStr(c.pedido)===normStr(pedido)&&normStr(c.contenedor)===normStr(contenedor);
+  });
+  if(idx<0){
+    console.warn('[EXCEL] Contenedor no encontrado para actualizar:',pedido,contenedor);
+    return Promise.resolve();
+  }
+  // Detectar índice de columna Status desde el encabezado real
+  // En la última carga parsear() guardó iC_stat en window._iC_stat
+  var colStat=(window._iC_stat>=0?window._iC_stat:5)+1; // +1 porque Graph API es base-1
+  var rowExcel=idx+2; // +1 encabezado fila 1, +1 base-1
+  var url='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
+    '/items/'+DB.catalogoItemId+
+    "/workbook/worksheets('Contenedores')/cell(row="+rowExcel+",column="+colStat+")";
+  return getToken().then(function(r){
+    return fetch(url,{method:'PATCH',
+      headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify({values:[[nuevoStatus]]})});
+  }).then(function(res){
+    if(res.ok){
+      DB.contenedores[idx].status=nuevoStatus; // actualizar memoria
+      console.log('[EXCEL] Status contenedor '+contenedor+' -> '+nuevoStatus);
+    } else {
+      res.text().then(function(t){console.warn('[EXCEL] PATCH contenedor error:',t.slice(0,100));});
+    }
+  }).catch(function(e){console.warn('[EXCEL] actualizarStatusContenedorExcel:',e.message);});
+}
+
+// ── Refrescar contenedores desde Excel ────────────────────────────
+function refrescarContenedoresExcel(){
+  if(!DB.catalogoDriveId||!DB.catalogoItemId) return Promise.resolve();
+  return gGet(urlWB('Contenedores')).then(function(data){
+    if(data&&data.values) parsear('Contenedores',data,null);
+    console.log('[EXCEL] Contenedores refrescados:',DB.contenedores.length);
+  }).catch(function(e){console.warn('[EXCEL] refrescarContenedores:',e.message);});
+}
+
+// ── Recargar catálogos desde Excel ────────────────────────────────
+function recargarCatalogos(){
+  render('<div class="loading"><div class="loading-icon">...</div>'+
+    '<div class="loading-txt">Actualizando desde Excel...</div></div>');
+  leerCatalogos().then(function(){
+    toast('Catálogos actualizados');
+    if(S.rol==='supervisor') showMenuSup();
+    else showMenuOp();
+  }).catch(function(){
+    toast('Error al actualizar');
+    if(S.rol==='supervisor') showMenuSup();
+    else showMenuOp();
+  });
+}
 function showHome(){
   S.step='home';
   var lista=S.rol==='supervisor'?DB.supervisores:DB.operadores;
@@ -867,7 +956,7 @@ function showMenuOp(){
       '<div class="grid2" style="margin-bottom:10px">'+
         '<div class="card-t" onclick="showCalendario()">'+
           '<div class="card-t-icon">📅</div><div class="card-t-lbl">CALENDARIO</div></div>'+
-        '<div class="card-t" onclick="showMenuOp()">'+
+        '<div class="card-t" onclick="recargarCatalogos()">'+
           '<div class="card-t-icon">🔄</div><div class="card-t-lbl">ACTUALIZAR</div></div>'+
       '</div>';
     if(!misAsigs.length){
@@ -1069,14 +1158,44 @@ function confAsignar(){
   if(!_asigPedido){toast('Selecciona el pedido');return;}
   if(!_asigTipo){toast('Selecciona el tipo');return;}
   if(!_asigOp){toast('Selecciona el operario');return;}
-  render('<div class="loading"><div class="loading-icon">⏳</div>'+
-    '<div class="loading-txt">Guardando asignación...</div></div>');
-  escribirAsignacion(_asigPedido,_asigTipo,_asigOp).then(function(){
-    toast('✓ Asignado: '+_asigOp+' → '+_asigPedido+' ('+_asigTipo+')');
+  render('<div class="loading"><div class="loading-icon">...</div>'+
+    '<div class="loading-txt">Verificando asignaciones...</div></div>');
+  escribirAsignacion(_asigPedido,_asigTipo,_asigOp).then(function(res){
+    if(res&&res._duplicado){
+      var ex=res.asignacion;
+      // Mostrar opciones: cancelar o reasignar
+      render(
+        '<div class="badge badge-sup">Asignacion existente</div>'+
+        '<div class="alert-w" style="margin-bottom:12px">'+
+          'Ya existe una asignacion activa para '+_asigPedido+' ('+_asigTipo+').<br>'+
+          'Operario actual: <strong>'+(ex.Operario||'Sin asignar')+'</strong><br>'+
+          'Status: <strong>'+(ex.Status||'')+'</strong>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:8px">'+
+          '<button class="btn btn-warn btn-big" onclick="reasignarExistente()">Reasignar a '+_asigOp+'</button>'+
+          '<button class="btn btn-sec btn-big" onclick="showAsignarSup()">Cancelar</button>'+
+        '</div>'
+      );
+      window._asigExistente=ex;
+    } else {
+      toast('Asignado: '+_asigOp+' -> '+_asigPedido+' ('+_asigTipo+')');
+      showMenuSup();
+    }
+  }).catch(function(e){
+    toast('Error: '+e.message.slice(0,50));
     showMenuSup();
-  }).catch(function(){
-    toast('Error al guardar asignación');showMenuSup();
   });
+}
+function reasignarExistente(){
+  var ex=window._asigExistente;
+  if(!ex||!ex.ID) return;
+  var t=ahora();
+  gPatch(urlLista(DB.listIds.asignaciones)+'/items/'+ex.ID,{
+    fields:{Operario:_asigOp,Supervisor:S.operario,FechaAsignacion:t.fecha,Status:'Activo'}
+  }).then(function(){
+    toast('Reasignado: '+_asigOp+' -> '+_asigPedido);
+    showMenuSup();
+  }).catch(function(e){toast('Error reasignando: '+e.message.slice(0,50));showMenuSup();});
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1095,6 +1214,13 @@ function iniciarFlujo(pedido,tipo){
 // ═══════════════════════════════════════════════════════════════════
 function showSeleccionarContenedor(){
   S.step='sel-cont';
+  // Refrescar contenedores desde Excel para reflejar estados reales
+  // (no confiar en memoria que puede estar desactualizada)
+  refrescarContenedoresExcel().finally(function(){
+    _renderSeleccionarContenedor();
+  });
+}
+function _renderSeleccionarContenedor(){
   var contsPend=DB.contenedores.filter(function(c){
     return normStr(c.pedido)===normStr(S.pedido)&&
            normStr(c.status)!=='RECIBIDO';
@@ -1593,7 +1719,11 @@ function confSalida(){
   var nov=document.getElementById('ev-nov').value.trim();
   var pers=parseInt(document.getElementById('ev-pers').value)||0;
   escribirEvento('SALIDA',hora);
-  // Mostrar resumen + opción cerrar pedido
+  // Escribir status Recibido en Excel (fuente de verdad)
+  actualizarStatusContenedorExcel(S.pedido,S.contenedor,'Recibido')
+    .then(function(){
+      console.log('[EXCEL] Contenedor marcado Recibido en Excel');
+    });
   showResumenContenedor(nov,pers);
 }
 
@@ -1786,6 +1916,10 @@ function showPantallaLogin(){
 // ═══════════════════════════════════════════════════════════════════
 window.S=S;window.DB=DB;
 window.goHome=goHome;
+window.reasignarExistente=reasignarExistente;
+window.recargarCatalogos=recargarCatalogos;
+window.actualizarStatusContenedorExcel=actualizarStatusContenedorExcel;
+window.refrescarContenedoresExcel=refrescarContenedoresExcel;
 window.showCorreccion=showCorreccion;
 window.renderCorreccion=renderCorreccion;
 window.iniciarCorreccion=iniciarCorreccion;
