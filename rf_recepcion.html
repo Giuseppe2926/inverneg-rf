@@ -852,46 +852,51 @@ function htmlPendiente(sku){
 function actualizarStatusContenedorExcel(pedido, contenedor, nuevoStatus){
   if(!DB.catalogoDriveId||!DB.catalogoItemId) return Promise.resolve();
 
-  // Paso 1: buscar fila del contenedor en DB (índice base-0 de datos)
+  // Paso 1: fila del contenedor en DB.contenedores (base-0 de datos → fila Excel base-1)
   var idx=DB.contenedores.findIndex(function(c){
     return normStr(c.pedido)===normStr(pedido)&&normStr(c.contenedor)===normStr(contenedor);
   });
-  if(idx<0){
-    console.warn('[PATCH-CONT] Contenedor no encontrado en DB:',pedido,contenedor);
-    return Promise.resolve();
-  }
-  var rowExcel=idx+2; // fila Excel: +1 por encabezado, +1 por base-1
+  if(idx<0){console.warn('[PATCH-CONT] Contenedor no encontrado en DB:',pedido,contenedor);return Promise.resolve();}
+  var rowExcel=idx+2; // +1 encabezado + 1 base-1
 
-  // Paso 2: leer encabezado con range(address='A1:Z1') — más compatible que rows/itemAt
-  // Esto devuelve la fila 1 completa incluyendo columnas vacías
-  var urlHdr='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
-    '/items/'+DB.catalogoItemId+
-    "/workbook/worksheets('Contenedores')/range(address='A1:Z1')";
+  // Paso 2: leer usedRange de la hoja Contenedores para obtener encabezado FÍSICO
+  // usedRange cubre todo el rango incluyendo columnas vacías → índice = columna física - 1
+  var urlUR='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
+    '/items/'+DB.catalogoItemId+"/workbook/worksheets('Contenedores')/usedRange";
 
-  return gGet(urlHdr).then(function(hdrData){
-    var hdrs=hdrData.values&&hdrData.values[0]?hdrData.values[0]:[];
-    console.log('[PATCH-CONT] Encabezado ('+hdrs.length+' cols):',
-      hdrs.map(function(v,i){return i+'="'+(v||'')+'"]';}).join(' | '));
+  return gGet(urlUR).then(function(d){
+    if(!d.values||!d.values[0]){console.error('[PATCH-CONT] Sin encabezado');return;}
+    var hdr=d.values[0]; // primera fila del usedRange = encabezado
+    console.log('[PATCH-CONT] Encabezado ('+hdr.length+' cols):',
+      hdr.map(function(v,i){return i+'="'+(v||'')+'"]';}).join(' | '));
 
-    var colStatIdx=-1;
-    hdrs.forEach(function(v,i){
-      var n=(v||'').toString().trim().toLowerCase();
-      if(n==='status'||n==='estado') colStatIdx=i;
+    // Buscar columna "Status" en el encabezado
+    var colIdx=-1;
+    hdr.forEach(function(v,i){
+      if((v||'').toString().trim().toLowerCase()==='status') colIdx=i;
     });
+    if(colIdx<0){console.error('[PATCH-CONT] Columna Status no encontrada. Encabezado:',hdr);return;}
 
-    // Columna física = índice base-0 + 1 (Graph API usa base-1 para cell())
-    var colStat=colStatIdx>=0?colStatIdx+1:6; // fallback col F si no se encuentra
-    var colLetra=colStat<=26?String.fromCharCode(64+colStat):'col'+colStat;
+    // Columna física Excel = colIdx + 1 (el usedRange incluye vacías → índice directo)
+    // PERO usedRange empieza en la primera columna con datos, que puede no ser A.
+    // Para garantizar, usamos el address del usedRange para saber desde dónde empieza.
+    var startCol=1; // por defecto A=1
+    if(d.address){
+      // d.address ejemplo: "Contenedores!A1:H10" → startCol=1 (A)
+      var m2=d.address.match(/!([A-Z]+)\d/);
+      if(m2){
+        var colStr=m2[1];
+        startCol=colStr.split('').reduce(function(acc,c){return acc*26+(c.charCodeAt(0)-64);},0);
+      }
+    }
+    var colFisica=startCol+colIdx; // columna física base-1 para cell()
+    var colLetra=colFisica<=26?String.fromCharCode(64+colFisica):'col'+colFisica;
+    console.log('[PATCH-CONT] Destino real: '+colLetra+rowExcel+' (colFisica='+colFisica+',idx='+colIdx+',start='+startCol+') Valor="'+nuevoStatus+'"');
 
-    console.log('[PATCH-CONT] Fila='+rowExcel+' ColStatus='+colStat+'('+colLetra+')'+
-      ' Destino='+colLetra+rowExcel+' Valor="'+nuevoStatus+'"'+
-      (colStatIdx<0?' ADVERTENCIA:Status no encontrado en encabezado,usando fallback':''));
-
-    // Paso 3: PATCH sobre la celda
+    // Paso 3: PATCH sobre la celda correcta
     var urlCell='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
       '/items/'+DB.catalogoItemId+
-      "/workbook/worksheets('Contenedores')/cell(row="+rowExcel+",column="+colStat+")";
-
+      "/workbook/worksheets('Contenedores')/cell(row="+rowExcel+",column="+colFisica+")";
     return getToken().then(function(r){
       return fetch(urlCell,{method:'PATCH',
         headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
@@ -907,31 +912,10 @@ function actualizarStatusContenedorExcel(pedido, contenedor, nuevoStatus){
       }
     });
   }).catch(function(e){
-    console.error('[PATCH-CONT] Error leyendo encabezado:',e.message);
-    // Intentar con índice de window._iC_stat como último recurso
-    var colFallback=(window._iC_stat>=0?window._iC_stat+1:6);
-    console.warn('[PATCH-CONT] Intentando fallback con col='+colFallback);
-    var urlFallback='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
-      '/items/'+DB.catalogoItemId+
-      "/workbook/worksheets('Contenedores')/cell(row="+rowExcel+",column="+colFallback+")";
-    return getToken().then(function(r){
-      return fetch(urlFallback,{method:'PATCH',
-        headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
-        body:JSON.stringify({values:[[nuevoStatus]]})});
-    }).then(function(res){
-      if(res.ok){
-        DB.contenedores[idx].status=nuevoStatus;
-        console.log('[PATCH-CONT] Fallback OK col='+colFallback);
-      } else {
-        return res.text().then(function(t){
-          console.error('[PATCH-CONT] Fallback error:',t.slice(0,100));
-        });
-      }
-    });
+    console.error('[PATCH-CONT] Error usedRange:',e.message);
   });
 }
 
-// ── Refrescar contenedores desde Excel ────────────────────────────
 function refrescarContenedoresExcel(){
   if(!DB.catalogoDriveId||!DB.catalogoItemId){
     console.warn('[CONT] Sin driveId/itemId — no se puede refrescar Excel');
@@ -1668,7 +1652,7 @@ function showEscaneo(){
   }
 
   html+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
-    '<button class="btn btn-sec btn-big" onclick="showEventoCierre()">🔒 CERRAR CONTENEDOR</button>'+
+    '<button class="btn btn-ok btn-big" onclick="finalizarRecepcionMercaderia()">✓ FINALIZAR RECEPCIÓN</button>'+
     '<button class="btn btn-sec" style="font-size:12px" onclick="showCorreccion()">Corregir registro anterior</button>'+
     '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">💾 Guardar y salir</button>'+
   '</div>';
@@ -1912,9 +1896,33 @@ function confCorreccion(){
 }
 
 // ── Escribir/actualizar horas del contenedor en LHoras ────────────
+// Buscar ítem en LHoras sin $filter en Title (Title no es filtrable en Graph SP)
+// Trae todos y filtra en JS por Pedido + Contenedor
+function buscarItemHorasSP(pedido, contenedor){
+  if(!DB.listIds.horas){console.warn('[LHORAS] Lista horas no disponible');return Promise.resolve(null);}
+  return gGet(urlLista(DB.listIds.horas)+'/items?$expand=fields&$top=500')
+    .then(function(d){
+      var items=d.value||[];
+      console.log('[LHORAS] Items en lista:',items.length,'Buscando Pedido="'+pedido+'" Cont="'+contenedor+'"');
+      var found=items.find(function(i){
+        var f=i.fields||{};
+        return normStr(f.Pedido||'')===normStr(pedido)&&
+               normStr(f.Contenedor||'')===normStr(contenedor);
+      });
+      if(found){
+        console.log('[LHORAS] Encontrado: id='+found.id+' Llegada="'+(found.fields.HoraLlegada||'')+'"');
+        var f=found.fields;
+        f._spId=found.id;
+        return f;
+      }
+      console.log('[LHORAS] No existe aún para este contenedor');
+      return null;
+    })
+    .catch(function(e){console.error('[LHORAS] buscar error:',e.message);return null;});
+}
+
 function escribirHoras(datos){
-  // datos: {llegada,apertura,cierre,salida,personas,novedades,estado}
-  if(!DB.listIds.horas) return Promise.resolve();
+  if(!DB.listIds.horas){console.warn('[LHORAS] Lista horas no disponible');return Promise.resolve();}
   var t=ahora();
   var titulo=S.pedido+'-'+S.contenedor;
   var fields={
@@ -1932,45 +1940,27 @@ function escribirHoras(datos){
     Estado:       datos.estado||'En Proceso',
     Timestamp:    t.ts,
   };
-  // Title no se puede filtrar en SP via $filter — buscar en JS
-  // Traer items del pedido y filtrar por Contenedor en JS
-  return buscarItemHorasSP(S.pedido,S.contenedor).then(function(existing){
-    if(existing){
-      console.log('[LHoras] PATCH existente id='+existing._spId);
+  return buscarItemHorasSP(S.pedido, S.contenedor).then(function(existing){
+    if(existing&&existing._spId){
+      console.log('[LHORAS] PATCH existente id='+existing._spId+' titulo='+titulo);
       return gPatch(urlLista(DB.listIds.horas)+'/items/'+existing._spId,{fields:fields})
-        .then(function(){console.log('[LHoras] PATCH OK:',titulo);});
+        .then(function(r){
+          console.log('[LHORAS] PATCH OK id='+existing._spId+' Pedido='+S.pedido+' Cont='+S.contenedor);
+          return r;
+        });
     } else {
+      console.log('[LHORAS] POST nuevo titulo='+titulo);
       return gPost(urlLista(DB.listIds.horas)+'/items',{fields:fields})
-        .then(function(){console.log('[LHoras] POST OK:',titulo);});
+        .then(function(r){
+          console.log('[LHORAS] POST OK id='+(r&&r.id)+' Pedido='+S.pedido+' Cont='+S.contenedor);
+          return r;
+        });
     }
-  }).catch(function(e){console.error('[LHoras] Error:',e.message);});
+  }).catch(function(e){console.error('[LHORAS] escribirHoras error:',e.message);});
 }
 
-// Buscar ítem en LHoras por Pedido+Contenedor (sin $filter en Title)
-function buscarItemHorasSP(pedido,contenedor){
-  if(!DB.listIds.horas) return Promise.resolve(null);
-  // Traer hasta 500 ítems y filtrar en JS (LHoras tiene pocos registros)
-  return gGet(urlLista(DB.listIds.horas)+'/items?$expand=fields&$top=500')
-    .then(function(d){
-      var items=d.value||[];
-      var found=items.find(function(i){
-        var f=i.fields||{};
-        return normStr(f.Pedido||'')===normStr(pedido)&&
-               normStr(f.Contenedor||'')===normStr(contenedor);
-      });
-      if(found){
-        found.fields._spId=found.id;
-        return found.fields;
-      }
-      return null;
-    })
-    .catch(function(e){console.error('[LHoras] buscar error:',e.message);return null;});
-}
-
-// Cargar horas existentes de un contenedor desde LHoras
-function cargarHorasContenedor(pedido,contenedor){
-  if(!DB.listIds.horas) return Promise.resolve(null);
-  return buscarItemHorasSP(pedido,contenedor);
+function cargarHorasContenedor(pedido, contenedor){
+  return buscarItemHorasSP(pedido, contenedor);
 }
 
 // ── Pantalla de opciones al seleccionar contenedor ────────────────
@@ -2078,6 +2068,32 @@ function confRegistrarHoras(){
     toast('Error guardando horas: '+e.message.slice(0,40));
     showOpcionesContenedor();
   });
+}
+
+// ── Finalizar recepción de mercadería (sin horas) ─────────────────
+function finalizarRecepcionMercaderia(){
+  var nSkus=S.skusRegistrados.length;
+  var nDan=S.skusRegistrados.filter(function(r){return r.estado==='DAÑADO';}).length;
+  var h='<div class="badge badge-ok">✓ MERCADERÍA REGISTRADA</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin:10px 0">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
+        '<span style="font-size:12px;color:var(--mut)">Contenedor</span>'+
+        '<span style="font-size:13px;font-weight:700">'+S.contenedor+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
+        '<span style="font-size:12px;color:var(--mut)">SKUs registrados</span>'+
+        '<span style="font-size:13px;font-weight:700">'+nSkus+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between">'+
+        '<span style="font-size:12px;color:var(--mut)">Dañados</span>'+
+        '<span style="font-size:13px;font-weight:700;color:'+(nDan>0?'var(--dan)':'var(--ok)')+'">'+nDan+'</span></div>'+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--mut);margin-bottom:12px">'+
+      'Para registrar horas de este contenedor usa la opción "Registrar Horas" desde el menú del contenedor.</div>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+      '<button class="btn btn-rec btn-big" onclick="nuevoContenedorMismoPedido()">🔄 Siguiente contenedor</button>'+
+      '<button class="btn btn-sec btn-big" onclick="showOpcionesContenedor()">← Volver al contenedor</button>'+
+      '<button class="btn btn-sec btn-big" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">⌂ Menú principal</button>'+
+    '</div>';
+  render(h);
 }
 function guardarYSalir(){
   toast('Sesión guardada. Puedes retomar desde Mis Pedidos.');
@@ -2375,6 +2391,8 @@ window.confNuevoContenedor=confNuevoContenedor;
 window.confPerchadoInicio=confPerchadoInicio;
 window.confPerchadoFin=confPerchadoFin;
 window.guardarYSalir=guardarYSalir;
+window.finalizarRecepcionMercaderia=finalizarRecepcionMercaderia;
+window.buscarItemHorasSP=buscarItemHorasSP;
 window.cerrarPedido=cerrarPedido;
 window.nuevoContenedorMismoPedido=nuevoContenedorMismoPedido;
 window.iniciarFlujo=iniciarFlujo;
