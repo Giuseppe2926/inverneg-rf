@@ -852,67 +852,118 @@ function htmlPendiente(sku){
 function actualizarStatusContenedorExcel(pedido, contenedor, nuevoStatus){
   if(!DB.catalogoDriveId||!DB.catalogoItemId) return Promise.resolve();
 
-  // Paso 1: fila del contenedor en DB.contenedores (base-0 de datos → fila Excel base-1)
-  var idx=DB.contenedores.findIndex(function(c){
-    return normStr(c.pedido)===normStr(pedido)&&normStr(c.contenedor)===normStr(contenedor);
-  });
-  if(idx<0){console.warn('[PATCH-CONT] Contenedor no encontrado en DB:',pedido,contenedor);return Promise.resolve();}
-  var rowExcel=idx+2; // +1 encabezado + 1 base-1
+  // Estrategia: leer el usedRange completo de la hoja,
+  // buscar la fila del contenedor Y la columna Status dentro de los mismos datos,
+  // y usar el address devuelto por Graph para calcular la celda exacta.
+  // Esto evita cualquier desincronización entre DB y el Excel real.
 
-  // Paso 2: leer usedRange de la hoja Contenedores para obtener encabezado FÍSICO
-  // usedRange cubre todo el rango incluyendo columnas vacías → índice = columna física - 1
   var urlUR='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
     '/items/'+DB.catalogoItemId+"/workbook/worksheets('Contenedores')/usedRange";
 
   return gGet(urlUR).then(function(d){
-    if(!d.values||!d.values[0]){console.error('[PATCH-CONT] Sin encabezado');return;}
-    var hdr=d.values[0]; // primera fila del usedRange = encabezado
-    console.log('[PATCH-CONT] Encabezado ('+hdr.length+' cols):',
-      hdr.map(function(v,i){return i+'="'+(v||'')+'"]';}).join(' | '));
+    if(!d.values||!d.values.length){
+      console.error('[PATCH-CONT] usedRange vacío');return;
+    }
 
-    // Buscar columna "Status" en el encabezado
-    var colIdx=-1;
-    hdr.forEach(function(v,i){
-      if((v||'').toString().trim().toLowerCase()==='status') colIdx=i;
-    });
-    if(colIdx<0){console.error('[PATCH-CONT] Columna Status no encontrada. Encabezado:',hdr);return;}
-
-    // Columna física Excel = colIdx + 1 (el usedRange incluye vacías → índice directo)
-    // PERO usedRange empieza en la primera columna con datos, que puede no ser A.
-    // Para garantizar, usamos el address del usedRange para saber desde dónde empieza.
-    var startCol=1; // por defecto A=1
+    // Obtener la letra de columna inicial del rango (normalmente A)
+    // d.address ejemplo: "Contenedores!A1:H10"
+    var startColLetra='A';
     if(d.address){
-      // d.address ejemplo: "Contenedores!A1:H10" → startCol=1 (A)
-      var m2=d.address.match(/!([A-Z]+)\d/);
-      if(m2){
-        var colStr=m2[1];
-        startCol=colStr.split('').reduce(function(acc,c){return acc*26+(c.charCodeAt(0)-64);},0);
+      var mAddr=d.address.match(/!([A-Z]+)\d/);
+      if(mAddr) startColLetra=mAddr[1];
+    }
+    // Convertir letra a número base-1
+    var startColNum=startColLetra.split('').reduce(function(acc,c){
+      return acc*26+(c.charCodeAt(0)-64);
+    },0);
+
+    var values=d.values;
+    var hdr=values[0]; // fila 0 = encabezado
+
+    // Log completo del encabezado para diagnóstico
+    console.log('[PATCH-CONT] address="'+d.address+'" startCol='+startColLetra+'('+startColNum+') filas='+values.length+' cols='+hdr.length);
+    console.log('[PATCH-CONT] Encabezado:',hdr.map(function(v,i){return i+'="'+(v||'')+'"]';}).join(' | '));
+
+    // Encontrar columna Status en encabezado
+    var colStatIdx=-1;
+    hdr.forEach(function(v,i){
+      if((v||'').toString().trim().toLowerCase()==='status') colStatIdx=i;
+    });
+    if(colStatIdx<0){
+      console.error('[PATCH-CONT] Columna Status no encontrada en encabezado');
+      return;
+    }
+
+    // Encontrar fila del contenedor buscando en los datos (no en DB.contenedores)
+    // Columna 0 del array = Pedido, buscar también por Contenedor
+    var contColIdx=-1;
+    hdr.forEach(function(v,i){
+      var n=(v||'').toString().trim().toLowerCase();
+      if(n==='contenedor'||n==='#contenedor') contColIdx=i;
+    });
+    var pedColIdx=0; // Pedido siempre es col 0
+
+    var filaDataIdx=-1; // índice base-0 dentro de values (0=encabezado, 1=primera fila datos)
+    for(var ri=1;ri<values.length;ri++){
+      var row=values[ri];
+      var pedVal=(row[pedColIdx]||'').toString().trim();
+      var contVal=contColIdx>=0?(row[contColIdx]||'').toString().trim():'';
+      if(normStr(pedVal)===normStr(pedido)&&normStr(contVal)===normStr(contenedor)){
+        filaDataIdx=ri;
+        break;
       }
     }
-    var colFisica=startCol+colIdx; // columna física base-1 para cell()
-    var colLetra=colFisica<=26?String.fromCharCode(64+colFisica):'col'+colFisica;
-    console.log('[PATCH-CONT] Destino real: '+colLetra+rowExcel+' (colFisica='+colFisica+',idx='+colIdx+',start='+startCol+') Valor="'+nuevoStatus+'"');
+    if(filaDataIdx<0){
+      console.error('[PATCH-CONT] Contenedor no encontrado en usedRange. Pedido="'+pedido+'" Cont="'+contenedor+'"');
+      // Mostrar primeras filas para diagnóstico
+      values.slice(0,5).forEach(function(r,i){
+        console.log('[PATCH-CONT] Fila '+i+':',r.slice(0,4).join(' | '));
+      });
+      return;
+    }
 
-    // Paso 3: PATCH sobre la celda correcta
-    var urlCell='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
+    // Fila Excel real = filaDataIdx + startRow del address
+    var startRowNum=1;
+    if(d.address){
+      var mRow=d.address.match(/!([A-Z]+)(\d+)/);
+      if(mRow) startRowNum=parseInt(mRow[2]);
+    }
+    var rowExcelReal=startRowNum+filaDataIdx; // fila real en Excel
+
+    // Columna Excel real = startColNum + colStatIdx
+    var colExcelReal=startColNum+colStatIdx;
+    var colLetraReal=colExcelReal<=26?String.fromCharCode(64+colExcelReal):'col'+colExcelReal;
+    var celdaDestino=colLetraReal+rowExcelReal;
+
+    console.log('[PATCH-CONT] Fila encontrada en usedRange: idx='+filaDataIdx+' rowExcel='+rowExcelReal);
+    console.log('[PATCH-CONT] ColStatus: idx='+colStatIdx+' colExcel='+colExcelReal+'('+colLetraReal+')');
+    console.log('[PATCH-CONT] >>> DESTINO: '+celdaDestino+' | VALOR: "'+nuevoStatus+'"');
+
+    // PATCH usando range(address='F11') — dirección exacta, imposible equivocarse
+    var urlPatch='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
       '/items/'+DB.catalogoItemId+
-      "/workbook/worksheets('Contenedores')/cell(row="+rowExcel+",column="+colFisica+")";
+      "/workbook/worksheets('Contenedores')/range(address='"+celdaDestino+"')";
+    var body={values:[[nuevoStatus]]};
+
+    console.log('[PATCH-CONT] URL:',urlPatch);
+    console.log('[PATCH-CONT] Body:',JSON.stringify(body));
+
     return getToken().then(function(r){
-      return fetch(urlCell,{method:'PATCH',
+      return fetch(urlPatch,{method:'PATCH',
         headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
-        body:JSON.stringify({values:[[nuevoStatus]]})});
+        body:JSON.stringify(body)});
     }).then(function(res){
-      if(res.ok){
-        DB.contenedores[idx].status=nuevoStatus;
-        console.log('[PATCH-CONT] OK — '+colLetra+rowExcel+' = "'+nuevoStatus+'"');
-      } else {
-        return res.text().then(function(t){
-          console.error('[PATCH-CONT] Error HTTP '+res.status+':',t.slice(0,200));
-        });
-      }
+      return res.text().then(function(txt){
+        if(res.ok){
+          DB.contenedores[filaDataIdx-1]&&(DB.contenedores[filaDataIdx-1].status=nuevoStatus);
+          console.log('[PATCH-CONT] RESPUESTA OK ('+res.status+'). Celda '+celdaDestino+' = "'+nuevoStatus+'"');
+        } else {
+          console.error('[PATCH-CONT] RESPUESTA ERROR '+res.status+':',txt.slice(0,300));
+        }
+      });
     });
   }).catch(function(e){
-    console.error('[PATCH-CONT] Error usedRange:',e.message);
+    console.error('[PATCH-CONT] Error general:',e.message);
   });
 }
 
