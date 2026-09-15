@@ -209,6 +209,8 @@ var CFG={
     recepciones: 'RF_PRecepciones_LRecepciones',
     eventos:     'RF_PRecepciones_LEventos',
     asignaciones:'RF_PRecepciones_LAsignaciones',
+    horas:'RF_PRecepciones_LHoras',
+    horas:       'RF_PRecepciones_LHoras',
   },
 };
 var GRAPH='https://graph.microsoft.com/v1.0';
@@ -221,7 +223,7 @@ var DB={
   pedidos:[],contenedores:[],
   compra:[],importaciones:[],
   codigosBarra:[],
-  listIds:{recepciones:null,eventos:null,asignaciones:null},
+  listIds:{recepciones:null,eventos:null,asignaciones:null,horas:null},
   catalogoDriveId:null,catalogoItemId:null,
 };
 
@@ -685,8 +687,8 @@ function escribirSKU(reg){
     Contenedor:     S.contenedor,
     Sello:          S.sello||'',
     Pallets:        Number(S.pallets)||0,
-    H_Llegada:      S.eventos.llegada||'',
-    H_Apertura:     S.eventos.apertura||'',
+    H_Llegada:      '',
+    H_Apertura:     '',
     H_Cierre:       '',
     H_Salida:       '',
     LPN:            '',
@@ -849,33 +851,75 @@ function htmlPendiente(sku){
 // ── Actualizar status de contenedor en Excel ──────────────────────
 function actualizarStatusContenedorExcel(pedido, contenedor, nuevoStatus){
   if(!DB.catalogoDriveId||!DB.catalogoItemId) return Promise.resolve();
-  // Buscar índice de fila en DB.contenedores (base 0 de datos = fila 2 en Excel)
+
+  // Paso 1: buscar fila del contenedor en DB (índice base-0 de datos)
   var idx=DB.contenedores.findIndex(function(c){
     return normStr(c.pedido)===normStr(pedido)&&normStr(c.contenedor)===normStr(contenedor);
   });
   if(idx<0){
-    console.warn('[EXCEL] Contenedor no encontrado para actualizar:',pedido,contenedor);
+    console.warn('[PATCH-CONT] Contenedor no encontrado en DB:',pedido,contenedor);
     return Promise.resolve();
   }
-  // Detectar índice de columna Status desde el encabezado real
-  // En la última carga parsear() guardó iC_stat en window._iC_stat
-  var colStat=(window._iC_stat>=0?window._iC_stat:5)+1; // +1 porque Graph API es base-1
-  var rowExcel=idx+2; // +1 encabezado fila 1, +1 base-1
-  var url='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
+  var rowExcel=idx+2; // fila Excel: +1 por encabezado, +1 por base-1
+
+  // Paso 2: leer fila 1 (encabezado) de la hoja para obtener columna física real
+  // El usedRange omite columnas vacías → el índice del array != columna física
+  // Se necesita leer el encabezado de la hoja Contenedores para mapear nombre→columna física
+  var urlHdr='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
     '/items/'+DB.catalogoItemId+
-    "/workbook/worksheets('Contenedores')/cell(row="+rowExcel+",column="+colStat+")";
-  return getToken().then(function(r){
-    return fetch(url,{method:'PATCH',
-      headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({values:[[nuevoStatus]]})});
-  }).then(function(res){
-    if(res.ok){
-      DB.contenedores[idx].status=nuevoStatus; // actualizar memoria
-      console.log('[EXCEL] Status contenedor '+contenedor+' -> '+nuevoStatus);
-    } else {
-      res.text().then(function(t){console.warn('[EXCEL] PATCH contenedor error:',t.slice(0,100));});
+    "/workbook/worksheets('Contenedores')/rows/itemAt(index=0)/range";
+
+  return gGet(urlHdr).then(function(hdrData){
+    // hdrData.values es [[col1,col2,...]] — incluye TODAS las columnas físicas incluso vacías
+    var hdrs=hdrData.values&&hdrData.values[0]?hdrData.values[0]:[];
+    console.log('[PATCH-CONT] Encabezado fila 1 ('+hdrs.length+' cols):',
+      hdrs.map(function(v,i){return i+'="'+(v||'')+'"]';}).join(' '));
+
+    // Buscar columna Status y FechaRecepcion por nombre (base-0)
+    var colStatIdx=-1, colFrecIdx=-1;
+    hdrs.forEach(function(v,i){
+      var n=(v||'').toString().trim().toLowerCase();
+      if(n==='status'||n==='estado') colStatIdx=i;
+      if(n.indexOf('fecharec')>-1||n==='fecharecepcion') colFrecIdx=i;
+    });
+
+    // Columna física Excel = índice base-0 + 1 (base-1)
+    var colStat=colStatIdx>=0?colStatIdx+1:6; // fallback: F (columna 6)
+    var colFrec=colFrecIdx>=0?colFrecIdx+1:7; // fallback: G (columna 7)
+
+    console.log('[PATCH-CONT] Fila='+rowExcel+
+      ' ColStatus='+colStat+'('+String.fromCharCode(64+colStat)+')'+
+      ' ColFechaRec='+colFrec+'('+String.fromCharCode(64+colFrec)+')'+
+      ' Destino='+String.fromCharCode(64+colStat)+rowExcel+
+      ' Valor='+nuevoStatus);
+
+    if(colStatIdx<0){
+      console.error('[PATCH-CONT] Columna Status no encontrada en encabezado. Abortando PATCH.');
+      return Promise.resolve();
     }
-  }).catch(function(e){console.warn('[EXCEL] actualizarStatusContenedorExcel:',e.message);});
+
+    // Paso 3: PATCH sobre la celda correcta
+    var urlCell='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
+      '/items/'+DB.catalogoItemId+
+      "/workbook/worksheets('Contenedores')/cell(row="+rowExcel+",column="+colStat+")";
+
+    return getToken().then(function(r){
+      return fetch(urlCell,{method:'PATCH',
+        headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
+        body:JSON.stringify({values:[[nuevoStatus]]})});
+    }).then(function(res){
+      if(res.ok){
+        DB.contenedores[idx].status=nuevoStatus;
+        console.log('[PATCH-CONT] OK — '+String.fromCharCode(64+colStat)+rowExcel+' = '+nuevoStatus);
+      } else {
+        res.text().then(function(t){
+          console.error('[PATCH-CONT] Error HTTP '+res.status+':',t.slice(0,150));
+        });
+      }
+    });
+  }).catch(function(e){
+    console.error('[PATCH-CONT] Error leyendo encabezado:',e.message);
+  });
 }
 
 // ── Refrescar contenedores desde Excel ────────────────────────────
@@ -1495,10 +1539,8 @@ function selContRow(cont,sello,pallets){
           sku:f.CodProducto||'',desc:f.Nombre||'',
           cantidad:Number(f.Cantidad)||0,estado:f.Estado||'OK',novedad:f.Novedades||'',
         };});
-        // Navegar según eventos parciales (retomar donde quedó)
-        if(S.eventos.cierre)       showEventoSalida();
-        else if(S.eventos.llegada) showEscaneo();
-        else                       showEventoLlegada();
+        // Navegar: siempre mostrar opciones (Horas o Mercadería)
+        showOpcionesContenedor();
       });
     }).catch(function(){showEventoLlegada();});
   }
@@ -1859,6 +1901,163 @@ function confCorreccion(){
     showEscaneo();
   });
 }
+
+// ── Escribir/actualizar horas del contenedor en LHoras ────────────
+function escribirHoras(datos){
+  // datos: {llegada,apertura,cierre,salida,personas,novedades,estado}
+  if(!DB.listIds.horas) return Promise.resolve();
+  var t=ahora();
+  var titulo=S.pedido+'-'+S.contenedor;
+  var fields={
+    Title:        titulo,
+    Pedido:       S.pedido,
+    Contenedor:   S.contenedor,
+    Operario:     S.operario,
+    HoraLlegada:  datos.llegada||'',
+    HoraApertura: datos.apertura||'',
+    HoraCierre:   datos.cierre||'',
+    HoraSalida:   datos.salida||'',
+    FechaRegistro:t.fecha,
+    Personas:     Number(datos.personas)||0,
+    Novedades:    datos.novedades||'',
+    Estado:       datos.estado||'En Proceso',
+    Timestamp:    t.ts,
+  };
+  // Buscar si ya existe un registro para este contenedor (upsert)
+  return gGet(urlLista(DB.listIds.horas)+
+    "/items?$filter=fields/Title eq '"+titulo+"'&$expand=fields&$top=1")
+    .then(function(d){
+      if(d.value&&d.value.length>0){
+        var spId=d.value[0].id;
+        return gPatch(urlLista(DB.listIds.horas)+'/items/'+spId,{fields:fields})
+          .then(function(){console.log('[LHoras] PATCH OK:',titulo);});
+      } else {
+        return gPost(urlLista(DB.listIds.horas)+'/items',{fields:fields})
+          .then(function(){console.log('[LHoras] POST OK:',titulo);});
+      }
+    })
+    .catch(function(e){console.error('[LHoras] Error:',e.message);});
+}
+
+// Cargar horas existentes de un contenedor desde LHoras
+function cargarHorasContenedor(pedido,contenedor){
+  if(!DB.listIds.horas) return Promise.resolve(null);
+  var titulo=pedido+'-'+contenedor;
+  return gGet(urlLista(DB.listIds.horas)+
+    "/items?$filter=fields/Title eq '"+titulo+"'&$expand=fields&$top=1")
+    .then(function(d){
+      if(d.value&&d.value.length>0) return d.value[0].fields;
+      return null;
+    })
+    .catch(function(){return null;});
+}
+
+// ── Pantalla de opciones al seleccionar contenedor ────────────────
+function showOpcionesContenedor(){
+  S.step='opciones-cont';
+  var contExcel=DB.contenedores.find(function(c){
+    return normStr(c.pedido)===normStr(S.pedido)&&normStr(c.contenedor)===normStr(S.contenedor);
+  });
+  var statusExcel=contExcel?contExcel.status:'Pendiente';
+  var h=stepsBar(1,6)+
+    '<div class="badge badge-rec">'+S.contenedor+'</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
+      '<div style="font-size:11px;color:var(--mut)">Pedido: '+S.pedido+'</div>'+
+      '<div style="font-size:11px;color:var(--mut)">Pallets: '+S.pallets+
+        (S.sello?' · Sello: '+S.sello:'')+
+        ' · Status Excel: <span style="font-weight:700;color:var(--acc)">'+statusExcel+'</span></div>'+
+    '</div>'+
+    '<div class="lbl">¿qué deseas registrar?</div>'+
+    '<div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">'+
+      '<div class="card-item" onclick="showRegistrarHoras()">'+
+        '<div class="card-t-icon" style="font-size:22px;margin-bottom:4px">🕐</div>'+
+        '<div style="font-size:14px;font-weight:700">Registrar Horas</div>'+
+        '<div style="font-size:11px;color:var(--mut)">Llegada · Apertura · Cierre · Salida · Cuadrilla</div>'+
+      '</div>'+
+      '<div class="card-item" onclick="showEscaneo()">'+
+        '<div class="card-t-icon" style="font-size:22px;margin-bottom:4px">📦</div>'+
+        '<div style="font-size:14px;font-weight:700">Registrar Mercadería</div>'+
+        '<div style="font-size:11px;color:var(--mut)">Escanear SKUs · Cantidades · Estado</div>'+
+      '</div>'+
+    '</div>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showSeleccionarContenedor()">← Volver</button>';
+  render(h);
+}
+
+// ── Registrar Horas del contenedor ────────────────────────────────
+function showRegistrarHoras(){
+  S.step='reg-horas';
+  render('<div class="loading"><div class="loading-icon">...</div>'+
+    '<div class="loading-txt">Cargando horas...</div></div>');
+  cargarHorasContenedor(S.pedido,S.contenedor).then(function(existing){
+    var h=stepsBar(2,4)+
+      '<div class="badge badge-rec">🕐 HORAS — '+S.contenedor+'</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-bottom:10px">Pedido: '+S.pedido+'</div>'+
+      '<div class="grid2">'+
+        '<div><div class="lbl" style="margin-top:0">Llegada</div>'+
+          '<input class="inp inp-sm" id="h-lleg" type="time" value="'+(existing&&existing.HoraLlegada||'')+'"></div>'+
+        '<div><div class="lbl" style="margin-top:0">Apertura</div>'+
+          '<input class="inp inp-sm" id="h-aper" type="time" value="'+(existing&&existing.HoraApertura||'')+'"></div>'+
+      '</div>'+
+      '<div class="grid2" style="margin-top:6px">'+
+        '<div><div class="lbl" style="margin-top:0">Cierre</div>'+
+          '<input class="inp inp-sm" id="h-cier" type="time" value="'+(existing&&existing.HoraCierre||'')+'"></div>'+
+        '<div><div class="lbl" style="margin-top:0">Salida</div>'+
+          '<input class="inp inp-sm" id="h-sal" type="time" value="'+(existing&&existing.HoraSalida||'')+'"></div>'+
+      '</div>'+
+      '<div class="grid2" style="margin-top:6px">'+
+        '<div><div class="lbl" style="margin-top:0">Cuadrilla (personas)</div>'+
+          '<input class="inp inp-sm" id="h-pers" type="number" min="0" placeholder="0" value="'+(existing&&existing.Personas||'')+'"></div>'+
+        '<div><div class="lbl" style="margin-top:0">Estado</div>'+
+          '<select class="inp inp-sm" id="h-est">'+
+            '<option value="En Proceso"'+((!existing||existing.Estado==='En Proceso')?' selected':'')+'>En Proceso</option>'+
+            '<option value="Cerrado"'+(existing&&existing.Estado==='Cerrado'?' selected':'')+'>Cerrado</option>'+
+          '</select></div>'+
+      '</div>'+
+      '<div class="lbl" style="margin-top:6px">Novedades generales (opcional)</div>'+
+      '<textarea class="inp inp-sm" id="h-nov" rows="2" style="resize:none" '+
+        'placeholder="Observaciones del contenedor...">'+(existing&&existing.Novedades||'')+'</textarea>'+
+      '<div class="btn-row" style="margin-top:10px">'+
+        '<button class="btn btn-sec" onclick="showOpcionesContenedor()">← ATR</button>'+
+        '<button class="btn btn-ok btn-big" onclick="confRegistrarHoras()">✓ GUARDAR HORAS</button>'+
+      '</div>';
+    render(h);
+    // Sugerir hora actual para llegada si está vacía
+    setTimeout(function(){
+      var ll=document.getElementById('h-lleg');
+      if(ll&&!ll.value) ll.value=horaActual();
+    },100);
+  });
+}
+
+function confRegistrarHoras(){
+  var datos={
+    llegada:  document.getElementById('h-lleg').value,
+    apertura: document.getElementById('h-aper').value,
+    cierre:   document.getElementById('h-cier').value,
+    salida:   document.getElementById('h-sal').value,
+    personas: document.getElementById('h-pers').value,
+    novedades:document.getElementById('h-nov').value.trim(),
+    estado:   document.getElementById('h-est').value,
+  };
+  render('<div class="loading"><div class="loading-icon">...</div>'+
+    '<div class="loading-txt">Guardando horas...</div></div>');
+  escribirHoras(datos).then(function(){
+    // Si estado = Cerrado → actualizar Excel Status = Recibido
+    if(datos.estado==='Cerrado'){
+      return actualizarStatusContenedorExcel(S.pedido,S.contenedor,'Recibido').then(function(){
+        toast('Horas guardadas. Contenedor marcado Recibido.');
+        showOpcionesContenedor();
+      });
+    } else {
+      toast('Horas guardadas.');
+      showOpcionesContenedor();
+    }
+  }).catch(function(e){
+    toast('Error guardando horas: '+e.message.slice(0,40));
+    showOpcionesContenedor();
+  });
+}
 function guardarYSalir(){
   toast('Sesión guardada. Puedes retomar desde Mis Pedidos.');
   if(S.rol==='supervisor') showMenuSup();
@@ -2119,6 +2318,10 @@ window.S=S;window.DB=DB;
 window.goHome=goHome;
 window.showAnularAsignacion=showAnularAsignacion;
 window.showReopenarContenedor=showReopenarContenedor;
+window.showOpcionesContenedor=showOpcionesContenedor;
+window.showRegistrarHoras=showRegistrarHoras;
+window.confRegistrarHoras=confRegistrarHoras;
+window.escribirHoras=escribirHoras;
 window.confirmarReopenar=confirmarReopenar;
 window.confirmarAnularAsig=confirmarAnularAsig;
 window.reasignarExistente=reasignarExistente;
