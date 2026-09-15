@@ -759,10 +759,25 @@ function actualizarStatusAsignacion(pedido,tipo,nuevoStatus,nuevoOperario){
 }
 
 function cargarAsignacionesSP(){
-  if(!DB.listIds.asignaciones) return Promise.resolve([]);
+  if(!DB.listIds.asignaciones){
+    console.warn('[ASIG] Lista asignaciones no disponible');
+    return Promise.resolve([]);
+  }
   return gGet(urlLista(DB.listIds.asignaciones)+'/items?$expand=fields&$top=500')
-    .then(function(d){return(d.value||[]).map(function(i){return i.fields;});})
-    .catch(function(){return[];});
+    .then(function(d){
+      var items=(d.value||[]).map(function(i){return i.fields;});
+      console.log('[ASIG] Total ítems en SP:',items.length);
+      // Log primeros 10 para ver campos reales
+      items.slice(0,10).forEach(function(f,i){
+        console.log('[ASIG] Item '+i+': Pedido="'+(f.Pedido||f.Title||'?')+
+          '" TipoAsig="'+(f.TipoAsignacion||'?')+
+          '" Operario="'+(f.Operario||'?')+
+          '" Status="'+(f.Status||f.Status0||'?')+
+          '" Keys='+JSON.stringify(Object.keys(f).filter(function(k){return !k.startsWith('@');})));
+      });
+      return items;
+    })
+    .catch(function(e){console.error('[ASIG] Error:',e.message);return[];});
 }
 function cargarEventosSP(pedido){
   if(!DB.listIds.eventos) return Promise.resolve([]);
@@ -865,11 +880,25 @@ function actualizarStatusContenedorExcel(pedido, contenedor, nuevoStatus){
 
 // ── Refrescar contenedores desde Excel ────────────────────────────
 function refrescarContenedoresExcel(){
-  if(!DB.catalogoDriveId||!DB.catalogoItemId) return Promise.resolve();
+  if(!DB.catalogoDriveId||!DB.catalogoItemId){
+    console.warn('[CONT] Sin driveId/itemId — no se puede refrescar Excel');
+    return Promise.resolve();
+  }
+  console.log('[CONT] Refrescando hoja Contenedores desde Excel...');
   return gGet(urlWB('Contenedores')).then(function(data){
-    if(data&&data.values) parsear('Contenedores',data,null);
-    console.log('[EXCEL] Contenedores refrescados:',DB.contenedores.length);
-  }).catch(function(e){console.warn('[EXCEL] refrescarContenedores:',e.message);});
+    if(data&&data.values){
+      parsear('Contenedores',data,null);
+      console.log('[CONT] Refrescados:',DB.contenedores.length,'contenedores');
+      // Log estado de TODOS los contenedores para diagnosticar
+      DB.contenedores.forEach(function(c){
+        console.log('[CONT] Pedido="'+c.pedido+'" Contenedor="'+c.contenedor+'" Status="'+c.status+'"');
+      });
+    } else {
+      console.error('[CONT] Respuesta vacía del API — no se actualizó');
+    }
+  }).catch(function(e){
+    console.error('[CONT] Error refrescando:',e.message);
+  });
 }
 
 // ── Recargar catálogos desde Excel ────────────────────────────────
@@ -920,6 +949,73 @@ function iniciarSesion(){
 // ═══════════════════════════════════════════════════════════════════
 // 12. MENÚ SUPERVISOR
 // ═══════════════════════════════════════════════════════════════════
+
+// ── Anular asignación (supervisor) ────────────────────────────────
+function showAnularAsignacion(){
+  S.step='anular-asig';
+  render('<div class="loading"><div class="loading-icon">...</div>'+
+    '<div class="loading-txt">Cargando asignaciones...</div></div>');
+  cargarAsignacionesSP().then(function(asigs){
+    // Mostrar TODAS las asignaciones no anuladas
+    var activas=asigs.filter(function(a){
+      return normStr(a.Status||'')==='ACTIVO'||
+             normStr(a.Status||'')==='ASIGNADO'||
+             normStr(a.Status||'')==='TOMADA'||
+             normStr(a.Status||'')==='EN PROCESO'||
+             normStr(a.Status||'')==='ACTIVO'||
+             (a.Status&&normStr(a.Status)!=='ANULADA'&&normStr(a.Status)!=='CERRADA');
+    });
+    var h='<div class="badge badge-sup">ANULAR ASIGNACION</div>';
+    if(!activas.length){
+      h+='<div class="alert-w">No hay asignaciones activas.</div>';
+    } else {
+      h+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+activas.length+' asignaciones. Toca para anular.</div>';
+      activas.forEach(function(a,i){
+        h+='<div class="card-item" style="margin-bottom:6px">'+
+          '<div style="flex:1">'+
+            '<div style="font-size:13px;font-weight:700">'+(a.Pedido||'?')+'</div>'+
+            '<div style="font-size:11px;color:var(--mut)">'+(a.TipoAsignacion||'?')+' · '+(a.Operario||'Sin operario')+'</div>'+
+            '<div style="font-size:10px;color:var(--warn)">Status: '+(a.Status||'?')+'</div>'+
+          '</div>'+
+          '<button class="btn btn-warn" style="font-size:11px;padding:4px 10px;flex-shrink:0" '+
+            'onclick="window._anularIdx='+i+';confirmarAnularAsig()">Anular</button>'+
+        '</div>';
+      });
+    }
+    h+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showMenuSup()">Volver</button>';
+    render(h);
+    window._asigsSP=activas;
+  });
+}
+
+function confirmarAnularAsig(){
+  var idx=window._anularIdx;
+  var a=window._asigsSP&&window._asigsSP[idx];
+  if(!a){toast('Error: asignacion no encontrada');return;}
+  var pedido=a.Pedido||'?';
+  var tipo=a.TipoAsignacion||'?';
+  var spId=a.ID;
+  if(!confirm('Anular asignacion de "'+tipo+'" para "'+pedido+'"?\nQuedara registrado.')) return;
+  var t=ahora();
+  gPatch(urlLista(DB.listIds.asignaciones)+'/items/'+spId,{
+    fields:{Status:'Anulada'}
+  }).then(function(){
+    // Auditar en LEventos
+    if(DB.listIds.eventos){
+      gPost(urlLista(DB.listIds.eventos)+'/items',{fields:{
+        Title: pedido+'-ANULACION_ASIG',
+        RecepcionId: '', Pedido: pedido, Contenedor: '',
+        TipoEvento: 'ANULACION_ASIG',
+        Operario: S.operario,
+        Hora: t.hora, Fecha: t.fecha, Timestamp: t.ts,
+      }}).catch(function(e){console.warn('[SP] Auditoria anulacion:',e.message);});
+    }
+    toast('Asignacion anulada: '+pedido+' ('+tipo+')');
+    showAnularAsignacion(); // recargar lista
+  }).catch(function(e){
+    toast('Error anulando: '+e.message.slice(0,50));
+  });
+}
 function showMenuSup(){
   S.step='menu-sup';
   render(
@@ -936,6 +1032,12 @@ function showMenuSup(){
         '<div class="card-t-icon">👤</div><div class="card-t-lbl">ASIGNAR</div></div>'+
       '<div class="card-t" onclick="showEstadoPedidos()">'+
         '<div class="card-t-icon">📊</div><div class="card-t-lbl">ESTADO</div></div>'+
+    '</div>'+
+    '<div class="grid2" style="margin-top:8px">'+
+      '<div class="card-t" onclick="showAnularAsignacion()">'+
+        '<div class="card-t-icon">🚫</div><div class="card-t-lbl">ANULAR ASIG.</div></div>'+
+      '<div class="card-t" onclick="recargarCatalogos()">'+
+        '<div class="card-t-icon">🔄</div><div class="card-t-lbl">ACTUALIZAR</div></div>'+
     '</div>'
   );
 }
@@ -948,9 +1050,18 @@ function showMenuOp(){
   render('<div class="loading"><div class="loading-icon">⏳</div>'+
     '<div class="loading-txt">Cargando pedidos...</div></div>');
   cargarAsignacionesSP().then(function(asigs){
+    console.log('[MENU-OP] Operario activo: "'+S.operario+'"');
+    console.log('[MENU-OP] Asignaciones totales SP:',asigs.length);
+    asigs.forEach(function(a){
+      console.log('[MENU-OP] Item: Pedido="'+(a.Pedido||'?')+
+        '" Op="'+(a.Operario||'?')+'" normOp="'+normStr(a.Operario||'')+
+        '" Status="'+(a.Status||'?')+'" normStatus="'+normStr(a.Status||'')+'"');
+    });
     var misAsigs=asigs.filter(function(a){
-      return normStr(a.Operario)===normStr(S.operario)&&
-             normStr(a.Status)==='ACTIVO';
+      var opMatch=normStr(a.Operario)===normStr(S.operario);
+      var stMatch=normStr(a.Status||'')==='ACTIVO';
+      if(opMatch) console.log('[MENU-OP] Mi asignación: Pedido='+(a.Pedido||'?')+' stMatch='+stMatch+' Status="'+(a.Status||'?')+'"');
+      return opMatch&&stMatch;
     });
     var html='<div class="badge badge-rec">👷 '+S.operario+'</div>'+
       '<div class="grid2" style="margin-bottom:10px">'+
@@ -1226,16 +1337,18 @@ function _renderSeleccionarContenedor(){
            normStr(c.status)!=='RECIBIDO';
   });
 
-  // ── LOG DIAGNÓSTICO ──────────────────────────────────────────────
-  console.log('[RENDER] Pedido seleccionado:',JSON.stringify(
-    DB.pedidos.find(function(p){return normStr(p.pedido)===normStr(S.pedido);})||null
-  ));
+    // ── LOG DIAGNÓSTICO ──────────────────────────────────────────────
+  console.log('[RENDER] ========================================');
+  console.log('[RENDER] Pedido activo: "'+S.pedido+'"');
   console.log('[RENDER] DB.contenedores total:',DB.contenedores.length);
-  console.log('[RENDER] Contenedores de este pedido (todos):',
-    JSON.stringify(DB.contenedores.filter(function(c){return normStr(c.pedido)===normStr(S.pedido);}))
-  );
-  console.log('[RENDER] Contenedores pendientes (para tarjetas):',JSON.stringify(contsPend));
-  // ─────────────────────────────────────────────────────────────────
+  DB.contenedores.filter(function(c){return normStr(c.pedido)===normStr(S.pedido);})
+    .forEach(function(c){
+      var esPend=normStr(c.status)!=='RECIBIDO';
+      console.log('[RENDER] Cont="'+c.contenedor+'" Excel_Status="'+c.status+'" normStatus="'+normStr(c.status)+'" ¿Pendiente?='+(esPend?'SI':'NO'));
+    });
+  console.log('[RENDER] Tarjetas a mostrar:',contsPend.length);
+  console.log('[RENDER] ========================================');
+  // ──────────────────────────────────────
 
   var html=stepsBar(1,6)+
     '<div class="badge badge-rec">'+S.pedido+' · '+S.subtipo+'</div>'+
@@ -1916,6 +2029,8 @@ function showPantallaLogin(){
 // ═══════════════════════════════════════════════════════════════════
 window.S=S;window.DB=DB;
 window.goHome=goHome;
+window.showAnularAsignacion=showAnularAsignacion;
+window.confirmarAnularAsig=confirmarAnularAsig;
 window.reasignarExistente=reasignarExistente;
 window.recargarCatalogos=recargarCatalogos;
 window.actualizarStatusContenedorExcel=actualizarStatusContenedorExcel;
