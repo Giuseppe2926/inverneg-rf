@@ -1058,33 +1058,18 @@ function aplicarEstadoDesdeItem(item, ordenId) {
 function refrescarEstadoOrden(ordenId) {
   var listId = DB.listIds['estado'];
   if (!listId) return Promise.resolve();
-  var baseUrl = urlLista(listId)+'/items?$orderby=ID%20desc&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
-
-  function buscarEnPagina(url) {
-    return graphGet(url).then(function(data) {
-      if (!data.value || data.value.length === 0) return false;
-      var encontrado = false;
-      data.value.forEach(function(item) {
-        var f = item.fields;
-        if (!f || !f.OrdenId) return;
-        var id = f.OrdenId.toString().trim();
-        aplicarEstadoDesdeItem(item, id);
-        if (id === ordenId) encontrado = true;
-      });
-      if (encontrado) {
-        console.log('Estado refrescado desde SP para orden:', ordenId);
-        return true;
-      }
-      // Si no encontrado y hay mas paginas, seguir buscando
-      if (data['@odata.nextLink']) {
-        return buscarEnPagina(data['@odata.nextLink']);
-      }
+  // OrdenId esta indexado — filtro directo, respuesta instantanea
+  var filtro = "fields/OrdenId eq '" + ordenId.replace(/'/g, "''") + "'";
+  var url = urlLista(listId)+'/items?$filter='+encodeURIComponent(filtro)+
+            '&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=1';
+  return graphGet(url).then(function(data) {
+    if (!data.value || data.value.length === 0) {
       console.log('refrescarEstadoOrden: orden nueva sin estado en SP:', ordenId);
-      return false;
-    });
-  }
-
-  return buscarEnPagina(baseUrl).catch(function(e) {
+      return;
+    }
+    aplicarEstadoDesdeItem(data.value[0], ordenId);
+    console.log('Estado refrescado desde SP para orden:', ordenId);
+  }).catch(function(e) {
     console.warn('refrescarEstadoOrden error (no critico):', e.message);
   });
 }
