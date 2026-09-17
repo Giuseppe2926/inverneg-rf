@@ -2176,10 +2176,12 @@ function escribirHoras(datos){
     FechaRegistro:t.fecha,
     Personas:     Number(datos.personas)||0,
     Novedades:    datos.novedades||'',
-    Estado:       datos.estado||'En Proceso',
-    Sello1:       datos.sello1||'',
-    Sello2:       datos.sello2||'',
-    Timestamp:    t.ts,
+    Estado:          datos.estado||'En Proceso',
+    Sello1:          datos.sello1||'',
+    Sello2:          datos.sello2||'',
+    PalletsRecibidos:Number(datos.palletsRecibidos)||0,
+    Capacidad:       datos.capacidad||'',
+    Timestamp:       t.ts,
   };
   return buscarItemHorasSP(S.pedido, S.contenedor).then(function(existing){
     if(existing&&existing._spId){
@@ -2268,6 +2270,12 @@ function showRegistrarHoras(){
       '<button class="btn btn-sec" style="font-size:11px;margin-top:6px" id="btn-add-sello" '+
         'onclick="mostrarSello2()">+ Agregar otro sello</button>'+
       '<div class="grid2" style="margin-top:8px">'+
+        '<div><div class="lbl" style="margin-top:0">Pallets recibidos</div>'+
+          '<input class="inp inp-sm" id="h-pallets" type="number" min="0" placeholder="0" value="'+(ex&&ex.PalletsRecibidos||'')+'"></div>'+
+        '<div><div class="lbl" style="margin-top:0">Capacidad (pies)</div>'+
+          _selCap(ex)+
+      '</div>'+
+      '<div class="grid2" style="margin-top:6px">'+
         '<div><div class="lbl" style="margin-top:0">Cuadrilla (personas)</div>'+
           '<input class="inp inp-sm" id="h-pers" type="number" min="0" placeholder="0" value="'+(ex&&ex.Personas||'')+'"></div>'+
         '<div><div class="lbl" style="margin-top:0">Estado</div>'+
@@ -2298,15 +2306,17 @@ function showRegistrarHoras(){
 
 function confRegistrarHoras(){
   var datos={
-    llegada:  document.getElementById('h-lleg').value,
-    apertura: document.getElementById('h-aper').value,
-    cierre:   document.getElementById('h-cier').value,
-    salida:   document.getElementById('h-sal').value,
-    personas: document.getElementById('h-pers').value,
-    novedades:document.getElementById('h-nov').value.trim(),
-    estado:   document.getElementById('h-est').value,
-    sello1:   (document.getElementById('h-sello1')?document.getElementById('h-sello1').value.trim().toUpperCase():''),
-    sello2:   (document.getElementById('h-sello2')?document.getElementById('h-sello2').value.trim().toUpperCase():''),
+    llegada:         document.getElementById('h-lleg').value,
+    apertura:        document.getElementById('h-aper').value,
+    cierre:          document.getElementById('h-cier').value,
+    salida:          document.getElementById('h-sal').value,
+    personas:        document.getElementById('h-pers').value,
+    palletsRecibidos:document.getElementById('h-pallets')?document.getElementById('h-pallets').value:'',
+    capacidad:       document.getElementById('h-cap')?document.getElementById('h-cap').value:'',
+    novedades:       document.getElementById('h-nov').value.trim(),
+    estado:          document.getElementById('h-est').value,
+    sello1:          (document.getElementById('h-sello1')?document.getElementById('h-sello1').value.trim().toUpperCase():''),
+    sello2:          (document.getElementById('h-sello2')?document.getElementById('h-sello2').value.trim().toUpperCase():''),
   };
   render('<div class="loading"><div class="loading-icon">...</div>'+
     '<div class="loading-txt">Guardando horas...</div></div>');
@@ -2698,6 +2708,15 @@ window.showIngresarLPN=showIngresarLPN;
 window.confLPN=confLPN;
 window.continuarConLPNActual=continuarConLPNActual;
 window.cargarCacheSKUsPedido=cargarCacheSKUsPedido;
+window._selCap=function(ex){
+  var v=ex&&ex.Capacidad?ex.Capacidad:'';
+  return '<div><div class="lbl" style="margin-top:0">Capacidad (pies)</div>'+
+    '<select class="inp inp-sm" id="h-cap">'+
+    '<option value=""'+(v===''?' selected':'')+'>— seleccionar —</option>'+
+    '<option value="20"'+(v==='20'?' selected':'')+'>20 pies</option>'+
+    '<option value="40"'+(v==='40'?' selected':'')+'>40 pies</option>'+
+    '</select></div>';
+};
 window.mostrarSello2=function(){var w=document.getElementById('sello2-wrap');var b=document.getElementById('btn-add-sello');if(w)w.style.display='block';if(b)b.style.display='none';};
 window.confirmarSobrante=confirmarSobrante;
 window._guardarSKU=_guardarSKU;
