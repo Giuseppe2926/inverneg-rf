@@ -5,104 +5,149 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Informe de Novedades — Inverneg</title>
 <style>
-/* ── VARIABLES ────────────────────────────────────── */
+/* ── APP SHELL (solo pantalla) ─────────────────────────────────── */
 :root{
   --bg:#0D1117;--sur:#161B22;--sur2:#1C2330;--bor:#2A3340;
-  --txt:#E6EDF3;--mut:#7D8590;
-  --acc:#58A6FF;--ok:#3FB950;--warn:#E3B341;--dan:#F85149;--rec:#F0883E;
+  --txt:#E6EDF3;--mut:#7D8590;--acc:#58A6FF;--ok:#3FB950;
+  --warn:#E3B341;--dan:#F85149;--rec:#F0883E;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
-
-/* ── APP SHELL ────────────────────────────────────── */
 .hdr{background:var(--sur);border-bottom:1px solid var(--bor);padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
-.hdr-brand{font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--rec)}
+.hdr-brand{font-size:13px;font-weight:700;color:var(--rec)}
 .hdr-sub{font-size:10px;color:var(--mut);margin-top:1px}
-.ftr{background:var(--sur);border-top:1px solid var(--bor);padding:8px 16px;font-size:11px;color:var(--mut);display:flex;justify-content:space-between;align-items:center}
+.ftr{background:var(--sur);border-top:1px solid var(--bor);padding:8px 16px;font-size:11px;color:var(--mut);display:flex;justify-content:space-between}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--warn);display:inline-block;margin-right:5px}
 .dot.ok{background:var(--ok)}.dot.err{background:var(--dan)}
-
-/* ── CONTROLES ────────────────────────────────────── */
-#screen{padding:16px;max-width:1100px;margin:0 auto}
+#screen{padding:16px;max-width:1000px;margin:0 auto}
 .lbl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;margin-top:10px}
 .inp{width:100%;background:var(--sur2);border:1px solid var(--bor);color:var(--txt);font-size:15px;padding:9px 12px;border-radius:6px;outline:none;font-family:inherit}
 .inp:focus{border-color:var(--acc)}
 select.inp{appearance:none}
 .btn{border:none;border-radius:6px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
 .btn:active{opacity:.75}
-.btn-pri{background:var(--acc);color:#000}
-.btn-ok{background:var(--ok);color:#000}
-.btn-sec{background:var(--sur2);color:var(--txt);border:1px solid var(--bor)}
 .btn-rec{background:var(--rec);color:#000}
+.btn-sec{background:var(--sur2);color:var(--txt);border:1px solid var(--bor)}
 .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.loading{text-align:center;padding:40px;color:var(--mut);font-size:13px}
-.alert-w{background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:12px;margin:6px 0}
-
-/* ── PANEL DE CONFIGURACIÓN ──────────────────────── */
 .config-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
-@media(max-width:600px){.config-grid{grid-template-columns:1fr}}
+.loading{text-align:center;padding:40px;color:var(--mut);font-size:13px}
 
-/* ═══════════════════════════════════════════════════
-   ESTILOS DEL INFORME (se aplican en pantalla y al imprimir)
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   ESTILOS DEL INFORME — optimizados para A4
+   ═══════════════════════════════════════════════════════════════ */
 #informe-wrap{margin-top:20px}
+
 .informe-page{
   background:#fff;color:#000;
-  width:100%;max-width:980px;margin:0 auto 32px;
-  padding:24px 28px;
-  font-family:'Times New Roman',Times,serif;
-  font-size:11pt;
+  width:210mm;
+  min-height:297mm;
+  margin:0 auto 24px;
+  padding:10mm 12mm 10mm 12mm;
+  font-family:'Arial Narrow','Arial',sans-serif;
+  font-size:8pt;
   box-shadow:0 2px 12px rgba(0,0,0,.4);
-  page-break-after:always;
+  position:relative;
 }
-.informe-page:last-child{page-break-after:auto}
 
 /* Encabezado */
-.inf-titulo{text-align:center;font-size:14pt;font-weight:700;letter-spacing:.08em;margin-bottom:14px;text-decoration:underline}
-.inf-meta{margin-bottom:10px}
-.inf-meta table{border-collapse:collapse;font-size:10.5pt}
-.inf-meta td{padding:1px 6px 1px 0}
-.inf-meta td:first-child{font-weight:700;white-space:nowrap}
+.inf-titulo{
+  text-align:center;font-size:10pt;font-weight:700;
+  letter-spacing:.06em;margin-bottom:8px;text-decoration:underline;
+  text-transform:uppercase;
+}
+.inf-meta{margin-bottom:6px}
+.inf-meta table{border-collapse:collapse;font-size:8pt}
+.inf-meta td{padding:1px 4px 1px 0;line-height:1.4}
+.inf-meta td:first-child{font-weight:700;white-space:nowrap;min-width:55px}
+.inf-narr{font-size:7.5pt;margin-bottom:5px;line-height:1.4}
 
-/* Secciones */
-.inf-seccion{font-weight:700;margin:14px 0 6px;font-size:10.5pt;text-decoration:underline}
-
-/* Tabla contenedores */
-.inf-tabla{width:100%;border-collapse:collapse;font-size:9.5pt;margin-bottom:8px}
-.inf-tabla th{background:#d0d0d0;border:1px solid #888;padding:3px 6px;text-align:center;font-size:9pt}
-.inf-tabla td{border:1px solid #888;padding:2px 5px;text-align:center;vertical-align:middle}
+/* Tablas — tamaño FIJO: siempre 10 filas visibles */
+.inf-tabla{width:100%;border-collapse:collapse;font-size:7pt;margin-bottom:5px;table-layout:fixed}
+.inf-tabla th{
+  background:#c0c0c0;border:1px solid #666;padding:2px 3px;
+  text-align:center;font-size:6.5pt;font-weight:700;white-space:nowrap;
+}
+.inf-tabla td{
+  border:1px solid #888;padding:1px 3px;text-align:center;
+  vertical-align:middle;height:14px;font-size:7pt;
+}
 .inf-tabla td.left{text-align:left}
-.inf-tabla tr:nth-child(even) td{background:#f5f5f5}
-.inf-tabla tfoot td{font-weight:700;background:#e8e8e8;border:1px solid #888;padding:2px 5px;text-align:center}
+.inf-tabla tfoot td{font-weight:700;background:#ddd;border:1px solid #666;padding:1px 3px;text-align:center;font-size:7pt}
+
+/* Anchos columnas tabla contenedores */
+.inf-tabla col.c-num   {width:5%}
+.inf-tabla col.c-cont  {width:22%}
+.inf-tabla col.c-sello {width:13%}
+.inf-tabla col.c-cap   {width:9%}
+.inf-tabla col.c-fecha {width:14%}
+.inf-tabla col.c-pall  {width:10%}
+
+/* Tabla tiempos */
+.inf-tabla-tiempos{width:100%;border-collapse:collapse;font-size:7pt;margin-bottom:5px;table-layout:fixed}
+.inf-tabla-tiempos th{background:#c0c0c0;border:1px solid #666;padding:2px 3px;text-align:center;font-size:6.5pt;font-weight:700}
+.inf-tabla-tiempos td{border:1px solid #888;padding:1px 3px;text-align:center;height:14px;font-size:7pt}
+.inf-tabla-tiempos col.c-num{width:5%}
+.inf-tabla-tiempos col.c-hora{width:11%}
+.inf-tabla-tiempos col.c-tpo{width:13%}
 
 /* Personal */
-.inf-personal{font-size:10pt;margin:8px 0}
+.inf-personal{font-size:7.5pt;margin:3px 0;line-height:1.4}
 .inf-personal span{font-weight:700}
+.inf-seccion{font-weight:700;margin:6px 0 3px;font-size:8pt;text-decoration:underline}
+.inf-bodega{font-size:7.5pt;margin:0 0 3px;font-style:italic}
 
-/* Tiempos */
-.inf-tabla-tiempos{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:8px}
-.inf-tabla-tiempos th{background:#d0d0d0;border:1px solid #888;padding:3px 5px;text-align:center}
-.inf-tabla-tiempos td{border:1px solid #888;padding:2px 5px;text-align:center}
-
-/* Mercadería con novedad */
-.inf-bodega{font-size:10pt;margin:4px 0 8px}
-.inf-tabla-nov{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:8px}
-.inf-tabla-nov th{background:#d0d0d0;border:1px solid #888;padding:3px 5px;text-align:center}
-.inf-tabla-nov td{border:1px solid #888;padding:2px 5px}
+/* Tabla novedades */
+.inf-tabla-nov{width:100%;border-collapse:collapse;font-size:7pt;margin-bottom:5px;table-layout:fixed}
+.inf-tabla-nov th{background:#c0c0c0;border:1px solid #666;padding:2px 3px;text-align:center;font-size:6.5pt;font-weight:700}
+.inf-tabla-nov td{border:1px solid #888;padding:1px 3px;height:14px;font-size:7pt}
 .inf-tabla-nov td.right{text-align:right}
+.inf-tabla-nov col.c-num  {width:4%}
+.inf-tabla-nov col.c-item {width:14%}
+.inf-tabla-nov col.c-lote {width:14%}
+.inf-tabla-nov col.c-cant {width:10%}
+.inf-tabla-nov col.c-marc {width:12%}
+.inf-tabla-nov col.c-obs  {width:25%}
+.inf-tabla-nov col.c-cont {width:21%}
 
 /* Comentarios */
-.inf-comentarios{font-size:10pt;white-space:pre-wrap;margin-top:4px;padding:6px;border:1px solid #ccc;min-height:40px;background:#fafafa}
+.inf-comentarios{font-size:7.5pt;white-space:pre-wrap;padding:4px 6px;border:1px solid #bbb;min-height:30px;background:#fafafa;line-height:1.5}
 
-/* Firma */
-.inf-firma{margin-top:20px;font-size:10pt;text-align:right}
+/* Firmas */
+.inf-firmas{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;
+  margin-top:28px;font-size:7.5pt;
+  position:absolute;bottom:12mm;left:12mm;right:12mm;
+}
+.inf-firma-bloque{text-align:center}
+.inf-firma-linea{border-top:1px solid #000;padding-top:3px;margin-top:55px;line-height:1.5}
 
-/* ── PRINT ────────────────────────────────────────── */
+/* ── PRINT — eliminar headers/footers del navegador ─────────────── */
+@page{
+  size:A4 portrait;
+  margin:0;  /* SIN márgenes — el padding lo maneja .informe-page */
+}
 @media print{
-  body{background:#fff}
+  html,body{
+    background:#fff!important;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  /* Ocultar todo excepto las páginas del informe */
   .hdr,.ftr,#screen>*:not(#informe-wrap),.btn-row,.no-print{display:none!important}
-  #informe-wrap{margin:0}
-  .informe-page{box-shadow:none;margin:0;max-width:100%;page-break-after:always}
+  #informe-wrap{margin:0!important}
+  .informe-page{
+    box-shadow:none!important;
+    margin:0!important;
+    width:210mm!important;
+    min-height:297mm!important;
+    page-break-after:always;
+    page-break-inside:avoid;
+    border:none!important;
+  }
+  .informe-page:last-child{page-break-after:auto}
+  /* Forzar fondo gris en encabezados de tablas al imprimir */
+  .inf-tabla th,.inf-tabla-tiempos th,.inf-tabla-nov th{background:#c0c0c0!important}
+  .inf-tabla tfoot td{background:#ddd!important}
 }
 </style>
 </head>
@@ -371,12 +416,8 @@ function generarInforme(){
   var conts=DB.contenedores.filter(function(c){return normStr(c.pedido)===normStr(pedido);});
   var packingPedido=DB.packing.filter(function(p){return normStr(p.pedido)===normStr(pedido);});
 
-  Promise.all([
-    cargarHorasPedido(pedido),
-    cargarRecepcionesPedido(pedido),
-  ]).then(function(res){
-    var horas=res[0];
-    var recepciones=res[1];
+  Promise.all([cargarHorasPedido(pedido),cargarRecepcionesPedido(pedido)]).then(function(res){
+    var horas=res[0], recepciones=res[1];
 
     function getHoras(cont){
       return horas.find(function(h){return normStr(h.Contenedor||'')===normStr(cont);})||{};
@@ -387,64 +428,38 @@ function generarInforme(){
     conts.forEach(function(c){if(!fechaRec&&c.fechaRec) fechaRec=c.fechaRec;});
     horas.forEach(function(h){if(!fechaRec&&h.FechaRegistro) fechaRec=h.FechaRegistro;});
 
-    // ── CALCULAR NOVEDADES (Ajuste 4) ────────────────────────────
-    // Excluir CORRECCION. Incluir: DAÑADO, observaciones, faltantes, sobrantes.
-    // Cada tipo de novedad = línea independiente.
+    // ── NOVEDADES ─────────────────────────────────────────────────
     var lineasNovedad=[];
 
-    // 1. Líneas de daños y observaciones (de LRecepciones)
+    // Daños y observaciones por registro
     recepciones.forEach(function(r){
       var est=normStr(r.Estado||'');
       var nov=(r.Novedades||'').trim();
-      if(est==='CORRECCION') return; // excluir correcciones
+      if(est==='CORRECCION') return;
       if(est==='DAÑADO'||est==='DANADO'||est==='DAÑADA'){
-        lineasNovedad.push({
-          sku:r.CodProducto||'',
-          lote:r.Lote||'',
-          cantidad:Number(r.Cantidad)||0,
-          marca:getMarca(r.CodProducto||''),
-          obs:'DAÑADO',
-          contenedor:r.Contenedor||'',
-        });
+        lineasNovedad.push({sku:r.CodProducto||'',lote:r.Lote||'',cantidad:Number(r.Cantidad)||0,marca:getMarca(r.CodProducto||''),obs:'DAÑADO',contenedor:r.Contenedor||''});
       } else if(nov){
-        lineasNovedad.push({
-          sku:r.CodProducto||'',
-          lote:r.Lote||'',
-          cantidad:Number(r.Cantidad)||0,
-          marca:getMarca(r.CodProducto||''),
-          obs:nov,
-          contenedor:r.Contenedor||'',
-        });
+        lineasNovedad.push({sku:r.CodProducto||'',lote:r.Lote||'',cantidad:Number(r.Cantidad)||0,marca:getMarca(r.CodProducto||''),obs:nov,contenedor:r.Contenedor||''});
       }
     });
 
-    // 2. Líneas de faltante/sobrante vs Packing (por SKU, excluyendo daños)
+    // Diferencias vs Packing (líneas independientes por tipo)
     packingPedido.forEach(function(pk){
       var esperado=pk.cantidad;
-      // Sumar recibido neto (excluyendo CORRECCION, incluyendo DAÑADO para el conteo real)
       var recibidoTotal=0;
+      var contEj='',loteEj='';
       recepciones.forEach(function(r){
         if(normStr(r.CodProducto||'')===normStr(pk.sku)&&normStr(r.Estado||'')!=='CORRECCION'){
           recibidoTotal+=Number(r.Cantidad)||0;
+          if(!contEj){contEj=r.Contenedor||'';loteEj=r.Lote||'';}
         }
       });
       var diff=recibidoTotal-esperado;
       if(diff!==0){
-        var loteEj='';
-        var contEj='';
-        recepciones.some(function(r){if(normStr(r.CodProducto||'')===normStr(pk.sku)){loteEj=r.Lote||'';contEj=r.Contenedor||'';return true;}});
-        lineasNovedad.push({
-          sku:pk.sku,
-          lote:loteEj,
-          cantidad:Math.abs(diff),
-          marca:getMarca(pk.sku),
-          obs:diff<0?'FALTANTE':'SOBRANTE',
-          contenedor:contEj,
-        });
+        lineasNovedad.push({sku:pk.sku,lote:loteEj,cantidad:Math.abs(diff),marca:getMarca(pk.sku),obs:diff<0?'FALTANTE':'SOBRANTE',contenedor:contEj});
       }
     });
 
-    // Ordenar: daños primero, luego observaciones, luego faltantes/sobrantes
     var orden={'DAÑADO':0,'FALTANTE':1,'SOBRANTE':2};
     lineasNovedad.sort(function(a,b){
       var oa=orden[a.obs]!==undefined?orden[a.obs]:3;
@@ -452,97 +467,99 @@ function generarInforme(){
       return oa-ob||(a.sku<b.sku?-1:a.sku>b.sku?1:0);
     });
 
-    // ── COMENTARIOS ───────────────────────────────────────────────
+    // Comentarios
     var comentarios='';
     conts.forEach(function(c){
       var h=getHoras(c.contenedor);
-      if(h.Novedades&&h.Novedades.trim()){
-        comentarios+='CONTENEDOR '+c.contenedor+':\n'+h.Novedades.trim()+'\n\n';
-      }
+      if(h.Novedades&&h.Novedades.trim()) comentarios+='CONTENEDOR '+c.contenedor+':\n'+h.Novedades.trim()+'\n\n';
     });
     comentarios=comentarios.trim();
 
-    // ── PAGINACIÓN ────────────────────────────────────────────────
-    var CONTS_POR_PAG=10;
+    // ── PAGINACIÓN (10 fijos por página) ─────────────────────────
+    var TOTAL=10;
     var paginas=[];
-    for(var i=0;i<conts.length;i+=CONTS_POR_PAG) paginas.push(conts.slice(i,i+CONTS_POR_PAG));
-    if(paginas.length===0) paginas=[[]];
+    if(conts.length===0){paginas=[[]];}
+    else{for(var i=0;i<conts.length;i+=TOTAL) paginas.push(conts.slice(i,i+TOTAL));}
 
-    var html='';
+    var htmlOut='';
     paginas.forEach(function(paginaConts,pIdx){
       var esUltima=pIdx===paginas.length-1;
       var totalPallets=0;
       paginaConts.forEach(function(c){totalPallets+=Number(getHoras(c.contenedor).PalletsRecibidos||0);});
 
-      html+='<div class="informe-page">';
+      htmlOut+='<div class="informe-page">';
 
       // Encabezado
-      html+='<div class="inf-titulo">INFORME DE NOVEDADES DE IMPORTACION</div>';
-      html+='<div class="inf-meta"><table>';
-      html+='<tr><td>DE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</td><td>'+esc(de)+'</td></tr>';
-      html+='<tr><td>PARA&nbsp;&nbsp;:</td><td>'+esc(para)+'</td></tr>';
-      html+='<tr><td>FECHA</td><td>'+fechaCorta(hoy())+'</td></tr>';
-      html+='<tr><td>PEDIDO</td><td><b>'+esc(pedido)+'</b></td></tr>';
-      html+='</table></div>';
-      html+='<p style="font-size:10pt;margin-bottom:6px">Informo a Ud. que con fecha <b>'+
-        (fechaRec?fechaLarga(fechaRec):'_______________')+
-        '</b> hemos recibido el/los siguiente(s) contenedor(es) con la(s) siguiente(s) denominación(es) y sello(s) respectivo(s):</p>';
+      htmlOut+='<div class="inf-titulo">INFORME DE NOVEDADES DE IMPORTACION</div>';
+      htmlOut+='<div class="inf-meta"><table>';
+      htmlOut+='<tr><td>DE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</td><td>'+esc(de)+'</td></tr>';
+      htmlOut+='<tr><td>PARA&nbsp;&nbsp;:</td><td>'+esc(para)+'</td></tr>';
+      htmlOut+='<tr><td>FECHA</td><td>'+fechaCorta(hoy())+'</td></tr>';
+      htmlOut+='<tr><td>PEDIDO</td><td><b>'+esc(pedido)+'</b></td></tr>';
+      htmlOut+='</table></div>';
+      htmlOut+='<p class="inf-narr">Informo a Ud. que con fecha <b>'+(fechaRec?fechaLarga(fechaRec):'_______________')+'</b> hemos recibido el/los siguiente(s) contenedor(es) con la(s) siguiente(s) denominación(es) y sello(s) respectivo(s):</p>';
 
-      // Sección 1: Contenedores
-      html+='<table class="inf-tabla">';
-      html+='<thead><tr><th>#</th><th>CONTENEDOR</th><th>Sello I</th><th>Sello II</th><th>Capacidad</th><th>Fecha Recepción</th><th>N° Pallets</th></tr></thead><tbody>';
-      paginaConts.forEach(function(c,ci){
-        var h=getHoras(c.contenedor);
-        var n=pIdx*CONTS_POR_PAG+ci+1;
-        var fr=c.fechaRec||h.FechaRegistro||'';
-        html+='<tr>'+
-          '<td>'+n+'</td>'+
-          '<td class="left"><b>'+esc(c.contenedor)+'</b></td>'+
-          '<td>'+esc(h.Sello1||'')+'</td>'+
-          '<td>'+esc(h.Sello2||'')+'</td>'+
-          '<td>'+(h.Capacidad?h.Capacidad+"'":'')+' </td>'+
-          '<td>'+fechaCorta(fr)+'</td>'+
-          '<td>'+((h.PalletsRecibidos||0)||'')+'</td>'+
-        '</tr>';
-      });
-      html+='</tbody><tfoot><tr><td colspan="6">TOTAL</td><td>'+(totalPallets||'')+'</td></tr></tfoot></table>';
+      // ── TABLA CONTENEDORES: siempre 10 filas ──────────────────
+      htmlOut+='<table class="inf-tabla">';
+      htmlOut+='<colgroup><col class="c-num"><col class="c-cont"><col class="c-sello"><col class="c-sello"><col class="c-cap"><col class="c-fecha"><col class="c-pall"></colgroup>';
+      htmlOut+='<thead><tr><th>#</th><th>CONTENEDOR</th><th>Sello I</th><th>Sello II</th><th>Capacidad</th><th>Fecha Recepción</th><th>N° Pallets</th></tr></thead><tbody>';
+      for(var ri=0;ri<TOTAL;ri++){
+        var c=paginaConts[ri];
+        var n=pIdx*TOTAL+ri+1;
+        if(c){
+          var h=getHoras(c.contenedor);
+          var fr=c.fechaRec||h.FechaRegistro||'';
+          htmlOut+='<tr><td>'+n+'</td><td class="left"><b>'+esc(c.contenedor)+'</b></td>'+
+            '<td>'+esc(h.Sello1||'')+'</td><td>'+esc(h.Sello2||'')+'</td>'+
+            '<td>'+(h.Capacidad?h.Capacidad+"'":'')+'</td>'+
+            '<td>'+fechaCorta(fr)+'</td>'+
+            '<td>'+(Number(h.PalletsRecibidos||0)||'')+'</td></tr>';
+        } else {
+          htmlOut+='<tr><td>'+n+'</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+        }
+      }
+      htmlOut+='</tbody><tfoot><tr><td colspan="6">TOTAL</td><td>'+(totalPallets||'')+'</td></tr></tfoot></table>';
 
       // Personal
       var h0=paginaConts.length>0?getHoras(paginaConts[0].contenedor):{};
-      html+='<div class="inf-personal">Personal de estiba particular: <span>'+(h0.Personas?h0.Personas+' personas':'—')+'</span>&nbsp;&nbsp; de Inverneg: <span>'+esc(h0.Operario||'')+'</span></div>';
-      html+='<div class="inf-personal" style="margin-bottom:8px">Tipo de estiba en el interior: ___________________________</div>';
+      htmlOut+='<div class="inf-personal">Personal de estiba particular: <span>'+(h0.Personas?h0.Personas+' personas':'—')+'</span>&nbsp;&nbsp;&nbsp;de Inverneg: <span>'+esc(h0.Operario||'')+'</span></div>';
+      htmlOut+='<div class="inf-personal" style="margin-bottom:5px">Tipo de estiba en el interior: ________________________________</div>';
 
-      // Sección 2: Tiempos
-      html+='<div class="inf-seccion">Tiempos por contenedor</div>';
-      html+='<table class="inf-tabla-tiempos"><thead><tr><th>#</th><th>Llegada</th><th>Salida</th><th>Tiempo Op.</th><th>Apertura</th><th>Cierre</th><th>Tiempo Desc.</th></tr></thead><tbody>';
-      paginaConts.forEach(function(c,ci){
-        var h=getHoras(c.contenedor);
-        var n=pIdx*CONTS_POR_PAG+ci+1;
-        html+='<tr>'+
-          '<td>'+n+'</td>'+
-          '<td>'+esc(h.HoraLlegada||'')+'</td>'+
-          '<td>'+esc(h.HoraSalida||'')+'</td>'+
-          '<td><b>'+calcTiempo(h.HoraLlegada,h.HoraSalida)+'</b></td>'+
-          '<td>'+esc(h.HoraApertura||'')+'</td>'+
-          '<td>'+esc(h.HoraCierre||'')+'</td>'+
-          '<td><b>'+calcTiempo(h.HoraApertura,h.HoraCierre)+'</b></td>'+
-        '</tr>';
-      });
-      html+='</tbody></table>';
+      // ── TABLA TIEMPOS: siempre 10 filas ───────────────────────
+      htmlOut+='<div class="inf-seccion">Tiempos por contenedor</div>';
+      htmlOut+='<table class="inf-tabla-tiempos">';
+      htmlOut+='<colgroup><col class="c-num"><col class="c-hora"><col class="c-hora"><col class="c-tpo"><col class="c-hora"><col class="c-hora"><col class="c-tpo"></colgroup>';
+      htmlOut+='<thead><tr><th>#</th><th>Llegada</th><th>Salida</th><th>Tiempo Op.</th><th>Apertura</th><th>Cierre</th><th>Tiempo Desc.</th></tr></thead><tbody>';
+      for(var ri=0;ri<TOTAL;ri++){
+        var c=paginaConts[ri];
+        var n=pIdx*TOTAL+ri+1;
+        if(c){
+          var h=getHoras(c.contenedor);
+          htmlOut+='<tr><td>'+n+'</td>'+
+            '<td>'+esc(h.HoraLlegada||'')+'</td><td>'+esc(h.HoraSalida||'')+'</td>'+
+            '<td><b>'+calcTiempo(h.HoraLlegada,h.HoraSalida)+'</b></td>'+
+            '<td>'+esc(h.HoraApertura||'')+'</td><td>'+esc(h.HoraCierre||'')+'</td>'+
+            '<td><b>'+calcTiempo(h.HoraApertura,h.HoraCierre)+'</b></td></tr>';
+        } else {
+          htmlOut+='<tr><td>'+n+'</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+        }
+      }
+      htmlOut+='</tbody></table>';
 
       // Secciones 3, 4 y firmas solo en última página
       if(esUltima){
-        // Sección 3: Mercadería con novedad (Ajuste 2: texto correcto)
-        html+='<div class="inf-seccion">Mercadería recibida en bodega: CND2</div>';
-        html+='<div class="inf-bodega">Observaciones (Detalles)</div>';
+        // Mercadería con novedad
+        htmlOut+='<div class="inf-seccion">Mercadería recibida en bodega: CND2</div>';
+        htmlOut+='<div class="inf-bodega">Observaciones (Detalles)</div>';
+        htmlOut+='<table class="inf-tabla-nov">';
+        htmlOut+='<colgroup><col class="c-num"><col class="c-item"><col class="c-lote"><col class="c-cant"><col class="c-marc"><col class="c-obs"><col class="c-cont"></colgroup>';
+        htmlOut+='<thead><tr><th>#</th><th>Item</th><th>Lote</th><th>Total Unidades</th><th>Marca</th><th>Observación</th><th>Contenedor</th></tr></thead><tbody>';
         if(lineasNovedad.length===0){
-          html+='<p style="font-size:10pt;color:#555;margin-bottom:8px">Sin novedades registradas.</p>';
+          htmlOut+='<tr><td colspan="7" style="text-align:center;color:#777;font-style:italic">Sin novedades registradas.</td></tr>';
         } else {
-          html+='<table class="inf-tabla-nov">';
-          html+='<thead><tr><th>#</th><th>Item</th><th>Lote</th><th>Total Unidades</th><th>Marca</th><th>Observación</th><th>Contenedor</th></tr></thead><tbody>';
           lineasNovedad.forEach(function(n,ni){
-            var colorObs=n.obs==='DAÑADO'?'color:red;font-weight:700':n.obs==='FALTANTE'?'color:#cc6600;font-weight:700':n.obs==='SOBRANTE'?'color:#006600;font-weight:700':'';
-            html+='<tr>'+
+            var colorObs=n.obs==='DAÑADO'?'color:red;font-weight:700':n.obs==='FALTANTE'?'color:#b85c00;font-weight:700':n.obs==='SOBRANTE'?'color:#006600;font-weight:700':'';
+            htmlOut+='<tr>'+
               '<td style="text-align:center">'+(ni+1)+'</td>'+
               '<td>'+esc(n.sku)+'</td>'+
               '<td>'+esc(n.lote)+'</td>'+
@@ -552,32 +569,26 @@ function generarInforme(){
               '<td>'+esc(n.contenedor)+'</td>'+
             '</tr>';
           });
-          html+='</tbody></table>';
         }
+        htmlOut+='</tbody></table>';
 
-        // Sección 4: Comentarios (Ajuste 6: "Sin novedades")
-        html+='<div class="inf-seccion">Comentarios</div>';
-        html+='<div class="inf-comentarios">'+esc(comentarios||'Sin novedades.')+'</div>';
+        // Comentarios
+        htmlOut+='<div class="inf-seccion">Comentarios</div>';
+        htmlOut+='<div class="inf-comentarios">'+esc(comentarios||'Sin novedades.')+'</div>';
 
-        // Firmas (Ajuste 1: 3 firmas con espacio, texto correcto)
-        html+=
-          '<div style="margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;font-size:9.5pt;font-family:\'Times New Roman\',Times,serif">'+
-            '<div style="text-align:center">'+
-              '<div style="border-top:1px solid #000;padding-top:4px;margin-top:50px">'+esc(de)+'<br>Jefe de Bodega</div>'+
-            '</div>'+
-            '<div style="text-align:center">'+
-              '<div style="border-top:1px solid #000;padding-top:4px;margin-top:50px">___________________________<br>Jefe de Importaciones/Supervisor de Importaciones</div>'+
-            '</div>'+
-            '<div style="text-align:center">'+
-              '<div style="border-top:1px solid #000;padding-top:4px;margin-top:50px">___________________________<br>Asistente Financiero</div>'+
-            '</div>'+
+        // Firmas con posición absoluta al fondo
+        htmlOut+=
+          '<div class="inf-firmas">'+
+            '<div class="inf-firma-bloque"><div class="inf-firma-linea">'+esc(de)+'<br>Jefe de Bodega</div></div>'+
+            '<div class="inf-firma-bloque"><div class="inf-firma-linea">___________________________<br>Jefe de Importaciones /<br>Supervisor de Importaciones</div></div>'+
+            '<div class="inf-firma-bloque"><div class="inf-firma-linea">___________________________<br>Asistente Financiero</div></div>'+
           '</div>';
       }
 
-      html+='</div>'; // fin informe-page
+      htmlOut+='</div>'; // fin informe-page
     });
 
-    $r('informe-wrap').innerHTML=html;
+    $r('informe-wrap').innerHTML=htmlOut;
   });
 }
 
