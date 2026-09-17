@@ -141,6 +141,8 @@ var CFG={
 var GRAPH='https://graph.microsoft.com/v1.0';
 var msalInst, msalAcc;
 var SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
+// Exponer al scope global para los onclick del HTML
+window._loginRedirect=function(){if(msalInst)msalInst.loginRedirect({scopes:SCOPES});else console.error('msalInst no listo');}
 
 /* ── DB ─────────────────────────────────────── */
 var DB={
@@ -557,7 +559,7 @@ function loginPage(){
   render('<div class="loading"><div style="font-size:28px;margin-bottom:12px">📋</div>'+
     '<div style="font-size:15px;font-weight:700;color:var(--rec);margin-bottom:8px">Informes de Novedades</div>'+
     '<div style="font-size:12px;color:var(--mut);margin-bottom:20px">Inverneg · Centro de Distribución Nacional</div>'+
-    '<button class="btn btn-rec" onclick="msalInst.loginRedirect({scopes:SCOPES})">🔐 Iniciar sesión Microsoft</button></div>');
+    '<button class="btn btn-rec" onclick="window._loginRedirect()">🔐 Iniciar sesión Microsoft</button></div>');
 }
 function boot(){
   $r('ftr-user').textContent=msalAcc.username||msalAcc.name||'—';
