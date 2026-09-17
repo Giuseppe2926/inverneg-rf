@@ -237,6 +237,7 @@ var S={
   eventos:{llegada:null,apertura:null,cierre:null,salida:null},
   skusRegistrados:[],
   step:'home',
+  lpnActual:'', // LPN activo en el flujo de mercadería
   // Calendario
   calFecha:'',
   // SKU scan
@@ -685,13 +686,13 @@ function escribirSKU(reg){
     Subtipo:        S.subtipo,
     Pedido:         S.pedido,
     Contenedor:     S.contenedor,
-    Sello:          S.sello||'',
+    Sello:          '', // Sello guardado en LHoras, no en LRecepciones
     Pallets:        Number(S.pallets)||0,
     H_Llegada:      '',
     H_Apertura:     '',
     H_Cierre:       '',
     H_Salida:       '',
-    LPN:            '',
+    LPN:            reg.lpn||'',
     LPN_OK:         true,
     CodProducto:    reg.sku,
     CodInterno:     reg.sku,
@@ -835,17 +836,20 @@ function esperadoSKU(sku){
   return it?it.cantidad:null;
 }
 function htmlPendiente(sku){
+  // NUNCA mostrar cantidades esperadas, registradas ni pendientes al operador
   var esp=esperadoSKU(sku);
-  if(esp===null) return '<div class="alert-w" style="font-size:11px;margin:6px 0">SKU no en packing list.</div>';
+  if(esp===null) return ''; // SKU no en packing list → sin indicador
   var reg=saldoSKU(S.pedido,sku);
-  var pend=esp-reg;
-  var col=pend>0?'var(--ok)':pend===0?'var(--acc)':'var(--dan)';
-  var lbl=pend>0?'Pendiente':pend===0?'Completo':'Sobrante';
-  return '<div style="background:var(--sur2);border-radius:6px;padding:8px 12px;margin:6px 0;font-size:12px">'+
-    '<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--mut)">Esperado</span><span style="font-weight:700">'+esp+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--mut)">Registrado</span><span style="font-weight:700">'+reg+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;border-top:1px solid var(--bor);padding-top:3px"><span style="color:'+col+';font-weight:700">'+lbl+'</span><span style="color:'+col+';font-weight:700">'+Math.abs(pend)+'</span></div>'+
-  '</div>';
+  if(reg>=esp){
+    // Completo o sobrante — se maneja en confCantidad, aquí solo mostrar OK
+    return '<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(63,185,80,.12);'+
+      'border:1px solid rgba(63,185,80,.3);border-radius:6px;padding:6px 12px;margin:6px 0;font-size:12px;font-weight:700;color:var(--ok)">'+
+      '✅ Cantidad OK</div>';
+  } else {
+    return '<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(227,179,65,.12);'+
+      'border:1px solid rgba(227,179,65,.3);border-radius:6px;padding:6px 12px;margin:6px 0;font-size:12px;font-weight:700;color:var(--warn)">'+
+      '⚠ Pendiente por Ingresar</div>';
+  }
 }
 
 // ── Actualizar status de contenedor en Excel ──────────────────────
@@ -1002,6 +1006,77 @@ function recargarCatalogos(){
     if(S.rol==='supervisor') showMenuSup();
     else showMenuOp();
   });
+}
+
+// ── Actualizar status del pedido en Excel ─────────────────────────
+function actualizarStatusPedidoExcel(pedido, nuevoStatus){
+  if(!DB.catalogoDriveId||!DB.catalogoItemId) return Promise.resolve();
+  var urlUR='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
+    '/items/'+DB.catalogoItemId+"/workbook/worksheets('Pedidos')/usedRange";
+  return gGet(urlUR).then(function(d){
+    if(!d.values||!d.values.length) return;
+    var hdr=d.values[0];
+    var startColNum=1, startRowNum=1;
+    if(d.address){
+      var mA=d.address.match(/!([A-Z]+)(\d+)/);
+      if(mA){
+        startColNum=mA[1].split('').reduce(function(a,c){return a*26+(c.charCodeAt(0)-64);},0);
+        startRowNum=parseInt(mA[2]);
+      }
+    }
+    var pedColIdx=-1, statColIdx=-1;
+    hdr.forEach(function(v,i){
+      var n=(v||'').toString().trim().toLowerCase();
+      if(n==='pedido') pedColIdx=i;
+      if(n==='status'||n==='estado') statColIdx=i;
+    });
+    if(pedColIdx<0||statColIdx<0){
+      console.error('[PATCH-PED] Columnas Pedido/Status no encontradas en hoja Pedidos');
+      return;
+    }
+    var filaIdx=-1;
+    for(var ri=1;ri<d.values.length;ri++){
+      if(normStr((d.values[ri][pedColIdx]||'').toString())===normStr(pedido)){
+        filaIdx=ri; break;
+      }
+    }
+    if(filaIdx<0){console.warn('[PATCH-PED] Pedido no encontrado:',pedido);return;}
+    var rowExcel=startRowNum+filaIdx;
+    var colExcel=startColNum+statColIdx;
+    var colLetra=colExcel<=26?String.fromCharCode(64+colExcel):'col'+colExcel;
+    var celda=colLetra+rowExcel;
+    console.log('[PATCH-PED] Destino: '+celda+' Valor="'+nuevoStatus+'"');
+    var urlPatch='https://graph.microsoft.com/v1.0/drives/'+DB.catalogoDriveId+
+      '/items/'+DB.catalogoItemId+
+      "/workbook/worksheets('Pedidos')/range(address='"+celda+"')";
+    return getToken().then(function(r){
+      return fetch(urlPatch,{method:'PATCH',
+        headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
+        body:JSON.stringify({values:[[nuevoStatus]]})});
+    }).then(function(res){
+      if(res.ok){
+        var pidx=DB.pedidos.findIndex(function(p){return normStr(p.pedido)===normStr(pedido);});
+        if(pidx>=0) DB.pedidos[pidx].status=nuevoStatus;
+        console.log('[PATCH-PED] OK — '+celda+' = "'+nuevoStatus+'"');
+      } else {
+        res.text().then(function(t){console.error('[PATCH-PED] Error:',t.slice(0,150));});
+      }
+    });
+  }).catch(function(e){console.error('[PATCH-PED] Error:',e.message);});
+}
+
+// ── Verificar y cerrar pedido automáticamente si todos los contenedores son Recibido ──
+function verificarCierrePedidoAutomatico(pedido){
+  var conts=DB.contenedores.filter(function(c){return normStr(c.pedido)===normStr(pedido);});
+  if(!conts.length) return;
+  var todosCerrados=conts.every(function(c){return normStr(c.status)==='RECIBIDO';});
+  console.log('[CIERRE-AUTO] Pedido='+pedido+' Contenedores='+conts.length+' TodosRecibidos='+todosCerrados);
+  if(todosCerrados){
+    console.log('[CIERRE-AUTO] Todos los contenedores Recibidos → cerrando pedido automáticamente');
+    actualizarStatusPedidoExcel(pedido,'Cerrado').then(function(){
+      toast('Pedido '+pedido+' cerrado automáticamente — todos los contenedores recibidos');
+    });
+  }
 }
 function showHome(){
   S.step='home';
@@ -1531,6 +1606,7 @@ function _renderSeleccionarContenedor(){
 function selContRow(cont,sello,pallets){
   S.contenedor=cont;S.sello=sello||'';S.pallets=pallets||0;
   S.skusRegistrados=[];
+  S.lpnActual='';
   S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
 
   // Obtener status del contenedor desde Excel (fuente única de verdad)
@@ -1681,33 +1757,42 @@ function showEventoApertura(){
 function showEscaneo(){
   S.step='escaneo';
   var nSkus=S.skusRegistrados.length;
-  var html=stepsBar(4,6)+
-    '<div class="badge badge-rec">'+S.contenedor+' · '+nSkus+' SKUs</div>'+
+  // Agrupar skus por LPN para mostrar resumen
+  var porLPN={};
+  S.skusRegistrados.forEach(function(r){
+    var k=r.lpn||'(sin LPN)';
+    if(!porLPN[k]) porLPN[k]=0;
+    porLPN[k]++;
+  });
+  var html=stepsBar(4,5)+
+    '<div class="badge badge-rec">'+S.contenedor+(S.lpnActual?' · LPN: '+S.lpnActual:'')+'</div>'+
     '<div class="lbl">escanea o ingresa código</div>'+
     '<input class="inp" id="inp-scan" type="text" placeholder="Código de barras o SKU" autocomplete="off" autocorrect="off" spellcheck="false">'+
     '<div class="btn-row" style="margin-top:8px">'+
-      '<button class="btn btn-rec btn-big" onclick="confScan()">🔍 BUSCAR</button>'+
+      '<button class="btn btn-rec btn-big" onclick="confScan()">BUSCAR</button>'+
     '</div>';
-
   if(nSkus>0){
-    html+='<div class="lbl" style="margin-top:12px">registrados en este contenedor</div>'+
-      '<div style="max-height:200px;overflow-y:auto">';
+    html+='<div class="lbl" style="margin-top:12px">registrados — '+nSkus+' SKUs</div>'+
+      '<div style="max-height:160px;overflow-y:auto">';
     S.skusRegistrados.slice(-5).reverse().forEach(function(r){
-      html+='<div style="background:var(--sur2);border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:11px;display:flex;justify-content:space-between">'+
-        '<span style="color:var(--acc)">'+r.sku+'</span>'+
-        '<span style="color:var(--txt)">'+r.cantidad+' un</span>'+
-        '<span style="color:'+(r.estado==='DAÑADO'?'var(--dan)':'var(--ok)')+'">'+r.estado+'</span>'+
+      html+='<div style="background:var(--sur2);border-radius:6px;padding:6px 10px;margin-bottom:4px;font-size:11px;display:flex;justify-content:space-between;align-items:center">'+
+        '<span><span style="color:var(--mut);margin-right:6px">'+(r.lpn||'')+'</span><span style="color:var(--acc)">'+r.sku+'</span></span>'+
+        '<span style="color:'+(r.estado==='DAÑADO'?'var(--dan)':'var(--ok)')+'">'+r.cantidad+' un</span>'+
       '</div>';
     });
     html+='</div>';
+    // Resumen por LPN
+    var lpnKeys=Object.keys(porLPN);
+    if(lpnKeys.length>0){
+      html+='<div style="font-size:10px;color:var(--mut);margin-top:4px">'+
+        lpnKeys.map(function(k){return k+': '+porLPN[k]+' SKUs';}).join(' · ')+'</div>';
+    }
   }
-
   html+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
-    '<button class="btn btn-ok btn-big" onclick="finalizarRecepcionMercaderia()">✓ FINALIZAR RECEPCIÓN</button>'+
-    '<button class="btn btn-sec" style="font-size:12px" onclick="showCorreccion()">Corregir registro anterior</button>'+
-    '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">💾 Guardar y salir</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="showIngresarLPN()">Nuevo LPN</button>'+
+    '<button class="btn btn-ok btn-big" onclick="finalizarRecepcionMercaderia()">FINALIZAR RECEPCIÓN</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">Guardar y salir</button>'+
   '</div>';
-
   render(html);
   setTimeout(function(){var el=document.getElementById('inp-scan');if(el)el.focus();},100);
 }
@@ -1817,6 +1902,37 @@ function selEstado(e){
 function confCantidad(){
   var cant=parseInt(document.getElementById('inp-cant').value);
   if(isNaN(cant)||cant<0){toast('Ingresa una cantidad válida');return;}
+  var sk=S.skuActual;
+  var esp=esperadoSKU(sk.sku);
+  var reg_actual=saldoSKU(S.pedido,sk.sku);
+  // Verificar sobrante ANTES de guardar — sin mostrar cantidades
+  if(esp!==null&&(reg_actual+cant)>esp){
+    // Alerta roja — cantidad supera el esperado, no mostrar números
+    window._cantPendiente=cant;
+    render(
+      '<div style="background:rgba(248,81,73,.15);border:2px solid var(--dan);border-radius:10px;padding:20px;margin:10px 0;text-align:center">'+
+        '<div style="font-size:28px;margin-bottom:10px">⚠</div>'+
+        '<div style="font-size:16px;font-weight:700;color:var(--dan);margin-bottom:8px">CANTIDAD MAYOR A LA ESPERADA</div>'+
+        '<div style="font-size:12px;color:var(--txt);margin-bottom:16px">'+
+          'La cantidad ingresada supera la cantidad indicada en el packing list para este SKU.'+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--mut);margin-bottom:16px">'+
+          '<strong>SKU:</strong> '+sk.sku+'<br><strong>Cantidad ingresada:</strong> '+cant+' unidades'+
+        '</div>'+
+      '</div>'+
+      '<div class="btn-row">'+
+        '<button class="btn btn-sec btn-big" onclick="showIngresoCantidad()">✗ Cancelar</button>'+
+        '<button class="btn btn-warn btn-big" onclick="confirmarSobrante()">✓ Continuar</button>'+
+      '</div>'
+    );
+    return;
+  }
+  _guardarSKU(cant);
+}
+function confirmarSobrante(){
+  _guardarSKU(window._cantPendiente||0);
+}
+function _guardarSKU(cant){
   var novEl=document.getElementById('inp-novedad');
   var nov=novEl?novEl.value.trim():'';
   var sk=S.skuActual;
@@ -1826,10 +1942,11 @@ function confCantidad(){
     estado:window._estadoActual||'OK',
     novedad:nov,
     pedido:S.pedido,
+    lpn:S.lpnActual||'',
   };
   S.skusRegistrados.push(reg);
   escribirSKU(reg).catch(function(e){console.warn('[SP] SKU async:',e.message);});
-  toast('✓ '+sk.sku+' — '+cant+' un registradas');
+  toast(sk.sku+' — '+cant+' un');
   showEscaneo();
 }
 
@@ -1989,6 +2106,8 @@ function escribirHoras(datos){
     Personas:     Number(datos.personas)||0,
     Novedades:    datos.novedades||'',
     Estado:       datos.estado||'En Proceso',
+    Sello1:       datos.sello1||'',
+    Sello2:       datos.sello2||'',
     Timestamp:    t.ts,
   };
   return buscarItemHorasSP(S.pedido, S.contenedor).then(function(existing){
@@ -2036,10 +2155,10 @@ function showOpcionesContenedor(){
         '<div style="font-size:14px;font-weight:700">Registrar Horas</div>'+
         '<div style="font-size:11px;color:var(--mut)">Llegada · Apertura · Cierre · Salida · Cuadrilla</div>'+
       '</div>'+
-      '<div class="card-item" onclick="showEscaneo()">'+
+      '<div class="card-item" onclick="showIngresarLPN()">'+
         '<div class="card-t-icon" style="font-size:22px;margin-bottom:4px">📦</div>'+
         '<div style="font-size:14px;font-weight:700">Registrar Mercadería</div>'+
-        '<div style="font-size:11px;color:var(--mut)">Escanear SKUs · Cantidades · Estado</div>'+
+        '<div style="font-size:11px;color:var(--mut)">LPN · Escanear SKUs · Cantidades · Estado</div>'+
       '</div>'+
     '</div>'+
     '<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showSeleccionarContenedor()">← Volver</button>';
@@ -2051,39 +2170,53 @@ function showRegistrarHoras(){
   S.step='reg-horas';
   render('<div class="loading"><div class="loading-icon">...</div>'+
     '<div class="loading-txt">Cargando horas...</div></div>');
-  cargarHorasContenedor(S.pedido,S.contenedor).then(function(existing){
+  cargarHorasContenedor(S.pedido,S.contenedor).then(function(ex){
     var h=stepsBar(2,4)+
-      '<div class="badge badge-rec">🕐 HORAS — '+S.contenedor+'</div>'+
+      '<div class="badge badge-rec">HORAS — '+S.contenedor+'</div>'+
       '<div style="font-size:11px;color:var(--mut);margin-bottom:10px">Pedido: '+S.pedido+'</div>'+
       '<div class="grid2">'+
         '<div><div class="lbl" style="margin-top:0">Llegada</div>'+
-          '<input class="inp inp-sm" id="h-lleg" type="time" value="'+(existing&&existing.HoraLlegada||'')+'"></div>'+
+          '<input class="inp inp-sm" id="h-lleg" type="time" value="'+(ex&&ex.HoraLlegada||'')+'"></div>'+
         '<div><div class="lbl" style="margin-top:0">Apertura</div>'+
-          '<input class="inp inp-sm" id="h-aper" type="time" value="'+(existing&&existing.HoraApertura||'')+'"></div>'+
+          '<input class="inp inp-sm" id="h-aper" type="time" value="'+(ex&&ex.HoraApertura||'')+'"></div>'+
       '</div>'+
       '<div class="grid2" style="margin-top:6px">'+
         '<div><div class="lbl" style="margin-top:0">Cierre</div>'+
-          '<input class="inp inp-sm" id="h-cier" type="time" value="'+(existing&&existing.HoraCierre||'')+'"></div>'+
+          '<input class="inp inp-sm" id="h-cier" type="time" value="'+(ex&&ex.HoraCierre||'')+'"></div>'+
         '<div><div class="lbl" style="margin-top:0">Salida</div>'+
-          '<input class="inp inp-sm" id="h-sal" type="time" value="'+(existing&&existing.HoraSalida||'')+'"></div>'+
+          '<input class="inp inp-sm" id="h-sal" type="time" value="'+(ex&&ex.HoraSalida||'')+'"></div>'+
       '</div>'+
-      '<div class="grid2" style="margin-top:6px">'+
+      '<div style="margin-top:8px">'+
+        '<div class="lbl" style="margin-top:0">Sello 1</div>'+
+        '<input class="inp inp-sm" id="h-sello1" type="text" placeholder="Número de sello" value="'+(ex&&ex.Sello1||'')+'" autocomplete="off" style="text-transform:uppercase">'+
+      '</div>'+
+      '<div id="sello2-wrap" style="display:'+(ex&&ex.Sello2?'block':'none')+'">'+
+        '<div class="lbl" style="margin-top:6px">Sello 2</div>'+
+        '<input class="inp inp-sm" id="h-sello2" type="text" placeholder="Número de sello 2 (opcional)" value="'+(ex&&ex.Sello2||'')+'" autocomplete="off" style="text-transform:uppercase">'+
+      '</div>'+
+      '<button class="btn btn-sec" style="font-size:11px;margin-top:6px" id="btn-add-sello" '+
+        'onclick="mostrarSello2()">+ Agregar otro sello</button>'+
+      '<div class="grid2" style="margin-top:8px">'+
         '<div><div class="lbl" style="margin-top:0">Cuadrilla (personas)</div>'+
-          '<input class="inp inp-sm" id="h-pers" type="number" min="0" placeholder="0" value="'+(existing&&existing.Personas||'')+'"></div>'+
+          '<input class="inp inp-sm" id="h-pers" type="number" min="0" placeholder="0" value="'+(ex&&ex.Personas||'')+'"></div>'+
         '<div><div class="lbl" style="margin-top:0">Estado</div>'+
           '<select class="inp inp-sm" id="h-est">'+
-            '<option value="En Proceso"'+((!existing||existing.Estado==='En Proceso')?' selected':'')+'>En Proceso</option>'+
-            '<option value="Cerrado"'+(existing&&existing.Estado==='Cerrado'?' selected':'')+'>Cerrado</option>'+
+            '<option value="En Proceso"'+((!ex||ex.Estado==='En Proceso')?' selected':'')+'>En Proceso</option>'+
+            '<option value="Cerrado"'+(ex&&ex.Estado==='Cerrado'?' selected':'')+'>Cerrado</option>'+
           '</select></div>'+
       '</div>'+
-      '<div class="lbl" style="margin-top:6px">Novedades generales (opcional)</div>'+
-      '<textarea class="inp inp-sm" id="h-nov" rows="2" style="resize:none" '+
-        'placeholder="Observaciones del contenedor...">'+(existing&&existing.Novedades||'')+'</textarea>'+
+      '<div class="lbl" style="margin-top:6px">Novedades (opcional)</div>'+
+      '<textarea class="inp inp-sm" id="h-nov" rows="2" style="resize:none">'+(ex&&ex.Novedades||'')+'</textarea>'+
       '<div class="btn-row" style="margin-top:10px">'+
         '<button class="btn btn-sec" onclick="showOpcionesContenedor()">← ATR</button>'+
         '<button class="btn btn-ok btn-big" onclick="confRegistrarHoras()">✓ GUARDAR HORAS</button>'+
       '</div>';
     render(h);
+    // Si Sello2 ya existe, ocultar el botón add
+    if(ex&&ex.Sello2){
+      var btn=document.getElementById('btn-add-sello');
+      if(btn) btn.style.display='none';
+    }
     // Sugerir hora actual para llegada si está vacía
     setTimeout(function(){
       var ll=document.getElementById('h-lleg');
@@ -2101,6 +2234,8 @@ function confRegistrarHoras(){
     personas: document.getElementById('h-pers').value,
     novedades:document.getElementById('h-nov').value.trim(),
     estado:   document.getElementById('h-est').value,
+    sello1:   (document.getElementById('h-sello1')?document.getElementById('h-sello1').value.trim().toUpperCase():''),
+    sello2:   (document.getElementById('h-sello2')?document.getElementById('h-sello2').value.trim().toUpperCase():''),
   };
   render('<div class="loading"><div class="loading-icon">...</div>'+
     '<div class="loading-txt">Guardando horas...</div></div>');
@@ -2109,6 +2244,8 @@ function confRegistrarHoras(){
     if(datos.estado==='Cerrado'){
       return actualizarStatusContenedorExcel(S.pedido,S.contenedor,'Recibido').then(function(){
         toast('Horas guardadas. Contenedor marcado Recibido.');
+        // Verificar si todos los contenedores del pedido están Recibidos
+        verificarCierrePedidoAutomatico(S.pedido);
         showOpcionesContenedor();
       });
     } else {
@@ -2145,6 +2282,33 @@ function finalizarRecepcionMercaderia(){
       '<button class="btn btn-sec btn-big" onclick="'+(S.rol==='supervisor'?'showMenuSup':'showMenuOp')+'()">⌂ Menú principal</button>'+
     '</div>';
   render(h);
+}
+
+// ── LPN — ingreso y cambio de LPN ─────────────────────────────────
+function showIngresarLPN(){
+  S.step='lpn';
+  var tieneSkus=S.skusRegistrados.length>0;
+  var h=stepsBar(1,5)+
+    '<div class="badge badge-rec">'+S.contenedor+' · MERCADERÍA</div>'+
+    (tieneSkus?'<div class="alert-w" style="font-size:11px;margin-bottom:8px">LPN actual: <strong>'+(S.lpnActual||'ninguno')+'</strong> · '+S.skusRegistrados.length+' SKUs registrados</div>':'')+
+    '<div class="lbl">'+(tieneSkus?'cambiar LPN o continuar':'ingresa el LPN del pallet')+'</div>'+
+    '<input class="inp" id="inp-lpn" type="text" placeholder="Ej: LPN0001" '+
+      'value="'+(tieneSkus?'':S.lpnActual||'')+'" autocomplete="off" autocorrect="off" spellcheck="false" '+
+      'style="font-size:20px;font-weight:700;text-align:center;text-transform:uppercase">'+
+    '<div style="font-size:11px;color:var(--mut);margin-top:6px;text-align:center">Ingresa o escanea el código LPN del pallet</div>'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="showOpcionesContenedor()">← ATR</button>'+
+      '<button class="btn btn-rec btn-big" onclick="confLPN()">→ ESCANEAR PRODUCTOS</button>'+
+    '</div>'+
+    (tieneSkus?'<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="showEscaneo()">Continuar con LPN actual</button>':'');
+  render(h);
+  setTimeout(function(){var el=document.getElementById('inp-lpn');if(el)el.focus();},100);
+}
+function confLPN(){
+  var v=document.getElementById('inp-lpn').value.trim().toUpperCase();
+  if(!v){toast('Ingresa el LPN del pallet');return;}
+  S.lpnActual=v;
+  showEscaneo();
 }
 function guardarYSalir(){
   toast('Sesión guardada. Puedes retomar desde Mis Pedidos.');
@@ -2442,6 +2606,13 @@ window.confNuevoContenedor=confNuevoContenedor;
 window.confPerchadoInicio=confPerchadoInicio;
 window.confPerchadoFin=confPerchadoFin;
 window.guardarYSalir=guardarYSalir;
+window.showIngresarLPN=showIngresarLPN;
+window.confLPN=confLPN;
+window.mostrarSello2=function(){var w=document.getElementById('sello2-wrap');var b=document.getElementById('btn-add-sello');if(w)w.style.display='block';if(b)b.style.display='none';};
+window.confirmarSobrante=confirmarSobrante;
+window._guardarSKU=_guardarSKU;
+window.actualizarStatusPedidoExcel=actualizarStatusPedidoExcel;
+window.verificarCierrePedidoAutomatico=verificarCierrePedidoAutomatico;
 window.finalizarRecepcionMercaderia=finalizarRecepcionMercaderia;
 window.buscarItemHorasSP=buscarItemHorasSP;
 window.cerrarPedido=cerrarPedido;
