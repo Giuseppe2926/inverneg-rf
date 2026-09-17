@@ -43,34 +43,34 @@ select.inp{appearance:none}
   margin:0 auto 24px;
   padding:10mm 12mm 10mm 12mm;
   font-family:'Arial Narrow','Arial',sans-serif;
-  font-size:8pt;
+  font-size:9pt;
   box-shadow:0 2px 12px rgba(0,0,0,.4);
 }
 
 /* Encabezado */
 .inf-titulo{
-  text-align:center;font-size:10pt;font-weight:700;
+  text-align:center;font-size:11pt;font-weight:700;
   letter-spacing:.06em;margin-bottom:8px;text-decoration:underline;
   text-transform:uppercase;
 }
 .inf-meta{margin-bottom:6px}
-.inf-meta table{border-collapse:collapse;font-size:8pt}
-.inf-meta td{padding:1px 4px 1px 0;line-height:1.4}
+.inf-meta table{border-collapse:collapse;font-size:9pt}
+.inf-meta td{padding:2px 4px 2px 0;line-height:1.5}
 .inf-meta td:first-child{font-weight:700;white-space:nowrap;min-width:55px}
-.inf-narr{font-size:7.5pt;margin-bottom:5px;line-height:1.4}
+.inf-narr{font-size:8.5pt;margin-bottom:6px;line-height:1.5}
 
 /* Tablas — tamaño FIJO: siempre 10 filas visibles */
 .inf-tabla{width:100%;border-collapse:collapse;font-size:7pt;margin-bottom:5px;table-layout:fixed}
 .inf-tabla th{
   background:#c0c0c0;border:1px solid #666;padding:2px 3px;
-  text-align:center;font-size:6.5pt;font-weight:700;white-space:nowrap;
+  text-align:center;font-size:7.5pt;font-weight:700;white-space:nowrap;
 }
 .inf-tabla td{
-  border:1px solid #888;padding:1px 3px;text-align:center;
-  vertical-align:middle;height:14px;font-size:7pt;
+  border:1px solid #888;padding:2px 4px;text-align:center;
+  vertical-align:middle;height:16px;font-size:8pt;
 }
 .inf-tabla td.left{text-align:left}
-.inf-tabla tfoot td{font-weight:700;background:#ddd;border:1px solid #666;padding:1px 3px;text-align:center;font-size:7pt}
+.inf-tabla tfoot td{font-weight:700;background:#ddd;border:1px solid #666;padding:2px 4px;text-align:center;font-size:8pt}
 
 /* Anchos columnas tabla contenedores */
 .inf-tabla col.c-num   {width:5%}
@@ -82,22 +82,22 @@ select.inp{appearance:none}
 
 /* Tabla tiempos */
 .inf-tabla-tiempos{width:100%;border-collapse:collapse;font-size:7pt;margin-bottom:5px;table-layout:fixed}
-.inf-tabla-tiempos th{background:#c0c0c0;border:1px solid #666;padding:2px 3px;text-align:center;font-size:6.5pt;font-weight:700}
-.inf-tabla-tiempos td{border:1px solid #888;padding:1px 3px;text-align:center;height:14px;font-size:7pt}
+.inf-tabla-tiempos th{background:#c0c0c0;border:1px solid #666;padding:2px 4px;text-align:center;font-size:7.5pt;font-weight:700}
+.inf-tabla-tiempos td{border:1px solid #888;padding:2px 4px;text-align:center;height:16px;font-size:8pt}
 .inf-tabla-tiempos col.c-num{width:5%}
 .inf-tabla-tiempos col.c-hora{width:11%}
 .inf-tabla-tiempos col.c-tpo{width:13%}
 
 /* Personal */
-.inf-personal{font-size:7.5pt;margin:3px 0;line-height:1.4}
+.inf-personal{font-size:8.5pt;margin:4px 0;line-height:1.5}
 .inf-personal span{font-weight:700}
-.inf-seccion{font-weight:700;margin:6px 0 3px;font-size:8pt;text-decoration:underline}
-.inf-bodega{font-size:7.5pt;margin:0 0 3px;font-style:italic}
+.inf-seccion{font-weight:700;margin:7px 0 4px;font-size:9pt;text-decoration:underline}
+.inf-bodega{font-size:8.5pt;margin:0 0 4px;font-style:italic}
 
 /* Tabla novedades */
 .inf-tabla-nov{width:100%;border-collapse:collapse;font-size:7pt;margin-bottom:5px;table-layout:fixed}
-.inf-tabla-nov th{background:#c0c0c0;border:1px solid #666;padding:2px 3px;text-align:center;font-size:6.5pt;font-weight:700}
-.inf-tabla-nov td{border:1px solid #888;padding:1px 3px;height:14px;font-size:7pt}
+.inf-tabla-nov th{background:#c0c0c0;border:1px solid #666;padding:2px 4px;text-align:center;font-size:7.5pt;font-weight:700}
+.inf-tabla-nov td{border:1px solid #888;padding:2px 4px;height:16px;font-size:8pt}
 .inf-tabla-nov td.right{text-align:right}
 .inf-tabla-nov col.c-num  {width:4%}
 .inf-tabla-nov col.c-item {width:14%}
@@ -108,15 +108,12 @@ select.inp{appearance:none}
 .inf-tabla-nov col.c-cont {width:21%}
 
 /* Comentarios */
-.inf-comentarios{font-size:7.5pt;white-space:pre-wrap;padding:4px 6px;border:1px solid #bbb;min-height:30px;background:#fafafa;line-height:1.5}
+.inf-comentarios{font-size:8.5pt;white-space:pre-wrap;padding:5px 8px;border:1px solid #bbb;min-height:32px;background:#fafafa;line-height:1.6}
 
 /* Firmas */
-.inf-firmas{
-  display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;
-  margin-top:16px;font-size:7.5pt;
-}
+.inf-firmas{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:22px;font-size:8.5pt;page-break-inside:avoid;}
 .inf-firma-bloque{text-align:center}
-.inf-firma-linea{border-top:1px solid #000;padding-top:3px;margin-top:50px;line-height:1.5}
+.inf-firma-linea{border-top:1px solid #000;padding-top:4px;margin-top:42px;line-height:1.6}
 
 /* ── PRINT — eliminar headers/footers del navegador ─────────────── */
 @page{
