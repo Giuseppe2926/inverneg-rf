@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Informe de Novedades — Inverneg</title>
+<style>
+/* ── VARIABLES ────────────────────────────────────── */
+:root{
+  --bg:#0D1117;--sur:#161B22;--sur2:#1C2330;--bor:#2A3340;
+  --txt:#E6EDF3;--mut:#7D8590;
+  --acc:#58A6FF;--ok:#3FB950;--warn:#E3B341;--dan:#F85149;--rec:#F0883E;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+
+/* ── APP SHELL ────────────────────────────────────── */
+.hdr{background:var(--sur);border-bottom:1px solid var(--bor);padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+.hdr-brand{font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--rec)}
+.hdr-sub{font-size:10px;color:var(--mut);margin-top:1px}
+.ftr{background:var(--sur);border-top:1px solid var(--bor);padding:8px 16px;font-size:11px;color:var(--mut);display:flex;justify-content:space-between;align-items:center}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--warn);display:inline-block;margin-right:5px}
+.dot.ok{background:var(--ok)}.dot.err{background:var(--dan)}
+
+/* ── CONTROLES ────────────────────────────────────── */
+#screen{padding:16px;max-width:1100px;margin:0 auto}
+.lbl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;margin-top:10px}
+.inp{width:100%;background:var(--sur2);border:1px solid var(--bor);color:var(--txt);font-size:15px;padding:9px 12px;border-radius:6px;outline:none;font-family:inherit}
+.inp:focus{border-color:var(--acc)}
+select.inp{appearance:none}
+.btn{border:none;border-radius:6px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn:active{opacity:.75}
+.btn-pri{background:var(--acc);color:#000}
+.btn-ok{background:var(--ok);color:#000}
+.btn-sec{background:var(--sur2);color:var(--txt);border:1px solid var(--bor)}
+.btn-rec{background:var(--rec);color:#000}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.loading{text-align:center;padding:40px;color:var(--mut);font-size:13px}
+.alert-w{background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:12px;margin:6px 0}
+
+/* ── PANEL DE CONFIGURACIÓN ──────────────────────── */
+.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
+@media(max-width:600px){.config-grid{grid-template-columns:1fr}}
+
+/* ═══════════════════════════════════════════════════
+   ESTILOS DEL INFORME (se aplican en pantalla y al imprimir)
+   ═══════════════════════════════════════════════════ */
+#informe-wrap{margin-top:20px}
+.informe-page{
+  background:#fff;color:#000;
+  width:100%;max-width:980px;margin:0 auto 32px;
+  padding:24px 28px;
+  font-family:'Times New Roman',Times,serif;
+  font-size:11pt;
+  box-shadow:0 2px 12px rgba(0,0,0,.4);
+  page-break-after:always;
+}
+.informe-page:last-child{page-break-after:auto}
+
+/* Encabezado */
+.inf-titulo{text-align:center;font-size:14pt;font-weight:700;letter-spacing:.08em;margin-bottom:14px;text-decoration:underline}
+.inf-meta{margin-bottom:10px}
+.inf-meta table{border-collapse:collapse;font-size:10.5pt}
+.inf-meta td{padding:1px 6px 1px 0}
+.inf-meta td:first-child{font-weight:700;white-space:nowrap}
+
+/* Secciones */
+.inf-seccion{font-weight:700;margin:14px 0 6px;font-size:10.5pt;text-decoration:underline}
+
+/* Tabla contenedores */
+.inf-tabla{width:100%;border-collapse:collapse;font-size:9.5pt;margin-bottom:8px}
+.inf-tabla th{background:#d0d0d0;border:1px solid #888;padding:3px 6px;text-align:center;font-size:9pt}
+.inf-tabla td{border:1px solid #888;padding:2px 5px;text-align:center;vertical-align:middle}
+.inf-tabla td.left{text-align:left}
+.inf-tabla tr:nth-child(even) td{background:#f5f5f5}
+.inf-tabla tfoot td{font-weight:700;background:#e8e8e8;border:1px solid #888;padding:2px 5px;text-align:center}
+
+/* Personal */
+.inf-personal{font-size:10pt;margin:8px 0}
+.inf-personal span{font-weight:700}
+
+/* Tiempos */
+.inf-tabla-tiempos{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:8px}
+.inf-tabla-tiempos th{background:#d0d0d0;border:1px solid #888;padding:3px 5px;text-align:center}
+.inf-tabla-tiempos td{border:1px solid #888;padding:2px 5px;text-align:center}
+
+/* Mercadería con novedad */
+.inf-bodega{font-size:10pt;margin:4px 0 8px}
+.inf-tabla-nov{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:8px}
+.inf-tabla-nov th{background:#d0d0d0;border:1px solid #888;padding:3px 5px;text-align:center}
+.inf-tabla-nov td{border:1px solid #888;padding:2px 5px}
+.inf-tabla-nov td.right{text-align:right}
+
+/* Comentarios */
+.inf-comentarios{font-size:10pt;white-space:pre-wrap;margin-top:4px;padding:6px;border:1px solid #ccc;min-height:40px;background:#fafafa}
+
+/* Firma */
+.inf-firma{margin-top:20px;font-size:10pt;text-align:right}
+
+/* ── PRINT ────────────────────────────────────────── */
+@media print{
+  body{background:#fff}
+  .hdr,.ftr,#screen>*:not(#informe-wrap),.btn-row,.no-print{display:none!important}
+  #informe-wrap{margin:0}
+  .informe-page{box-shadow:none;margin:0;max-width:100%;page-break-after:always}
+}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div><div class="hdr-brand">▸ INFORMES DE NOVEDADES</div>
+  <div class="hdr-sub">Inverneg · CND</div></div>
+  <div style="font-size:11px;color:var(--mut)"><span class="dot" id="conn-dot"></span><span id="conn-lbl">CONECTANDO</span></div>
+</div>
+
+<div id="screen">
+  <div class="loading" id="init-msg">Iniciando sesión Microsoft...</div>
+</div>
+
+<div class="ftr">
+  <span>RF Novedades v1.0</span>
+  <span id="ftr-user">—</span>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ── CFG ─────────────────────────────────────── */
+var CFG={
+  clientId:   'ec976114-e146-4ce4-850c-5d978e12acfd',
+  tenantId:   '5e008bd3-17b6-4f83-8d23-019691a40609',
+  siteId:     'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
+  catalogoNombre:'Inverneg_ConteoRF_Base_Live.xlsx',
+  listas:{
+    recepciones: 'RF_PRecepciones_LRecepciones',
+    horas:       'RF_PRecepciones_LHoras',
+  },
+  defaults:{de:'Giuseppe Junco', para:'Karem Palan'},
+};
+var GRAPH='https://graph.microsoft.com/v1.0';
+var msalInst, msalAcc;
+var SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
+
+/* ── DB ─────────────────────────────────────── */
+var DB={
+  pedidos:[],contenedores:[],packing:[],codigosBarra:[],
+  catalogoDriveId:null,catalogoItemId:null,
+  listIds:{recepciones:null,horas:null},
+};
+
+/* ── UTILS ───────────────────────────────────── */
+function pad(n){return String(n).padStart(2,'0');}
+function hoy(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function fechaLarga(iso){
+  if(!iso) return '';
+  var meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  var p=iso.split('-'); if(p.length<3) return iso;
+  return parseInt(p[2])+' de '+meses[parseInt(p[1])-1]+' de '+p[0];
+}
+function fechaCorta(iso){
+  if(!iso) return ''; var p=iso.split('-');
+  return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:iso;
+}
+function normalizarFecha(v){
+  if(!v) return '';
+  if(typeof v==='number'){
+    var d=new Date(Math.round((v-25569)*86400*1000));
+    return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());
+  }
+  var s=v.toString().trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
+  if(s.indexOf('T')>-1) return s.substring(0,10);
+  var pts=s.split('/');
+  if(pts.length===3){
+    var d2=parseInt(pts[0]),m2=parseInt(pts[1]),a2=pts[2].length===4?pts[2]:'20'+pts[2];
+    return a2+'-'+String(m2).padStart(2,'0')+'-'+String(d2).padStart(2,'0');
+  }
+  return s;
+}
+function calcTiempo(desde,hasta){
+  if(!desde||!hasta) return '—';
+  var toMin=function(t){var p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]||0);};
+  var diff=toMin(hasta)-toMin(desde);
+  if(diff<0) diff+=1440;
+  var h=Math.floor(diff/60),m=diff%60;
+  return pad(h)+':'+pad(m);
+}
+function normStr(s){return s?s.toString().trim().toUpperCase():'';}
+function $r(id){return document.getElementById(id);}
+function render(html){document.getElementById('screen').innerHTML=html;}
+function setConn(s){
+  var dot=$r('conn-dot'),lbl=$r('conn-lbl');
+  dot.className='dot'+(s==='ok'?' ok':s==='err'?' err':'');
+  lbl.textContent=s==='ok'?'LIVE':s==='err'?'SIN CONEXIÓN':'CONECTANDO';
+}
+
+/* ── GRAPH ───────────────────────────────────── */
+function getToken(){
+  var req={scopes:SCOPES,account:msalAcc};
+  return msalInst.acquireTokenSilent(req).catch(function(){return msalInst.acquireTokenRedirect(req);});
+}
+function gGet(url){
+  return getToken().then(function(r){
+    return fetch(url,{headers:{'Authorization':'Bearer '+r.accessToken}});
+  }).then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,120));});return r.json();});
+}
+function urlWB(hoja){
+  return GRAPH+'/drives/'+DB.catalogoDriveId+'/items/'+DB.catalogoItemId+
+    "/workbook/worksheets('"+hoja+"')/usedRange";
+}
+function urlLista(id){return GRAPH+'/sites/'+CFG.siteId+'/lists/'+id;}
+
+/* ── DESCUBRIMIENTO ───────────────────────────── */
+function descubrirListas(){
+  return gGet(GRAPH+'/sites/'+CFG.siteId+'/lists?$select=id,displayName&$top=200').then(function(d){
+    (d.value||[]).forEach(function(l){
+      Object.keys(CFG.listas).forEach(function(k){if(l.displayName===CFG.listas[k])DB.listIds[k]=l.id;});
+    });
+  }).catch(function(e){console.error('[INIT] listas:',e.message);});
+}
+function descubrirExcel(){
+  var nom=CFG.catalogoNombre;
+  var urlSP=GRAPH+'/sites/'+CFG.siteId+'/drive/root/search(q=\''+encodeURIComponent(nom)+'\')';
+  return gGet(urlSP).then(function(d){
+    var f=d.value&&d.value.find(function(x){return x.name===nom;});
+    if(!f) return gGet(GRAPH+'/me/drive/root/search(q=\''+encodeURIComponent(nom)+'\')').then(function(d2){
+      return d2.value&&d2.value.find(function(x){return x.name===nom;});
+    });
+    return f;
+  }).then(function(f){
+    if(!f){console.error('[INIT] Excel no encontrado');return;}
+    DB.catalogoDriveId=f.parentReference&&f.parentReference.driveId;
+    DB.catalogoItemId=f.id;
+  }).catch(function(e){console.error('[INIT] Excel:',e.message);});
+}
+
+/* ── LECTURA DE CATÁLOGOS ────────────────────── */
+function cargarCatalogos(){
+  return descubrirExcel().then(function(){
+    if(!DB.catalogoDriveId) return;
+    return Promise.all([
+      gGet(urlWB('Pedidos')).then(function(d){parsearPedidos(d);}).catch(function(){}),
+      gGet(urlWB('Contenedores')).then(function(d){parsearContenedores(d);}).catch(function(){}),
+      gGet(urlWB('Packing')).then(function(d){parsearPacking(d);}).catch(function(){}),
+      gGet(urlWB('C.Barra')).then(function(d){parsearCBarra(d);}).catch(function(){}),
+    ]);
+  });
+}
+function filaValida(v){return v!==null&&v!==undefined&&v.toString().trim().length>0;}
+function parsearPedidos(d){
+  if(!d||!d.values||d.values.length<2) return;
+  var hdr=d.values[0].map(function(v){return(v||'').toString().trim().toLowerCase();});
+  var iP=hdr.indexOf('pedido');
+  var iT=hdr.findIndex(function(h){return h==='tipo';});
+  var iS=hdr.findIndex(function(h){return h==='status'||h==='estado';});
+  d.values.slice(1).forEach(function(r){
+    if(!filaValida(r[iP])) return;
+    DB.pedidos.push({pedido:r[iP].toString().trim(),tipo:iT>=0&&r[iT]?r[iT].toString().trim():'',status:iS>=0&&r[iS]?r[iS].toString().trim():''});
+  });
+}
+function parsearContenedores(d){
+  if(!d||!d.values||d.values.length<2) return;
+  var hdr=d.values[0].map(function(v){return(v||'').toString().trim().toLowerCase();});
+  var iP=hdr.indexOf('pedido');
+  var iFP=hdr.findIndex(function(h){return h.indexOf('fechaprog')>-1||h==='fechaprogramada';});
+  var iC=hdr.findIndex(function(h){return h.indexOf('contenedor')>-1;});
+  var iS1=hdr.findIndex(function(h){return h.indexOf('sello')>-1&&!h.includes('2');});
+  var iS2=hdr.findIndex(function(h){return h.includes('sello')&&(h.includes('2')||h.includes('ii'));});
+  var iPall=hdr.findIndex(function(h){return h.indexOf('pallet')>-1;});
+  var iStat=hdr.findIndex(function(h){return h==='status'||h==='estado';});
+  var iFR=hdr.findIndex(function(h){return h.indexOf('fecharec')>-1;});
+  d.values.slice(1).forEach(function(r){
+    if(!filaValida(r[iP])) return;
+    DB.contenedores.push({
+      pedido:r[iP].toString().trim(),
+      fechaProg:iFP>=0?normalizarFecha(r[iFP]):'',
+      contenedor:iC>=0&&r[iC]?r[iC].toString().trim():'',
+      pallets:iPall>=0&&r[iPall]?Number(r[iPall]):0,
+      status:iStat>=0&&r[iStat]?r[iStat].toString().trim():'',
+      fechaRec:iFR>=0?normalizarFecha(r[iFR]):'',
+    });
+  });
+}
+function parsearPacking(d){
+  if(!d||!d.values||d.values.length<2) return;
+  var hdr=d.values[0].map(function(v){return(v||'').toString().trim().toLowerCase();});
+  var iP=hdr.indexOf('pedido'),iS=hdr.findIndex(function(h){return h==='sku';});
+  var iD=hdr.findIndex(function(h){return h.indexOf('desc')>-1;});
+  var iQ=hdr.findIndex(function(h){return h.indexOf('cant')>-1||h==='cantidad';});
+  d.values.slice(1).forEach(function(r){
+    if(!filaValida(r[iP])||!filaValida(r[iS])) return;
+    DB.packing.push({pedido:r[iP].toString().trim(),sku:r[iS].toString().trim(),desc:iD>=0&&r[iD]?r[iD].toString().trim():'',cantidad:iQ>=0&&r[iQ]?Number(r[iQ]):0});
+  });
+}
+function parsearCBarra(d){
+  if(!d||!d.values||d.values.length<2) return;
+  var hdr=d.values[0].map(function(v){return(v||'').toString().trim().toLowerCase();});
+  var iS=hdr.indexOf('sku')||0;
+  var iD=hdr.findIndex(function(h){return h.indexOf('desc')>-1;});
+  var iM=hdr.findIndex(function(h){return h==='marca';});
+  d.values.slice(1).forEach(function(r){
+    if(!filaValida(r[iS])) return;
+    DB.codigosBarra.push({sku:r[iS].toString().trim(),desc:iD>=0&&r[iD]?r[iD].toString().trim():'',marca:iM>=0&&r[iM]?r[iM].toString().trim():''});
+  });
+}
+function getMarca(sku){
+  var it=DB.codigosBarra.find(function(r){return normStr(r.sku)===normStr(sku);});
+  return it?it.marca:'';
+}
+
+/* ── CARGA DE DATOS SP ───────────────────────── */
+function cargarHorasPedido(pedido){
+  if(!DB.listIds.horas) return Promise.resolve([]);
+  return gGet(urlLista(DB.listIds.horas)+'/items?$expand=fields&$top=500').then(function(d){
+    return (d.value||[]).map(function(i){return i.fields||{};}).filter(function(f){
+      return normStr(f.Pedido||'')===normStr(pedido);
+    });
+  }).catch(function(){return[];});
+}
+function cargarRecepcionesPedido(pedido){
+  if(!DB.listIds.recepciones) return Promise.resolve([]);
+  return gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=2000').then(function(d){
+    return (d.value||[]).map(function(i){return i.fields||{};}).filter(function(f){
+      return normStr(f.Pedido||'')===normStr(pedido);
+    });
+  }).catch(function(){return[];});
+}
+
+/* ── PANTALLA PRINCIPAL ──────────────────────── */
+function showPanel(){
+  var pedOpts=DB.pedidos.map(function(p){return '<option value="'+p.pedido+'">'+p.pedido+(p.tipo?' · '+p.tipo:'')+'</option>';}).join('');
+  render(
+    '<div class="lbl">pedido</div>'+
+    '<select class="inp" id="sel-pedido">'+
+      '<option value="">— seleccionar pedido —</option>'+pedOpts+
+    '</select>'+
+    '<div class="config-grid" style="margin-top:10px">'+
+      '<div><div class="lbl">DE</div><input class="inp" id="inp-de" value="'+CFG.defaults.de+'"></div>'+
+      '<div><div class="lbl">PARA</div><input class="inp" id="inp-para" value="'+CFG.defaults.para+'"></div>'+
+    '</div>'+
+    '<div class="btn-row">'+
+      '<button class="btn btn-rec" onclick="generarInforme()">📋 Generar Informe</button>'+
+      '<button class="btn btn-sec" onclick="window.print()">🖨 Imprimir / PDF</button>'+
+    '</div>'+
+    '<div id="informe-wrap"></div>'
+  );
+}
+
+/* ── GENERAR INFORME ─────────────────────────── */
+function generarInforme(){
+  var pedido=$r('sel-pedido').value;
+  if(!pedido){alert('Selecciona un pedido');return;}
+  var de=$r('inp-de').value.trim()||CFG.defaults.de;
+  var para=$r('inp-para').value.trim()||CFG.defaults.para;
+  $r('informe-wrap').innerHTML='<div class="loading">⏳ Cargando datos del pedido...</div>';
+
+  var conts=DB.contenedores.filter(function(c){return normStr(c.pedido)===normStr(pedido);});
+
+  Promise.all([
+    cargarHorasPedido(pedido),
+    cargarRecepcionesPedido(pedido),
+  ]).then(function(res){
+    var horas=res[0];
+    var recepciones=res[1];
+
+    // Helper: encontrar registro de horas por contenedor
+    function getHoras(cont){
+      return horas.find(function(h){return normStr(h.Contenedor||'')===normStr(cont);})||{};
+    }
+
+    // Fecha de recepción del informe = primera fecha de recepción disponible
+    var fechaRec='';
+    conts.forEach(function(c){if(!fechaRec&&c.fechaRec) fechaRec=c.fechaRec;});
+    horas.forEach(function(h){if(!fechaRec&&h.FechaRegistro) fechaRec=h.FechaRegistro;});
+
+    // Mercadería con novedad
+    var novedad=recepciones.filter(function(r){
+      var est=normStr(r.Estado||'');
+      var nov=(r.Novedades||'').trim();
+      return est==='DAÑADO'||est==='DAÑADA'||est==='CORRECCION'||nov.length>0;
+    });
+
+    // Agrupar novedades por SKU+Contenedor
+    var novedadGroup={};
+    novedad.forEach(function(r){
+      var k=(r.CodProducto||'')+'|'+(r.Contenedor||'');
+      if(!novedadGroup[k]){novedadGroup[k]={sku:r.CodProducto||'',cont:r.Contenedor||'',total:0,obs:'',marca:''};}
+      novedadGroup[k].total+=Number(r.Cantidad)||0;
+      if(r.Novedades&&novedadGroup[k].obs.indexOf(r.Novedades)<0) novedadGroup[k].obs+=(novedadGroup[k].obs?'; ':'')+r.Novedades;
+      if(!novedadGroup[k].marca) novedadGroup[k].marca=getMarca(r.CodProducto||'');
+    });
+    var novedades=Object.values(novedadGroup);
+
+    // Comentarios: novedades de LHoras por contenedor
+    var comentarios='';
+    conts.forEach(function(c){
+      var h=getHoras(c.contenedor);
+      if(h.Novedades&&h.Novedades.trim()){
+        comentarios+='CONTENEDOR '+c.contenedor+':\n'+h.Novedades.trim()+'\n\n';
+      }
+    });
+    comentarios=comentarios.trim();
+
+    // Paginación: 10 contenedores por página
+    var CONTS_POR_PAG=10;
+    var paginas=[];
+    for(var i=0;i<conts.length;i+=CONTS_POR_PAG){
+      paginas.push(conts.slice(i,i+CONTS_POR_PAG));
+    }
+    if(paginas.length===0) paginas=[[]];
+
+    var html='';
+    paginas.forEach(function(paginaConts,pIdx){
+      var esUltimaPagina=pIdx===paginas.length-1;
+      var totalPallets=0;
+      paginaConts.forEach(function(c){
+        var h=getHoras(c.contenedor);
+        totalPallets+=Number(h.PalletsRecibidos||0);
+      });
+
+      html+='<div class="informe-page">';
+
+      /* ── ENCABEZADO ── */
+      html+='<div class="inf-titulo">INFORME DE NOVEDADES DE IMPORTACION</div>';
+      html+='<div class="inf-meta"><table>';
+      html+='<tr><td>DE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</td><td>'+esc(de)+'</td></tr>';
+      html+='<tr><td>PARA&nbsp;&nbsp;:</td><td>'+esc(para)+'</td></tr>';
+      html+='<tr><td>FECHA</td><td>'+fechaCorta(hoy())+'</td></tr>';
+      html+='<tr><td>PEDIDO</td><td><b>'+esc(pedido)+'</b></td></tr>';
+      html+='</table></div>';
+
+      html+='<p style="font-size:10pt;margin-bottom:6px">Informo a Ud. que con fecha <b>'+
+        (fechaRec?fechaLarga(fechaRec):'_______________')+
+        '</b> hemos recibido el/los siguiente(s) contenedor(es) con la(s) siguiente(s) denominación(es) y sello(s) respectivo(s):</p>';
+
+      /* ── SECCIÓN 1: CONTENEDORES ── */
+      html+='<table class="inf-tabla">';
+      html+='<thead><tr>'+
+        '<th>#</th><th>CONTENEDOR</th><th>Sello I</th><th>Sello II</th>'+
+        '<th>Capacidad</th><th>Fecha Recepción</th><th>N° Pallets</th>'+
+      '</tr></thead><tbody>';
+
+      paginaConts.forEach(function(c,ci){
+        var h=getHoras(c.contenedor);
+        var numGlobal=pIdx*CONTS_POR_PAG+ci+1;
+        var fr=c.fechaRec||h.FechaRegistro||'';
+        html+='<tr>'+
+          '<td>'+numGlobal+'</td>'+
+          '<td class="left"><b>'+esc(c.contenedor)+'</b></td>'+
+          '<td>'+esc(h.Sello1||'')+'</td>'+
+          '<td>'+esc(h.Sello2||'')+'</td>'+
+          '<td>'+(h.Capacidad?h.Capacidad+"'":'')+' </td>'+
+          '<td>'+fechaCorta(fr)+'</td>'+
+          '<td>'+((h.PalletsRecibidos||0)||'')+'</td>'+
+        '</tr>';
+      });
+      html+='</tbody><tfoot><tr>'+
+        '<td colspan="6">TOTAL</td>'+
+        '<td>'+(totalPallets||'')+'</td>'+
+      '</tr></tfoot></table>';
+
+      /* ── PERSONAL ── */
+      var h0=paginaConts.length>0?getHoras(paginaConts[0].contenedor):{};
+      var personas=h0.Personas||'';
+      var operario=h0.Operario||'';
+      html+='<div class="inf-personal">Personal de estiba particular: <span>'+
+        (personas?personas+' personas':'—')+
+        '</span>&nbsp;&nbsp; de Inverneg: <span>'+esc(operario||'')+'</span></div>';
+      html+='<div class="inf-personal" style="margin-bottom:8px">Tipo de estiba en el interior: ___________________________</div>';
+
+      /* ── SECCIÓN 2: TIEMPOS ── */
+      html+='<div class="inf-seccion">Tiempos por contenedor</div>';
+      html+='<table class="inf-tabla-tiempos">';
+      html+='<thead><tr>'+
+        '<th>#</th>'+
+        '<th>Llegada</th><th>Salida</th><th>Tiempo Op.</th>'+
+        '<th>Apertura</th><th>Cierre</th><th>Tiempo Desc.</th>'+
+      '</tr></thead><tbody>';
+      paginaConts.forEach(function(c,ci){
+        var h=getHoras(c.contenedor);
+        var numGlobal=pIdx*CONTS_POR_PAG+ci+1;
+        html+='<tr>'+
+          '<td>'+numGlobal+'</td>'+
+          '<td>'+esc(h.HoraLlegada||'')+'</td>'+
+          '<td>'+esc(h.HoraSalida||'')+'</td>'+
+          '<td><b>'+calcTiempo(h.HoraLlegada,h.HoraSalida)+'</b></td>'+
+          '<td>'+esc(h.HoraApertura||'')+'</td>'+
+          '<td>'+esc(h.HoraCierre||'')+'</td>'+
+          '<td><b>'+calcTiempo(h.HoraApertura,h.HoraCierre)+'</b></td>'+
+        '</tr>';
+      });
+      html+='</tbody></table>';
+
+      /* ── SECCIÓN 3 y 4: solo en última página ── */
+      if(esUltimaPagina){
+        /* Mercadería con novedad */
+        html+='<div class="inf-seccion">Mercadería recibida en bodega con novedad:</div>';
+        html+='<div class="inf-bodega">Observaciones (Detalles)</div>';
+        if(novedades.length===0){
+          html+='<p style="font-size:10pt;color:#555;margin-bottom:8px">Sin novedades registradas.</p>';
+        } else {
+          html+='<table class="inf-tabla-nov">';
+          html+='<thead><tr><th>#</th><th>Item</th><th>Total Unidades</th><th>Marca</th><th>Observación</th><th>Contenedor</th></tr></thead><tbody>';
+          novedades.forEach(function(n,ni){
+            html+='<tr>'+
+              '<td style="text-align:center">'+(ni+1)+'</td>'+
+              '<td>'+esc(n.sku)+'</td>'+
+              '<td class="right">'+n.total+'</td>'+
+              '<td>'+esc(n.marca)+'</td>'+
+              '<td>'+esc(n.obs)+'</td>'+
+              '<td>'+esc(n.cont)+'</td>'+
+            '</tr>';
+          });
+          html+='</tbody></table>';
+        }
+
+        /* Comentarios */
+        html+='<div class="inf-seccion">Comentarios</div>';
+        html+='<div class="inf-comentarios">'+esc(comentarios||'Sin comentarios.')+'</div>';
+
+        /* Firma */
+        html+='<div class="inf-firma">'+
+          '<div style="margin-top:30px;border-top:1px solid #000;display:inline-block;min-width:200px;text-align:center;padding-top:4px">'+
+          esc(de)+'<br><span style="font-size:9pt">Jefe de Bodega CND</span></div>'+
+        '</div>';
+      }
+
+      html+='</div>'; // fin informe-page
+    });
+
+    $r('informe-wrap').innerHTML=html;
+  });
+}
+
+function esc(s){return(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+/* ── MSAL BOOT ───────────────────────────────── */
+var s=document.createElement('script');
+s.src='https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
+s.onload=function(){
+  var cfg={
+    auth:{clientId:CFG.clientId,authority:'https://login.microsoftonline.com/'+CFG.tenantId,
+      redirectUri:location.href.split('?')[0].split('#')[0],navigateToLoginRequestUrl:false},
+    cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true},
+  };
+  msalInst=new msal.PublicClientApplication(cfg);
+  msalInst.handleRedirectPromise().then(function(res){
+    if(res&&res.account){msalAcc=res.account;boot();}
+    else{var acc=msalInst.getAllAccounts();if(acc.length>0){msalAcc=acc[0];boot();}else{loginPage();}}
+  }).catch(function(e){console.error('[MSAL]',e.message);loginPage();});
+};
+s.onerror=function(){document.getElementById('screen').innerHTML='<div class="loading" style="color:var(--dan)">Error cargando MSAL. Verifica conexión.</div>';};
+document.head.appendChild(s);
+
+function loginPage(){
+  render('<div class="loading"><div style="font-size:28px;margin-bottom:12px">📋</div>'+
+    '<div style="font-size:15px;font-weight:700;color:var(--rec);margin-bottom:8px">Informes de Novedades</div>'+
+    '<div style="font-size:12px;color:var(--mut);margin-bottom:20px">Inverneg · Centro de Distribución Nacional</div>'+
+    '<button class="btn btn-rec" onclick="msalInst.loginRedirect({scopes:SCOPES})">🔐 Iniciar sesión Microsoft</button></div>');
+}
+function boot(){
+  $r('ftr-user').textContent=msalAcc.username||msalAcc.name||'—';
+  render('<div class="loading">⏳ Cargando catálogos...</div>');
+  Promise.all([descubrirListas(),cargarCatalogos()]).then(function(){
+    setConn('ok');
+    showPanel();
+  }).catch(function(e){console.error('[BOOT]',e.message);setConn('err');showPanel();});
+}
+
+window.generarInforme=generarInforme;
+})();
+</script>
+</body>
+</html>
