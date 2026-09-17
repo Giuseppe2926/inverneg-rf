@@ -223,6 +223,7 @@ var DB={
   pedidos:[],contenedores:[],
   compra:[],importaciones:[],
   codigosBarra:[],
+  skusPedidoCache:[], // registros SP del pedido activo para validación de exceso
   listIds:{recepciones:null,eventos:null,asignaciones:null,horas:null},
   catalogoDriveId:null,catalogoItemId:null,
 };
@@ -821,12 +822,35 @@ function getPacingList(pedido,subtipo){
 
 // ── Helpers pendiente por pedido ────────────────────────────────
 function saldoSKU(pedido,sku){
-  var t=0;
+  // Suma registros de SP de otros contenedores (caché) + sesión actual
+  // La comparación es a nivel Pedido + SKU (todos los contenedores)
+  var total=0;
+  // Registros ya persistidos en SP (otros contenedores del pedido)
+  DB.skusPedidoCache.forEach(function(r){
+    if(normStr(r.CodProducto||'')===normStr(sku))
+      total+=Number(r.Cantidad)||0;
+  });
+  // Registros de la sesión actual (aún no en el caché)
   S.skusRegistrados.forEach(function(r){
     if(normStr(r.sku)===normStr(sku)&&normStr(r.pedido||S.pedido)===normStr(pedido))
-      t+=Number(r.cantidad)||0;
+      total+=Number(r.cantidad)||0;
   });
-  return t;
+  return total;
+}
+
+// Cargar caché de SKUs del pedido desde SP (llamar al iniciar flujo de mercadería)
+function cargarCacheSKUsPedido(pedido){
+  return cargarSKUsSP(pedido, null).then(function(regs){
+    // Excluir registros de la sesión actual para no doble-contar
+    // Identificar por RecId de sesión
+    DB.skusPedidoCache=regs.filter(function(r){
+      return (r.Sesion||'')!==S.recId;
+    });
+    console.log('[CACHE-SKU] Pedido='+pedido+' registros SP:'+regs.length+' en caché:'+DB.skusPedidoCache.length);
+  }).catch(function(e){
+    console.warn('[CACHE-SKU] Error cargando caché:',e.message);
+    DB.skusPedidoCache=[];
+  });
 }
 function esperadoSKU(sku){
   var lista=S.subtipo==='IMPORTACION'?DB.importaciones:DB.compra;
@@ -1607,6 +1631,7 @@ function selContRow(cont,sello,pallets){
   S.contenedor=cont;S.sello=sello||'';S.pallets=pallets||0;
   S.skusRegistrados=[];
   S.lpnActual='';
+  DB.skusPedidoCache=[];
   S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
 
   // Obtener status del contenedor desde Excel (fuente única de verdad)
@@ -2300,15 +2325,32 @@ function showIngresarLPN(){
       '<button class="btn btn-sec" onclick="showOpcionesContenedor()">← ATR</button>'+
       '<button class="btn btn-rec btn-big" onclick="confLPN()">→ ESCANEAR PRODUCTOS</button>'+
     '</div>'+
-    (tieneSkus?'<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="showEscaneo()">Continuar con LPN actual</button>':'');
+    (tieneSkus?'<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="continuarConLPNActual()">Continuar con LPN actual</button>':'');
   render(h);
   setTimeout(function(){var el=document.getElementById('inp-lpn');if(el)el.focus();},100);
+}
+
+function continuarConLPNActual(){
+  if(DB.skusPedidoCache.length===0&&S.skusRegistrados.length===0){
+    // Primera vez — cargar caché
+    render('<div class="loading"><div class="loading-icon">...</div>'+
+      '<div class="loading-txt">Cargando datos del pedido...</div></div>');
+    cargarCacheSKUsPedido(S.pedido).then(function(){showEscaneo();});
+  } else {
+    showEscaneo();
+  }
 }
 function confLPN(){
   var v=document.getElementById('inp-lpn').value.trim().toUpperCase();
   if(!v){toast('Ingresa el LPN del pallet');return;}
   S.lpnActual=v;
-  showEscaneo();
+  // Cargar caché de SKUs del pedido para validación correcta de exceso
+  // (incluye registros de otros contenedores del mismo pedido)
+  render('<div class="loading"><div class="loading-icon">...</div>'+
+    '<div class="loading-txt">Cargando datos del pedido...</div></div>');
+  cargarCacheSKUsPedido(S.pedido).then(function(){
+    showEscaneo();
+  });
 }
 function guardarYSalir(){
   toast('Sesión guardada. Puedes retomar desde Mis Pedidos.');
@@ -2608,6 +2650,8 @@ window.confPerchadoFin=confPerchadoFin;
 window.guardarYSalir=guardarYSalir;
 window.showIngresarLPN=showIngresarLPN;
 window.confLPN=confLPN;
+window.continuarConLPNActual=continuarConLPNActual;
+window.cargarCacheSKUsPedido=cargarCacheSKUsPedido;
 window.mostrarSello2=function(){var w=document.getElementById('sello2-wrap');var b=document.getElementById('btn-add-sello');if(w)w.style.display='block';if(b)b.style.display='none';};
 window.confirmarSobrante=confirmarSobrante;
 window._guardarSKU=_guardarSKU;
