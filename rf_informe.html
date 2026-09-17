@@ -40,13 +40,11 @@ select.inp{appearance:none}
 .informe-page{
   background:#fff;color:#000;
   width:210mm;
-  min-height:297mm;
   margin:0 auto 24px;
   padding:10mm 12mm 10mm 12mm;
   font-family:'Arial Narrow','Arial',sans-serif;
   font-size:8pt;
   box-shadow:0 2px 12px rgba(0,0,0,.4);
-  position:relative;
 }
 
 /* Encabezado */
@@ -115,11 +113,10 @@ select.inp{appearance:none}
 /* Firmas */
 .inf-firmas{
   display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;
-  margin-top:28px;font-size:7.5pt;
-  position:absolute;bottom:12mm;left:12mm;right:12mm;
+  margin-top:16px;font-size:7.5pt;
 }
 .inf-firma-bloque{text-align:center}
-.inf-firma-linea{border-top:1px solid #000;padding-top:3px;margin-top:55px;line-height:1.5}
+.inf-firma-linea{border-top:1px solid #000;padding-top:3px;margin-top:50px;line-height:1.5}
 
 /* ── PRINT — eliminar headers/footers del navegador ─────────────── */
 @page{
@@ -139,10 +136,11 @@ select.inp{appearance:none}
     box-shadow:none!important;
     margin:0!important;
     width:210mm!important;
-    min-height:297mm!important;
+    min-height:auto!important;
     page-break-after:always;
     page-break-inside:avoid;
     border:none!important;
+    padding:10mm 12mm!important;
   }
   .informe-page:last-child{page-break-after:auto}
   /* Forzar fondo gris en encabezados de tablas al imprimir */
@@ -443,23 +441,31 @@ function generarInforme(){
       }
     });
 
-    // Diferencias vs Packing (líneas independientes por tipo)
+    // Diferencias vs Packing
+    // REGLA: el neto incluye TODOS los registros (OK + DAÑADO + CORRECCION).
+    // Las correcciones son cantidades negativas que ajustan el saldo real.
+    // Se excluyen solo como líneas independientes de novedad, no del cálculo.
     packingPedido.forEach(function(pk){
       var esperado=pk.cantidad;
-      var recibidoTotal=0;
+      var recibidoNeto=0;
       var contEj='',loteEj='';
       recepciones.forEach(function(r){
-        if(normStr(r.CodProducto||'')===normStr(pk.sku)&&normStr(r.Estado||'')!=='CORRECCION'){
-          recibidoTotal+=Number(r.Cantidad)||0;
+        if(normStr(r.CodProducto||'')===normStr(pk.sku)){
+          recibidoNeto+=Number(r.Cantidad)||0;
           if(!contEj){contEj=r.Contenedor||'';loteEj=r.Lote||'';}
         }
       });
-      var diff=recibidoTotal-esperado;
+      var diff=recibidoNeto-esperado;
       if(diff!==0){
-        lineasNovedad.push({sku:pk.sku,lote:loteEj,cantidad:Math.abs(diff),marca:getMarca(pk.sku),obs:diff<0?'FALTANTE':'SOBRANTE',contenedor:contEj});
+        lineasNovedad.push({
+          sku:pk.sku,lote:loteEj,cantidad:Math.abs(diff),
+          marca:getMarca(pk.sku),
+          obs:diff<0?'FALTANTE':'SOBRANTE',
+          contenedor:contEj,
+        });
       }
     });
-
+    
     var orden={'DAÑADO':0,'FALTANTE':1,'SOBRANTE':2};
     lineasNovedad.sort(function(a,b){
       var oa=orden[a.obs]!==undefined?orden[a.obs]:3;
