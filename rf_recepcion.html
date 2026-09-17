@@ -1930,6 +1930,25 @@ function confCantidad(){
   var cant=parseInt(document.getElementById('inp-cant').value);
   if(isNaN(cant)||cant<0){toast('Ingresa una cantidad válida');return;}
   var sk=S.skuActual;
+
+  // LOG CRÍTICO: estado de DB.packing y S.skusRegistrados antes de evaluar
+  console.log('[CONF-CANT] ==========================================');
+  console.log('[CONF-CANT] Pedido="'+S.pedido+'" SKU="'+sk.sku+'" CantIngresada='+cant);
+  console.log('[CONF-CANT] DB.packing total='+DB.packing.length+' items');
+  console.log('[CONF-CANT] S.skusRegistrados total='+S.skusRegistrados.length+' items');
+  console.log('[CONF-CANT] DB.skusPedidoCache total='+DB.skusPedidoCache.length+' items');
+  // Mostrar items del packing para este pedido
+  var packingDelPedido=DB.packing.filter(function(r){return normStr(r.pedido)===normStr(S.pedido);});
+  console.log('[CONF-CANT] Packing del pedido "'+S.pedido+'": '+packingDelPedido.length+' SKUs');
+  packingDelPedido.forEach(function(r){
+    console.log('[CONF-CANT]   SKU="'+r.sku+'" desc="'+r.desc+'" cant='+r.cantidad+
+      ' normSKU="'+normStr(r.sku)+'" normSKUbuscado="'+normStr(sk.sku)+'" match='+(normStr(r.sku)===normStr(sk.sku)));
+  });
+  // Mostrar registros de sesión para este SKU
+  var sesionDelSKU=S.skusRegistrados.filter(function(r){return normStr(r.sku)===normStr(sk.sku);});
+  console.log('[CONF-CANT] Sesion SKU "'+sk.sku+'": '+sesionDelSKU.length+' registros, suma='+
+    sesionDelSKU.reduce(function(a,r){return a+(Number(r.cantidad)||0);},0));
+
   var esp=esperadoSKU(sk.sku);
 
   // Log detallado de componentes del saldo para diagnóstico
