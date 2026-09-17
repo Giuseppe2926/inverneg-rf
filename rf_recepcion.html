@@ -221,7 +221,7 @@ var GRAPH='https://graph.microsoft.com/v1.0';
 var DB={
   operadores:[],supervisores:[],
   pedidos:[],contenedores:[],
-  compra:[],importaciones:[],
+  packing:[], // hoja Packing — única fuente de cantidades esperadas
   codigosBarra:[],
   skusPedidoCache:[], // registros SP del pedido activo para validación de exceso
   listIds:{recepciones:null,eventos:null,asignaciones:null,horas:null},
@@ -436,8 +436,7 @@ function leerCatalogos(){
         '<button class="btn btn-sec btn-big" style="margin-top:16px" onclick="location.reload()">↻ Reintentar</button></div>');
       return;
     }
-    var hojas=['Operadores','Supervisores','Pedidos','Contenedores',
-               'Compra','Importaciones','C.Barra','Asignaciones'];
+    var hojas=['Operadores','Supervisores','Pedidos','Contenedores','Packing','C.Barra','Asignaciones'];
     return Promise.all(hojas.map(function(h){
       return gGet(urlWB(h)).then(function(r){return{hoja:h,data:r,err:null};})
         .catch(function(e){
@@ -576,26 +575,17 @@ function parsear(hoja,data,err){
       console.log('[EXCEL] Contenedores['+i+']:',JSON.stringify(c));
     });
 
-  } else if(hoja==='Compra'){
-    // Cols: Pedido(0), SKU(1), Descripcion(2), Cantidad(3)
+  
+  } else if(hoja==='Packing'){
+    // Hoja única de packing list — Cols: Pedido(0), SKU(1), Descripcion(2), Cantidad(3)
     var carg=raw.filter(function(r){return filaValida(r[0],50)&&r[1];});
-    DB.compra=carg.map(function(r){return{
+    DB.packing=carg.map(function(r){return{
       pedido:  r[0]?r[0].toString().trim():'',
       sku:     r[1]?r[1].toString().trim():'',
       desc:    r[2]?r[2].toString().trim():'',
       cantidad:r[3]?Number(r[3]):0,
     };});
-    logHoja('Compra',rawTotal,DB.compra.length,rawTotal-DB.compra.length,DB.compra);
-
-  } else if(hoja==='Importaciones'){
-    var carg=raw.filter(function(r){return filaValida(r[0],50)&&r[1];});
-    DB.importaciones=carg.map(function(r){return{
-      pedido:  r[0]?r[0].toString().trim():'',
-      sku:     r[1]?r[1].toString().trim():'',
-      desc:    r[2]?r[2].toString().trim():'',
-      cantidad:r[3]?Number(r[3]):0,
-    };});
-    logHoja('Importaciones',rawTotal,DB.importaciones.length,rawTotal-DB.importaciones.length,DB.importaciones);
+    logHoja('Packing',rawTotal,DB.packing.length,rawTotal-DB.packing.length,DB.packing);
 
   } else if(hoja==='C.Barra'){
     // Cols: SKU(0), Descripcion(1), Un(2), Cód.BarrasUnidad(3), Un/CJ(4), Cód.BarrasCaja(5)
@@ -811,9 +801,9 @@ function buscarCodigo(cb){
     return r.cb.trim().toUpperCase()===norm;
   });
 }
-function getPacingList(pedido,subtipo){
-  var lista=subtipo==='IMPORTACION'?DB.importaciones:DB.compra;
-  return lista.filter(function(r){return r.pedido===pedido;});
+function getPacingList(pedido){
+  // Hoja Packing única — sin distinción de subtipo
+  return DB.packing.filter(function(r){return normStr(r.pedido)===normStr(pedido);});
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -846,17 +836,29 @@ function cargarCacheSKUsPedido(pedido){
     DB.skusPedidoCache=regs.filter(function(r){
       return (r.Sesion||'')!==S.recId;
     });
-    console.log('[CACHE-SKU] Pedido='+pedido+' registros SP:'+regs.length+' en caché:'+DB.skusPedidoCache.length);
+    console.log('[CACHE-SKU] Pedido='+pedido+' registros SP total:'+regs.length+' en caché:'+DB.skusPedidoCache.length+' (excluidos sesión actual RecId='+S.recId+')');
+    // Log desglosado por SKU para verificar
+    var porSKU={};
+    DB.skusPedidoCache.forEach(function(r){
+      var k=r.CodProducto||'?';
+      porSKU[k]=(porSKU[k]||0)+(Number(r.Cantidad)||0);
+    });
+    console.log('[CACHE-SKU] Totales por SKU en caché:',JSON.stringify(porSKU));
   }).catch(function(e){
     console.warn('[CACHE-SKU] Error cargando caché:',e.message);
     DB.skusPedidoCache=[];
   });
 }
 function esperadoSKU(sku){
-  var lista=S.subtipo==='IMPORTACION'?DB.importaciones:DB.compra;
-  var it=lista.find(function(r){
+  // Fuente única: hoja Packing (sin distinción de subtipo)
+  var it=DB.packing.find(function(r){
     return normStr(r.pedido)===normStr(S.pedido)&&normStr(r.sku)===normStr(sku);
   });
+  if(!it){
+    console.log('[PACKING] SKU='+sku+' Pedido='+S.pedido+' → NO encontrado en Packing ('+DB.packing.length+' items)');
+  } else {
+    console.log('[PACKING] SKU='+sku+' Pedido='+S.pedido+' → Esperado='+it.cantidad);
+  }
   return it?it.cantidad:null;
 }
 function htmlPendiente(sku){
@@ -1929,9 +1931,34 @@ function confCantidad(){
   if(isNaN(cant)||cant<0){toast('Ingresa una cantidad válida');return;}
   var sk=S.skuActual;
   var esp=esperadoSKU(sk.sku);
-  var reg_actual=saldoSKU(S.pedido,sk.sku);
+
+  // Log detallado de componentes del saldo para diagnóstico
+  var _spSum=0;
+  DB.skusPedidoCache.forEach(function(r){
+    if(normStr(r.CodProducto||'')===normStr(sk.sku)) _spSum+=Number(r.Cantidad)||0;
+  });
+  var _sesSum=0;
+  S.skusRegistrados.forEach(function(r){
+    if(normStr(r.sku)===normStr(sk.sku)) _sesSum+=Number(r.cantidad)||0;
+  });
+  var reg_actual=_spSum+_sesSum; // = saldoSKU(S.pedido, sk.sku)
+  var total=reg_actual+cant;
+
+  console.log('[EXCESO] Pedido='+S.pedido+' SKU='+sk.sku+
+    ' Esperado='+(esp!==null?esp:'null(no en packing)')+
+    ' SPCache='+_spSum+' ('+DB.skusPedidoCache.length+' regs)'+
+    ' Sesion='+_sesSum+' ('+S.skusRegistrados.length+' regs)'+
+    ' CantNueva='+cant+
+    ' Total='+(reg_actual+cant)+
+    ' Excede='+(esp!==null&&total>esp?'SI':'NO'));
+
+  // Si el caché está vacío y hay registros anteriores, puede ser que no se cargó
+  if(DB.skusPedidoCache.length===0&&_sesSum===0){
+    console.warn('[EXCESO] ATENCION: caché SP vacío — ¿se llamó cargarCacheSKUsPedido?');
+  }
+
   // Verificar sobrante ANTES de guardar — sin mostrar cantidades
-  if(esp!==null&&(reg_actual+cant)>esp){
+  if(esp!==null&&total>esp){
     // Alerta roja — cantidad supera el esperado, no mostrar números
     window._cantPendiente=cant;
     render(
@@ -2485,7 +2512,7 @@ function showFlujoPerchado(){
       if(!consol[sku]) consol[sku]={desc:r.Nombre||sku,total:0};
       consol[sku].total+=Number(r.Cantidad)||0;
     });
-    var packing=getPacingList(S.pedido,S.subtipo);
+    var packing=getPacingList(S.pedido);
     packing.forEach(function(p){
       if(!consol[p.sku]) consol[p.sku]={desc:p.desc,total:0};
     });
