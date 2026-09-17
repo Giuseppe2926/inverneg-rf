@@ -298,13 +298,24 @@ function parsearPacking(d){
 function parsearCBarra(d){
   if(!d||!d.values||d.values.length<2) return;
   var hdr=d.values[0].map(function(v){return(v||'').toString().trim().toLowerCase();});
-  var iS=hdr.indexOf('sku')||0;
+  // Bug fix: indexOf puede devolver 0 (col A) que es falsy — no usar ||0
+  var iS=hdr.findIndex(function(h){return h==='sku'||h==='codigo'||h==='cod';});
+  if(iS<0) iS=0; // fallback col A si no encuentra encabezado SKU
   var iD=hdr.findIndex(function(h){return h.indexOf('desc')>-1;});
   var iM=hdr.findIndex(function(h){return h==='marca';});
+  console.log('[C.BARRA] Encabezado:',hdr.join('|'),'| iSKU='+iS+' iDesc='+iD+' iMarca='+iM);
+  var agregados=0;
   d.values.slice(1).forEach(function(r){
     if(!filaValida(r[iS])) return;
-    DB.codigosBarra.push({sku:r[iS].toString().trim(),desc:iD>=0&&r[iD]?r[iD].toString().trim():'',marca:iM>=0&&r[iM]?r[iM].toString().trim():''});
+    var sku=r[iS].toString().trim();
+    var marca=iM>=0&&r[iM]?r[iM].toString().trim():'';
+    // Solo guardar primera ocurrencia de cada SKU para la marca
+    if(!DB.codigosBarra.find(function(x){return x.sku===sku;})){
+      DB.codigosBarra.push({sku:sku,desc:iD>=0&&r[iD]?r[iD].toString().trim():'',marca:marca});
+      agregados++;
+    }
   });
+  console.log('[C.BARRA] SKUs únicos cargados:',agregados,'| Total registros:',d.values.length-1);
 }
 function getMarca(sku){
   var it=DB.codigosBarra.find(function(r){return normStr(r.sku)===normStr(sku);});
@@ -358,6 +369,7 @@ function generarInforme(){
   $r('informe-wrap').innerHTML='<div class="loading">⏳ Cargando datos del pedido...</div>';
 
   var conts=DB.contenedores.filter(function(c){return normStr(c.pedido)===normStr(pedido);});
+  var packingPedido=DB.packing.filter(function(p){return normStr(p.pedido)===normStr(pedido);});
 
   Promise.all([
     cargarHorasPedido(pedido),
@@ -366,35 +378,81 @@ function generarInforme(){
     var horas=res[0];
     var recepciones=res[1];
 
-    // Helper: encontrar registro de horas por contenedor
     function getHoras(cont){
       return horas.find(function(h){return normStr(h.Contenedor||'')===normStr(cont);})||{};
     }
 
-    // Fecha de recepción del informe = primera fecha de recepción disponible
+    // Fecha recepción
     var fechaRec='';
     conts.forEach(function(c){if(!fechaRec&&c.fechaRec) fechaRec=c.fechaRec;});
     horas.forEach(function(h){if(!fechaRec&&h.FechaRegistro) fechaRec=h.FechaRegistro;});
 
-    // Mercadería con novedad
-    var novedad=recepciones.filter(function(r){
+    // ── CALCULAR NOVEDADES (Ajuste 4) ────────────────────────────
+    // Excluir CORRECCION. Incluir: DAÑADO, observaciones, faltantes, sobrantes.
+    // Cada tipo de novedad = línea independiente.
+    var lineasNovedad=[];
+
+    // 1. Líneas de daños y observaciones (de LRecepciones)
+    recepciones.forEach(function(r){
       var est=normStr(r.Estado||'');
       var nov=(r.Novedades||'').trim();
-      return est==='DAÑADO'||est==='DAÑADA'||est==='CORRECCION'||nov.length>0;
+      if(est==='CORRECCION') return; // excluir correcciones
+      if(est==='DAÑADO'||est==='DANADO'||est==='DAÑADA'){
+        lineasNovedad.push({
+          sku:r.CodProducto||'',
+          lote:r.Lote||'',
+          cantidad:Number(r.Cantidad)||0,
+          marca:getMarca(r.CodProducto||''),
+          obs:'DAÑADO',
+          contenedor:r.Contenedor||'',
+        });
+      } else if(nov){
+        lineasNovedad.push({
+          sku:r.CodProducto||'',
+          lote:r.Lote||'',
+          cantidad:Number(r.Cantidad)||0,
+          marca:getMarca(r.CodProducto||''),
+          obs:nov,
+          contenedor:r.Contenedor||'',
+        });
+      }
     });
 
-    // Agrupar novedades por SKU+Contenedor
-    var novedadGroup={};
-    novedad.forEach(function(r){
-      var k=(r.CodProducto||'')+'|'+(r.Contenedor||'');
-      if(!novedadGroup[k]){novedadGroup[k]={sku:r.CodProducto||'',cont:r.Contenedor||'',total:0,obs:'',marca:''};}
-      novedadGroup[k].total+=Number(r.Cantidad)||0;
-      if(r.Novedades&&novedadGroup[k].obs.indexOf(r.Novedades)<0) novedadGroup[k].obs+=(novedadGroup[k].obs?'; ':'')+r.Novedades;
-      if(!novedadGroup[k].marca) novedadGroup[k].marca=getMarca(r.CodProducto||'');
+    // 2. Líneas de faltante/sobrante vs Packing (por SKU, excluyendo daños)
+    packingPedido.forEach(function(pk){
+      var esperado=pk.cantidad;
+      // Sumar recibido neto (excluyendo CORRECCION, incluyendo DAÑADO para el conteo real)
+      var recibidoTotal=0;
+      recepciones.forEach(function(r){
+        if(normStr(r.CodProducto||'')===normStr(pk.sku)&&normStr(r.Estado||'')!=='CORRECCION'){
+          recibidoTotal+=Number(r.Cantidad)||0;
+        }
+      });
+      var diff=recibidoTotal-esperado;
+      if(diff!==0){
+        var loteEj='';
+        var contEj='';
+        recepciones.some(function(r){if(normStr(r.CodProducto||'')===normStr(pk.sku)){loteEj=r.Lote||'';contEj=r.Contenedor||'';return true;}});
+        lineasNovedad.push({
+          sku:pk.sku,
+          lote:loteEj,
+          cantidad:Math.abs(diff),
+          marca:getMarca(pk.sku),
+          obs:diff<0?'FALTANTE':'SOBRANTE',
+          contenedor:contEj,
+        });
+      }
     });
-    var novedades=Object.values(novedadGroup);
 
-    // Comentarios: novedades de LHoras por contenedor
+    // Ordenar: daños primero, luego observaciones, luego faltantes/sobrantes
+    var orden={'DAÑADO':0,'FALTANTE':1,'SOBRANTE':2};
+    lineasNovedad.sort(function(a,b){
+      var oa=orden[a.obs]!==undefined?orden[a.obs]:3;
+      var ob=orden[b.obs]!==undefined?orden[b.obs]:3;
+      return oa-ob||(a.sku<b.sku?-1:a.sku>b.sku?1:0);
+    });
+
+    // ── COMENTARIOS ───────────────────────────────────────────────
     var comentarios='';
     conts.forEach(function(c){
       var h=getHoras(c.contenedor);
@@ -404,26 +462,21 @@ function generarInforme(){
     });
     comentarios=comentarios.trim();
 
-    // Paginación: 10 contenedores por página
+    // ── PAGINACIÓN ────────────────────────────────────────────────
     var CONTS_POR_PAG=10;
     var paginas=[];
-    for(var i=0;i<conts.length;i+=CONTS_POR_PAG){
-      paginas.push(conts.slice(i,i+CONTS_POR_PAG));
-    }
+    for(var i=0;i<conts.length;i+=CONTS_POR_PAG) paginas.push(conts.slice(i,i+CONTS_POR_PAG));
     if(paginas.length===0) paginas=[[]];
 
     var html='';
     paginas.forEach(function(paginaConts,pIdx){
-      var esUltimaPagina=pIdx===paginas.length-1;
+      var esUltima=pIdx===paginas.length-1;
       var totalPallets=0;
-      paginaConts.forEach(function(c){
-        var h=getHoras(c.contenedor);
-        totalPallets+=Number(h.PalletsRecibidos||0);
-      });
+      paginaConts.forEach(function(c){totalPallets+=Number(getHoras(c.contenedor).PalletsRecibidos||0);});
 
       html+='<div class="informe-page">';
 
-      /* ── ENCABEZADO ── */
+      // Encabezado
       html+='<div class="inf-titulo">INFORME DE NOVEDADES DE IMPORTACION</div>';
       html+='<div class="inf-meta"><table>';
       html+='<tr><td>DE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</td><td>'+esc(de)+'</td></tr>';
@@ -431,24 +484,19 @@ function generarInforme(){
       html+='<tr><td>FECHA</td><td>'+fechaCorta(hoy())+'</td></tr>';
       html+='<tr><td>PEDIDO</td><td><b>'+esc(pedido)+'</b></td></tr>';
       html+='</table></div>';
-
       html+='<p style="font-size:10pt;margin-bottom:6px">Informo a Ud. que con fecha <b>'+
         (fechaRec?fechaLarga(fechaRec):'_______________')+
         '</b> hemos recibido el/los siguiente(s) contenedor(es) con la(s) siguiente(s) denominación(es) y sello(s) respectivo(s):</p>';
 
-      /* ── SECCIÓN 1: CONTENEDORES ── */
+      // Sección 1: Contenedores
       html+='<table class="inf-tabla">';
-      html+='<thead><tr>'+
-        '<th>#</th><th>CONTENEDOR</th><th>Sello I</th><th>Sello II</th>'+
-        '<th>Capacidad</th><th>Fecha Recepción</th><th>N° Pallets</th>'+
-      '</tr></thead><tbody>';
-
+      html+='<thead><tr><th>#</th><th>CONTENEDOR</th><th>Sello I</th><th>Sello II</th><th>Capacidad</th><th>Fecha Recepción</th><th>N° Pallets</th></tr></thead><tbody>';
       paginaConts.forEach(function(c,ci){
         var h=getHoras(c.contenedor);
-        var numGlobal=pIdx*CONTS_POR_PAG+ci+1;
+        var n=pIdx*CONTS_POR_PAG+ci+1;
         var fr=c.fechaRec||h.FechaRegistro||'';
         html+='<tr>'+
-          '<td>'+numGlobal+'</td>'+
+          '<td>'+n+'</td>'+
           '<td class="left"><b>'+esc(c.contenedor)+'</b></td>'+
           '<td>'+esc(h.Sello1||'')+'</td>'+
           '<td>'+esc(h.Sello2||'')+'</td>'+
@@ -457,33 +505,21 @@ function generarInforme(){
           '<td>'+((h.PalletsRecibidos||0)||'')+'</td>'+
         '</tr>';
       });
-      html+='</tbody><tfoot><tr>'+
-        '<td colspan="6">TOTAL</td>'+
-        '<td>'+(totalPallets||'')+'</td>'+
-      '</tr></tfoot></table>';
+      html+='</tbody><tfoot><tr><td colspan="6">TOTAL</td><td>'+(totalPallets||'')+'</td></tr></tfoot></table>';
 
-      /* ── PERSONAL ── */
+      // Personal
       var h0=paginaConts.length>0?getHoras(paginaConts[0].contenedor):{};
-      var personas=h0.Personas||'';
-      var operario=h0.Operario||'';
-      html+='<div class="inf-personal">Personal de estiba particular: <span>'+
-        (personas?personas+' personas':'—')+
-        '</span>&nbsp;&nbsp; de Inverneg: <span>'+esc(operario||'')+'</span></div>';
+      html+='<div class="inf-personal">Personal de estiba particular: <span>'+(h0.Personas?h0.Personas+' personas':'—')+'</span>&nbsp;&nbsp; de Inverneg: <span>'+esc(h0.Operario||'')+'</span></div>';
       html+='<div class="inf-personal" style="margin-bottom:8px">Tipo de estiba en el interior: ___________________________</div>';
 
-      /* ── SECCIÓN 2: TIEMPOS ── */
+      // Sección 2: Tiempos
       html+='<div class="inf-seccion">Tiempos por contenedor</div>';
-      html+='<table class="inf-tabla-tiempos">';
-      html+='<thead><tr>'+
-        '<th>#</th>'+
-        '<th>Llegada</th><th>Salida</th><th>Tiempo Op.</th>'+
-        '<th>Apertura</th><th>Cierre</th><th>Tiempo Desc.</th>'+
-      '</tr></thead><tbody>';
+      html+='<table class="inf-tabla-tiempos"><thead><tr><th>#</th><th>Llegada</th><th>Salida</th><th>Tiempo Op.</th><th>Apertura</th><th>Cierre</th><th>Tiempo Desc.</th></tr></thead><tbody>';
       paginaConts.forEach(function(c,ci){
         var h=getHoras(c.contenedor);
-        var numGlobal=pIdx*CONTS_POR_PAG+ci+1;
+        var n=pIdx*CONTS_POR_PAG+ci+1;
         html+='<tr>'+
-          '<td>'+numGlobal+'</td>'+
+          '<td>'+n+'</td>'+
           '<td>'+esc(h.HoraLlegada||'')+'</td>'+
           '<td>'+esc(h.HoraSalida||'')+'</td>'+
           '<td><b>'+calcTiempo(h.HoraLlegada,h.HoraSalida)+'</b></td>'+
@@ -494,38 +530,48 @@ function generarInforme(){
       });
       html+='</tbody></table>';
 
-      /* ── SECCIÓN 3 y 4: solo en última página ── */
-      if(esUltimaPagina){
-        /* Mercadería con novedad */
-        html+='<div class="inf-seccion">Mercadería recibida en bodega con novedad:</div>';
+      // Secciones 3, 4 y firmas solo en última página
+      if(esUltima){
+        // Sección 3: Mercadería con novedad (Ajuste 2: texto correcto)
+        html+='<div class="inf-seccion">Mercadería recibida en bodega: CND2</div>';
         html+='<div class="inf-bodega">Observaciones (Detalles)</div>';
-        if(novedades.length===0){
+        if(lineasNovedad.length===0){
           html+='<p style="font-size:10pt;color:#555;margin-bottom:8px">Sin novedades registradas.</p>';
         } else {
           html+='<table class="inf-tabla-nov">';
-          html+='<thead><tr><th>#</th><th>Item</th><th>Total Unidades</th><th>Marca</th><th>Observación</th><th>Contenedor</th></tr></thead><tbody>';
-          novedades.forEach(function(n,ni){
+          html+='<thead><tr><th>#</th><th>Item</th><th>Lote</th><th>Total Unidades</th><th>Marca</th><th>Observación</th><th>Contenedor</th></tr></thead><tbody>';
+          lineasNovedad.forEach(function(n,ni){
+            var colorObs=n.obs==='DAÑADO'?'color:red;font-weight:700':n.obs==='FALTANTE'?'color:#cc6600;font-weight:700':n.obs==='SOBRANTE'?'color:#006600;font-weight:700':'';
             html+='<tr>'+
               '<td style="text-align:center">'+(ni+1)+'</td>'+
               '<td>'+esc(n.sku)+'</td>'+
-              '<td class="right">'+n.total+'</td>'+
+              '<td>'+esc(n.lote)+'</td>'+
+              '<td class="right">'+n.cantidad+'</td>'+
               '<td>'+esc(n.marca)+'</td>'+
-              '<td>'+esc(n.obs)+'</td>'+
-              '<td>'+esc(n.cont)+'</td>'+
+              '<td style="'+colorObs+'">'+esc(n.obs)+'</td>'+
+              '<td>'+esc(n.contenedor)+'</td>'+
             '</tr>';
           });
           html+='</tbody></table>';
         }
 
-        /* Comentarios */
+        // Sección 4: Comentarios (Ajuste 6: "Sin novedades")
         html+='<div class="inf-seccion">Comentarios</div>';
-        html+='<div class="inf-comentarios">'+esc(comentarios||'Sin comentarios.')+'</div>';
+        html+='<div class="inf-comentarios">'+esc(comentarios||'Sin novedades.')+'</div>';
 
-        /* Firma */
-        html+='<div class="inf-firma">'+
-          '<div style="margin-top:30px;border-top:1px solid #000;display:inline-block;min-width:200px;text-align:center;padding-top:4px">'+
-          esc(de)+'<br><span style="font-size:9pt">Jefe de Bodega CND</span></div>'+
-        '</div>';
+        // Firmas (Ajuste 1: 3 firmas con espacio, texto correcto)
+        html+=
+          '<div style="margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;font-size:9.5pt;font-family:\'Times New Roman\',Times,serif">'+
+            '<div style="text-align:center">'+
+              '<div style="border-top:1px solid #000;padding-top:4px;margin-top:50px">'+esc(de)+'<br>Jefe de Bodega</div>'+
+            '</div>'+
+            '<div style="text-align:center">'+
+              '<div style="border-top:1px solid #000;padding-top:4px;margin-top:50px">___________________________<br>Jefe de Importaciones/Supervisor de Importaciones</div>'+
+            '</div>'+
+            '<div style="text-align:center">'+
+              '<div style="border-top:1px solid #000;padding-top:4px;margin-top:50px">___________________________<br>Asistente Financiero</div>'+
+            '</div>'+
+          '</div>';
       }
 
       html+='</div>'; // fin informe-page
