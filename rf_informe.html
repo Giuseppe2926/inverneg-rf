@@ -419,84 +419,137 @@ function cargarRecepcionesPedido(pedido){
 
 /* ── PANTALLA PRINCIPAL ──────────────────────── */
 function showPanel(){
+  // El buscador usa DOM puro — sin innerHTML con eventos para evitar
+  // problemas de comillas anidadas y scope de variables
   render(
     '<div class="lbl">buscar pedido</div>'+
-    '<input class="inp" id="inp-busca-pedido" type="text" placeholder="Escribe el código del pedido..." autocomplete="off" autocorrect="off" spellcheck="false" oninput="filtrarPedidos(this.value)">'+
-    '<div id="lista-pedidos" style="background:var(--sur2);border:1px solid var(--bor);border-radius:6px;margin-top:4px;max-height:200px;overflow-y:auto;display:none"></div>'+
-    '<div id="pedido-seleccionado" style="background:rgba(88,166,255,.12);border:1px solid var(--acc);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:13px;display:none">'+
-      '<span style="color:var(--mut);font-size:11px">PEDIDO SELECCIONADO</span><br>'+
-      '<span id="pedido-sel-txt" style="font-weight:700;color:var(--acc)"></span>'+
-      ' <button style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:11px" onclick="limpiarPedido()">✕ cambiar</button>'+
-    '</div>'+
+    '<input class="inp" id="inp-busca" type="text" placeholder="Escribe el código del pedido..." autocomplete="off" autocorrect="off" spellcheck="false">'+
+    '<div id="lista-drop" style="background:var(--sur2);border:1px solid var(--bor);border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;display:none"></div>'+
+    '<div id="pedido-badge" style="display:none;margin-top:6px;background:rgba(63,185,80,.12);border:1px solid var(--ok);border-radius:6px;padding:8px 12px;font-size:13px;color:var(--ok);font-weight:700"></div>'+
     '<div class="config-grid" style="margin-top:10px">'+
       '<div><div class="lbl">DE</div><input class="inp" id="inp-de" value="'+CFG.defaults.de+'"></div>'+
       '<div><div class="lbl">PARA</div><input class="inp" id="inp-para" value="'+CFG.defaults.para+'"></div>'+
     '</div>'+
     '<div class="btn-row">'+
-      '<button class="btn btn-rec" onclick="generarInforme()">📋 Generar Informe de Novedades</button>'+
-      '<button class="btn btn-sec" onclick="generarDetalle()">📊 Detalle de Recepción</button>'+
+      '<button class="btn btn-rec" onclick="generarInforme()">📋 Generar Informe</button>'+
+      '<button class="btn" style="background:#8B949E;color:#000" onclick="generarDetalleRecepcion()">📊 Detalle de Recepción</button>'+
       '<button class="btn btn-sec" onclick="window.print()">🖨 Imprimir / PDF</button>'+
     '</div>'+
     '<div id="informe-wrap"></div>'
   );
+
+  // Inicializar buscador después de que el DOM esté listo
   window._pedidoSeleccionado='';
+  setTimeout(_initBuscador, 0);
 }
 
-function filtrarPedidos(q){
-  var lista=document.getElementById('lista-pedidos');
-  if(!q||q.length<1){lista.style.display='none';return;}
-  var norm=q.trim().toUpperCase();
-  var coincidencias=DB.pedidos.filter(function(p){return p.pedido.toUpperCase().indexOf(norm)>-1||(p.tipo||'').toUpperCase().indexOf(norm)>-1;}).slice(0,15);
-  if(!coincidencias.length){lista.style.display='none';return;}
-  lista.style.display='block';
-  lista.innerHTML=coincidencias.map(function(p){
-    var d='<div class="dd-item" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #2A3340;font-size:13px;color:#E6EDF3" '+
-      'onmousedown="seleccionarPedido(this.getAttribute(\'data-ped\'))" data-ped="'+p.pedido+'">'+
-      '<span style="color:#58A6FF;font-weight:700">'+p.pedido+'</span>';
-    if(p.tipo) d+=' <span style="color:#7D8590;font-size:11px"> · '+p.tipo+'</span>';
-    d+='</div>';
-    return d;
-  }).join('');
+function _initBuscador(){
+  var inp=document.getElementById('inp-busca');
+  var drop=document.getElementById('lista-drop');
+  if(!inp||!drop) return;
+
+  inp.addEventListener('input', function(){
+    _renderDrop(this.value);
+  });
+  inp.addEventListener('focus', function(){
+    _renderDrop(this.value);
+  });
+  inp.addEventListener('blur', function(){
+    setTimeout(function(){
+      if(drop) drop.style.display='none';
+    }, 200);
+  });
+  inp.addEventListener('keydown', function(e){
+    if(e.key==='Enter'){
+      var p=getPedidoActivo();
+      if(p){ seleccionarPedido(p); }
+      else { alert('Escribe un código de pedido válido'); }
+    }
+  });
 }
 
-function seleccionarPedido(pedido){
-  window._pedidoSeleccionado=pedido;
-  var buscaEl=document.getElementById('inp-busca-pedido');
-  var listaEl=document.getElementById('lista-pedidos');
-  var selEl=document.getElementById('pedido-seleccionado');
-  var selTxt=document.getElementById('pedido-sel-txt');
-  if(buscaEl) buscaEl.value='';
-  if(listaEl) listaEl.style.display='none';
-  if(selEl)   selEl.style.display='block';
-  if(selTxt)  selTxt.textContent=pedido;
-}
+function _renderDrop(q){
+  var drop=document.getElementById('lista-drop');
+  if(!drop) return;
+  var norm=(q||'').trim().toUpperCase();
+  var matches=DB.pedidos.filter(function(p){
+    return !norm||p.pedido.toUpperCase().indexOf(norm)>-1||(p.tipo||'').toUpperCase().indexOf(norm)>-1;
+  }).slice(0,20);
 
-function limpiarPedido(){
-  window._pedidoSeleccionado='';
-  var selEl=document.getElementById('pedido-seleccionado');
-  var buscaEl=document.getElementById('inp-busca-pedido');
-  if(selEl)   selEl.style.display='none';
-  if(buscaEl){buscaEl.value='';buscaEl.focus();}
-  document.getElementById('informe-wrap').innerHTML='';
-}
+  // Limpiar y reconstruir con DOM puro
+  drop.innerHTML='';
+  if(!matches.length||!norm){ drop.style.display='none'; return; }
 
-function manejarEnterBusq(e){
-  if(e.key!=='Enter') return;
-  var p=getPedidoActivo();
-  if(p){seleccionarPedido(p);}
-  else{
-    var v=(document.getElementById('inp-pedido-busq')||{}).value||'';
-    if(v) alert('Pedido no encontrado: '+v);
+  matches.forEach(function(p){
+    var item=document.createElement('div');
+    item.style.cssText='padding:8px 12px;cursor:pointer;border-bottom:1px solid #2A3340;font-size:13px;color:#E6EDF3;user-select:none';
+    item.innerHTML='<span style="color:#58A6FF;font-weight:700">'+p.pedido+'</span>'+
+      (p.tipo?' <span style="color:#7D8590;font-size:11px"> · '+p.tipo+'</span>':'');
+    item.addEventListener('mouseover', function(){ this.style.background='#2A3340'; });
+    item.addEventListener('mouseout',  function(){ this.style.background=''; });
+    // mousedown con preventDefault evita que blur del input cierre el dropdown
+    // antes de que el clic se registre
+    item.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      console.log('[PEDIDO] clic en item:', p.pedido);
+      seleccionarPedido(p.pedido);
+    });
+    drop.appendChild(item);
+  });
+  drop.style.display='block';
+
+  // Si texto coincide exactamente con un pedido, preseleccionar
+  var exacto=DB.pedidos.find(function(p){return p.pedido.toUpperCase()===norm;});
+  if(exacto&&exacto.pedido!==window._pedidoSeleccionado){
+    window._pedidoSeleccionado=exacto.pedido;
+    console.log('[PEDIDO] coincidencia exacta preseleccionada:', exacto.pedido);
+    _actualizarBadge();
   }
 }
+
+function seleccionarPedido(ped){
+  console.log('[PEDIDO] seleccionarPedido("'+ped+'")');
+    var inp=document.getElementById('inp-busca');
+  var drop=document.getElementById('lista-drop');
+  if(inp)  inp.value=ped;
+  if(drop) drop.style.display='none';
+  _actualizarBadge();
+  console.log('[PEDIDO] _pedidoSeleccionado="'+window._pedidoSeleccionado+'"');
+}
+
+function _actualizarBadge(){
+  var badge=document.getElementById('pedido-badge');
+  if(!badge) return;
+  if(window._pedidoSeleccionado){
+    badge.textContent='✅ Pedido seleccionado: '+window._pedidoSeleccionado;
+    badge.style.display='block';
+  } else {
+    badge.style.display='none';
+  }
+}
+
 function getPedidoActivo(){
-  return window._pedidoSeleccionado||'';
+  // 1. Pedido confirmado por clic o coincidencia exacta
+  if(window._pedidoSeleccionado){
+    console.log('[PEDIDO] getPedidoActivo()="'+window._pedidoSeleccionado+'"');
+    return window._pedidoSeleccionado;
+  }
+  // 2. Fallback: texto del input si coincide exactamente
+  var v=(document.getElementById('inp-busca')||{}).value||'';
+  var found=DB.pedidos.find(function(p){return p.pedido.toUpperCase()===v.toUpperCase();});
+  if(found){
+    console.log('[PEDIDO] getPedidoActivo() fallback="'+found.pedido+'"');
+    return found.pedido;
+  }
+  console.warn('[PEDIDO] getPedidoActivo()="" — nada seleccionado');
+  return '';
 }
 
 /* ── GENERAR INFORME ─────────────────────────── */
 function generarInforme(){
   var pedido=getPedidoActivo();
-  if(!pedido){alert('Selecciona un pedido primero');return;}
+  console.log('[PEDIDO] generarInforme() pedido="'+pedido+'"');
+  if(!pedido){alert('Selecciona un pedido del buscador antes de generar el informe');return;}
   var de=$r('inp-de').value.trim()||CFG.defaults.de;
   var para=$r('inp-para').value.trim()||CFG.defaults.para;
   $r('informe-wrap').innerHTML='<div class="loading">⏳ Cargando datos del pedido...</div>';
@@ -691,7 +744,8 @@ function generarInforme(){
 
 function generarDetalle(){
   var pedido=getPedidoActivo();
-  if(!pedido){alert('Selecciona un pedido primero');return;}
+  console.log('[PEDIDO] generarInforme() pedido="'+pedido+'"');
+  if(!pedido){alert('Selecciona un pedido del buscador antes de generar el informe');return;}
   var de=$r('inp-de').value.trim()||CFG.defaults.de;
   document.getElementById('informe-wrap').innerHTML='<div class="loading">⏳ Generando detalle...</div>';
 
@@ -839,7 +893,8 @@ function generarDetalle(){
 // ── Informe: Detalle de Recepción ─────────────────────────────────
 function generarDetalleRecepcion(){
   var pedido=getPedidoActivo();
-  if(!pedido){alert('Selecciona un pedido primero');return;}
+  console.log('[PEDIDO] generarInforme() pedido="'+pedido+'"');
+  if(!pedido){alert('Selecciona un pedido del buscador antes de generar el informe');return;}
   var de=($r('inp-de')||{}).value||CFG.defaults.de;
   $r('informe-wrap').innerHTML='<div class="loading">⏳ Cargando detalle de recepción...</div>';
 
@@ -1021,21 +1076,11 @@ function boot(){
 }
 
 window.generarInforme=generarInforme;
+window.seleccionarPedido=seleccionarPedido;
+window.getPedidoActivo=getPedidoActivo;
 window.generarDetalleRecepcion=generarDetalleRecepcion;
-window.filtrarPedidos=filtrarPedidos;
-window.manejarEnterBusq=manejarEnterBusq;
-window.actualizarIndicador=actualizarIndicador;
-window.mostrarDropdown=mostrarDropdown;
-window.ocultarDropdown=ocultarDropdown;
-window.seleccionarPedido=seleccionarPedido;
-window.getPedidoActivo=getPedidoActivo;
+window.generarDetalleRecepcion=generarDetalleRecepcion;
 window.generarDetalle=generarDetalle;
-window.filtrarPedidos=filtrarPedidos;
-window.manejarEnterBusq=manejarEnterBusq;
-window.actualizarIndicador=actualizarIndicador;
-window.seleccionarPedido=seleccionarPedido;
-window.limpiarPedido=limpiarPedido;
-window.getPedidoActivo=getPedidoActivo;
 window._hovPed=function(el,on){el.style.background=on?'var(--sur)':'';};
 })();
 </script>
