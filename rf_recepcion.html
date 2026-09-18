@@ -1816,9 +1816,10 @@ function showEscaneo(){
     }
   }
   html+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
-    '<button class="btn btn-sec" style="font-size:12px" onclick="showIngresarLPN()">Nuevo LPN</button>'+
-    '<button class="btn btn-ok btn-big" onclick="finalizarRecepcionMercaderia()">FINALIZAR RECEPCIÓN</button>'+
-    '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">Guardar y salir</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="showIngresarLPN()">🔄 Nuevo LPN</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="showCorreccion()">✏ Corregir registro anterior</button>'+
+    '<button class="btn btn-ok btn-big" onclick="finalizarRecepcionMercaderia()">✓ FINALIZAR RECEPCIÓN</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">💾 Guardar y salir</button>'+
   '</div>';
   render(html);
   setTimeout(function(){var el=document.getElementById('inp-scan');if(el)el.focus();},100);
@@ -1930,6 +1931,9 @@ function confCantidad(){
   var cant=parseInt(document.getElementById('inp-cant').value);
   if(isNaN(cant)||cant<0){toast('Ingresa una cantidad válida');return;}
   var sk=S.skuActual;
+
+  // Verificar que el packing esté cargado (diagnóstico por si htmlPendiente no muestra nada)
+  if(DB.packing.length===0) console.warn('[PACKING] DB.packing vacío — la hoja Packing no cargó o no tiene datos para este pedido');
 
   // LOG CRÍTICO: estado de DB.packing y S.skusRegistrados antes de evaluar
   console.log('[CONF-CANT] ==========================================');
