@@ -31,6 +31,7 @@ select.inp{appearance:none}
 .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .config-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
 .loading{text-align:center;padding:40px;color:var(--mut);font-size:13px}
+.dd-item:hover{background:var(--bor)!important}
 
 /* ═══════════════════════════════════════════════════════════════
    ESTILOS DEL INFORME — optimizados para A4
@@ -115,6 +116,14 @@ select.inp{appearance:none}
 .inf-firma-bloque{text-align:center}
 .inf-firma-linea{border-top:1px solid #000;padding-top:4px;margin-top:42px;line-height:1.6}
 
+
+/* Tabla detalle de recepción */
+.inf-tabla-det{width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:8px;table-layout:fixed}
+.inf-tabla-det th{background:#c0c0c0;border:1px solid #666;padding:3px 4px;text-align:center;font-size:7.5pt;font-weight:700}
+.inf-tabla-det td{border:1px solid #888;padding:2px 4px;height:15px;font-size:8pt}
+.inf-tabla-det td.left{text-align:left}
+.inf-tabla-det td.right{text-align:right}
+.inf-tabla-det tfoot td{font-weight:700;background:#ddd;border:1px solid #666;padding:2px 4px;font-size:8pt}
 /* ── PRINT — eliminar headers/footers del navegador ─────────────── */
 @page{
   size:A4 portrait;
@@ -143,6 +152,34 @@ select.inp{appearance:none}
   /* Forzar fondo gris en encabezados de tablas al imprimir */
   .inf-tabla th,.inf-tabla-tiempos th,.inf-tabla-nov th{background:#c0c0c0!important}
   .inf-tabla tfoot td{background:#ddd!important}
+}
+
+/* ── DETALLE DE RECEPCIÓN ────────────────────────────────────────── */
+.det-page{
+  background:#fff;color:#000;
+  width:210mm;
+  min-height:auto;
+  margin:0 auto 24px;
+  padding:12mm 14mm;
+  font-family:'Arial Narrow','Arial',sans-serif;
+  font-size:9pt;
+  box-shadow:0 2px 12px rgba(0,0,0,.4);
+}
+.det-titulo{text-align:center;font-size:11pt;font-weight:700;letter-spacing:.05em;text-decoration:underline;text-transform:uppercase;margin-bottom:8px}
+.det-meta{font-size:9pt;margin-bottom:8px}
+.det-meta b{font-weight:700}
+.det-tabla{width:100%;border-collapse:collapse;font-size:8pt;margin-top:6px;table-layout:fixed}
+.det-tabla th{background:#c0c0c0;border:1px solid #666;padding:3px 5px;text-align:center;font-size:8pt;font-weight:700}
+.det-tabla td{border:1px solid #888;padding:2px 5px;vertical-align:middle;font-size:8pt}
+.det-tabla td.right{text-align:right}
+.det-tabla td.center{text-align:center}
+.det-tabla tr.completo td{background:#f0fff0}
+.det-tabla tr.novedad td{background:#fff8f0}
+.det-resumen{margin-top:10px;font-size:8.5pt;padding:6px 10px;border:1px solid #ccc;background:#f9f9f9}
+.det-resumen b{font-weight:700}
+@media print{
+  .det-page{box-shadow:none!important;margin:0!important;width:210mm!important;page-break-after:always;border:none!important;padding:12mm 14mm!important}
+  .det-page:last-child{page-break-after:auto}
 }
 </style>
 </head>
@@ -382,28 +419,75 @@ function cargarRecepcionesPedido(pedido){
 
 /* ── PANTALLA PRINCIPAL ──────────────────────── */
 function showPanel(){
-  var pedOpts=DB.pedidos.map(function(p){return '<option value="'+p.pedido+'">'+p.pedido+(p.tipo?' · '+p.tipo:'')+'</option>';}).join('');
   render(
-    '<div class="lbl">pedido</div>'+
-    '<select class="inp" id="sel-pedido">'+
-      '<option value="">— seleccionar pedido —</option>'+pedOpts+
-    '</select>'+
+    '<div class="lbl">buscar pedido</div>'+
+    '<input class="inp" id="inp-busca-pedido" type="text" placeholder="Escribe el código del pedido..." autocomplete="off" autocorrect="off" spellcheck="false" oninput="filtrarPedidos(this.value)">'+
+    '<div id="lista-pedidos" style="background:var(--sur2);border:1px solid var(--bor);border-radius:6px;margin-top:4px;max-height:200px;overflow-y:auto;display:none"></div>'+
+    '<div id="pedido-seleccionado" style="background:rgba(88,166,255,.12);border:1px solid var(--acc);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:13px;display:none">'+
+      '<span style="color:var(--mut);font-size:11px">PEDIDO SELECCIONADO</span><br>'+
+      '<span id="pedido-sel-txt" style="font-weight:700;color:var(--acc)"></span>'+
+      ' <button style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:11px" onclick="limpiarPedido()">✕ cambiar</button>'+
+    '</div>'+
     '<div class="config-grid" style="margin-top:10px">'+
       '<div><div class="lbl">DE</div><input class="inp" id="inp-de" value="'+CFG.defaults.de+'"></div>'+
       '<div><div class="lbl">PARA</div><input class="inp" id="inp-para" value="'+CFG.defaults.para+'"></div>'+
     '</div>'+
     '<div class="btn-row">'+
-      '<button class="btn btn-rec" onclick="generarInforme()">📋 Generar Informe</button>'+
+      '<button class="btn btn-rec" onclick="generarInforme()">📋 Generar Informe de Novedades</button>'+
+      '<button class="btn btn-sec" onclick="generarDetalle()">📊 Detalle de Recepción</button>'+
       '<button class="btn btn-sec" onclick="window.print()">🖨 Imprimir / PDF</button>'+
     '</div>'+
     '<div id="informe-wrap"></div>'
   );
+  window._pedidoSeleccionado='';
+}
+
+function filtrarPedidos(q){
+  var lista=document.getElementById('lista-pedidos');
+  if(!q||q.length<1){lista.style.display='none';return;}
+  var norm=q.trim().toUpperCase();
+  var coincidencias=DB.pedidos.filter(function(p){return p.pedido.toUpperCase().indexOf(norm)>-1||(p.tipo||'').toUpperCase().indexOf(norm)>-1;}).slice(0,15);
+  if(!coincidencias.length){lista.style.display='none';return;}
+  lista.style.display='block';
+  lista.innerHTML=coincidencias.map(function(p){
+    var d='<div class="dd-item" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #2A3340;font-size:13px;color:#E6EDF3" '+
+      'onmousedown="seleccionarPedido(this.getAttribute(\'data-ped\'))" data-ped="'+p.pedido+'">'+
+      '<span style="color:#58A6FF;font-weight:700">'+p.pedido+'</span>';
+    if(p.tipo) d+=' <span style="color:#7D8590;font-size:11px"> · '+p.tipo+'</span>';
+    d+='</div>';
+    return d;
+  }).join('');
+}
+
+function seleccionarPedido(pedido){
+  window._pedidoSeleccionado=pedido;
+  var buscaEl=document.getElementById('inp-busca-pedido');
+  var listaEl=document.getElementById('lista-pedidos');
+  var selEl=document.getElementById('pedido-seleccionado');
+  var selTxt=document.getElementById('pedido-sel-txt');
+  if(buscaEl) buscaEl.value='';
+  if(listaEl) listaEl.style.display='none';
+  if(selEl)   selEl.style.display='block';
+  if(selTxt)  selTxt.textContent=pedido;
+}
+
+function limpiarPedido(){
+  window._pedidoSeleccionado='';
+  var selEl=document.getElementById('pedido-seleccionado');
+  var buscaEl=document.getElementById('inp-busca-pedido');
+  if(selEl)   selEl.style.display='none';
+  if(buscaEl){buscaEl.value='';buscaEl.focus();}
+  document.getElementById('informe-wrap').innerHTML='';
+}
+
+function getPedidoActivo(){
+  return window._pedidoSeleccionado||'';
 }
 
 /* ── GENERAR INFORME ─────────────────────────── */
 function generarInforme(){
-  var pedido=$r('sel-pedido').value;
-  if(!pedido){alert('Selecciona un pedido');return;}
+  var pedido=getPedidoActivo();
+  if(!pedido){alert('Selecciona un pedido primero');return;}
   var de=$r('inp-de').value.trim()||CFG.defaults.de;
   var para=$r('inp-para').value.trim()||CFG.defaults.para;
   $r('informe-wrap').innerHTML='<div class="loading">⏳ Cargando datos del pedido...</div>';
@@ -595,6 +679,303 @@ function generarInforme(){
   });
 }
 
+
+function generarDetalle(){
+  var pedido=getPedidoActivo();
+  if(!pedido){alert('Selecciona un pedido primero');return;}
+  var de=$r('inp-de').value.trim()||CFG.defaults.de;
+  document.getElementById('informe-wrap').innerHTML='<div class="loading">⏳ Generando detalle...</div>';
+
+  var packingPedido=DB.packing.filter(function(p){return normStr(p.pedido)===normStr(pedido);});
+
+  cargarRecepcionesPedido(pedido).then(function(recepciones){
+    // ── Calcular neto por SKU (incluyendo correcciones negativas) ──
+    var netoSKU={}; // {sku: {cant, dañado, lote, cont, desc}}
+    recepciones.forEach(function(r){
+      var sku=r.CodProducto||'';
+      if(!sku) return;
+      if(!netoSKU[sku]) netoSKU[sku]={cant:0,dañado:0,lote:'',cont:'',desc:r.Nombre||''};
+      netoSKU[sku].cant+=Number(r.Cantidad)||0; // incluye negativos de CORRECCION
+      if(normStr(r.Estado||'')==='DAÑADO'||normStr(r.Estado||'')==='DANADO'){
+        netoSKU[sku].dañado+=Number(r.Cantidad)||0;
+      }
+      if(!netoSKU[sku].lote&&r.Lote) netoSKU[sku].lote=r.Lote;
+      if(!netoSKU[sku].cont&&r.Contenedor) netoSKU[sku].cont=r.Contenedor;
+    });
+
+    // ── Construir filas del detalle ──
+    // Todos los SKUs del packing + SKUs recibidos que no están en packing
+    var skusVistos={};
+    var filas=[];
+
+    packingPedido.forEach(function(pk){
+      skusVistos[normStr(pk.sku)]=true;
+      var rec=netoSKU[pk.sku]||{cant:0,dañado:0,lote:'',cont:'',desc:''};
+      var diff=rec.cant-pk.cantidad;
+      var desc=pk.desc||(DB.codigosBarra.find(function(c){return normStr(c.sku)===normStr(pk.sku);})||{}).desc||'';
+      // Líneas de novedad independientes
+      var novedades=[];
+      if(rec.dañado>0) novedades.push({tipo:'DAÑADO',cant:rec.dañado});
+      if(diff<0) novedades.push({tipo:'FALTANTE',cant:Math.abs(diff)});
+      else if(diff>0) novedades.push({tipo:'SOBRANTE',cant:diff});
+      filas.push({sku:pk.sku,desc:desc,planificado:pk.cantidad,recibido:rec.cant,diff:diff,novedades:novedades,lote:rec.lote,cont:rec.cont,marca:getMarca(pk.sku)});
+    });
+
+    // SKUs recibidos sin packing (sobrantes totales)
+    Object.keys(netoSKU).forEach(function(sku){
+      if(skusVistos[normStr(sku)]) return;
+      var rec=netoSKU[sku];
+      var desc=(DB.codigosBarra.find(function(c){return normStr(c.sku)===normStr(sku);})||{}).desc||rec.desc||'';
+      filas.push({sku:sku,desc:desc,planificado:0,recibido:rec.cant,diff:rec.cant,novedades:[{tipo:'SOBRANTE',cant:rec.cant}],lote:rec.lote,cont:rec.cont,marca:getMarca(sku)});
+    });
+
+    // Ordenar: con novedades primero, luego alfabético por SKU
+    filas.sort(function(a,b){
+      var an=a.novedades.length>0?0:1, bn=b.novedades.length>0?0:1;
+      return an-bn||(a.sku<b.sku?-1:a.sku>b.sku?1:0);
+    });
+
+    // ── Resumen ──
+    var totalPlan=0,totalRec=0,totalComp=0,totalFalt=0,totalSobr=0,totalDan=0;
+    filas.forEach(function(f){
+      totalPlan+=f.planificado; totalRec+=f.recibido;
+      var tipos=f.novedades.map(function(n){return n.tipo;});
+      if(tipos.indexOf('FALTANTE')>-1) totalFalt++;
+      else if(tipos.indexOf('SOBRANTE')>-1) totalSobr++;
+      else totalComp++;
+      if(tipos.indexOf('DAÑADO')>-1) totalDan++;
+    });
+
+    // ── Construir HTML del informe ──
+    var htmlOut='<div class="det-page">';
+    htmlOut+='<div class="det-titulo">Detalle de Recepción</div>';
+    htmlOut+='<div class="det-meta">'+
+      '<b>Pedido:</b> '+esc(pedido)+'&nbsp;&nbsp;&nbsp;'+
+      '<b>Fecha:</b> '+fechaCorta(hoy())+'&nbsp;&nbsp;&nbsp;'+
+      '<b>Preparado por:</b> '+esc(de)+
+    '</div>';
+
+    // Tabla principal
+    htmlOut+='<table class="det-tabla">';
+    htmlOut+='<thead><tr>'+
+      '<th style="width:12%">SKU</th>'+
+      '<th style="width:28%">Descripción</th>'+
+      '<th style="width:11%">Marca</th>'+
+      '<th style="width:10%;text-align:right">Planificado</th>'+
+      '<th style="width:10%;text-align:right">Recibido</th>'+
+      '<th style="width:9%;text-align:right">Diferencia</th>'+
+      '<th style="width:20%">Novedad</th>'+
+    '</tr></thead><tbody>';
+
+    if(!filas.length){
+      htmlOut+='<tr><td colspan="7" style="text-align:center;color:#777">Sin datos de packing para este pedido.</td></tr>';
+    } else {
+      filas.forEach(function(f){
+        var nTipos=f.novedades.length;
+        var trClass=nTipos===0?'completo':'novedad';
+        if(nTipos===0){
+          // Sin novedad — una fila
+          htmlOut+='<tr class="'+trClass+'">'+
+            '<td>'+esc(f.sku)+'</td>'+
+            '<td>'+esc(f.desc)+'</td>'+
+            '<td>'+esc(f.marca)+'</td>'+
+            '<td class="right">'+f.planificado+'</td>'+
+            '<td class="right">'+f.recibido+'</td>'+
+            '<td class="right">'+(f.diff===0?'—':(f.diff>0?'+':'')+f.diff)+'</td>'+
+            '<td class="center" style="color:green">✅ Completo</td>'+
+          '</tr>';
+        } else {
+          // Con novedades — una fila por tipo de novedad
+          f.novedades.forEach(function(n,ni){
+            var colorNov=n.tipo==='DAÑADO'?'color:red;font-weight:700':n.tipo==='FALTANTE'?'color:#b85c00;font-weight:700':'color:#006600;font-weight:700';
+            htmlOut+='<tr class="novedad">'+
+              (ni===0?'<td rowspan="'+nTipos+'">'+esc(f.sku)+'</td>':'')+
+              (ni===0?'<td rowspan="'+nTipos+'">'+esc(f.desc)+'</td>':'')+
+              (ni===0?'<td rowspan="'+nTipos+'">'+esc(f.marca)+'</td>':'')+
+              (ni===0?'<td class="right" rowspan="'+nTipos+'">'+f.planificado+'</td>':'')+
+              (ni===0?'<td class="right" rowspan="'+nTipos+'">'+f.recibido+'</td>':'')+
+              (ni===0?'<td class="right" rowspan="'+nTipos+'">'+(f.diff===0?'—':(f.diff>0?'+':'')+f.diff)+'</td>':'')+
+              '<td style="'+colorNov+'">'+n.tipo+(n.cant?(' ('+n.cant+' un)'):'')+'</td>'+
+            '</tr>';
+          });
+        }
+      });
+    }
+    htmlOut+='</tbody></table>';
+
+    // Resumen estadístico
+    htmlOut+='<div class="det-resumen">'+
+      '<b>Resumen:</b> &nbsp;'+
+      'Total SKUs: <b>'+filas.length+'</b> &nbsp;|&nbsp; '+
+      '✅ Completos: <b>'+totalComp+'</b> &nbsp;|&nbsp; '+
+      '⚠ Faltantes: <b style="color:#b85c00">'+totalFalt+'</b> &nbsp;|&nbsp; '+
+      '⚠ Sobrantes: <b style="color:#006600">'+totalSobr+'</b> &nbsp;|&nbsp; '+
+      '⚠ Dañados: <b style="color:red">'+totalDan+'</b>'+
+      '<br><b>Cantidades:</b> &nbsp;'+
+      'Planificado: <b>'+totalPlan+' un</b> &nbsp;|&nbsp; '+
+      'Recibido: <b>'+totalRec+' un</b> &nbsp;|&nbsp; '+
+      'Diferencia: <b>'+(totalRec-totalPlan>=0?'+'+(totalRec-totalPlan):(totalRec-totalPlan))+' un</b>'+
+    '</div>';
+
+    // Pie
+    htmlOut+='<div style="margin-top:16px;font-size:7.5pt;color:#777;text-align:right">'+
+      'Generado automáticamente desde RF Recepción · Inverneg CND · '+fechaCorta(hoy())+
+    '</div>';
+    htmlOut+='</div>';
+
+    document.getElementById('informe-wrap').innerHTML=htmlOut;
+  });
+}
+
+// ── Informe: Detalle de Recepción ─────────────────────────────────
+function generarDetalleRecepcion(){
+  var pedido=getPedidoActivo();
+  if(!pedido){alert('Selecciona un pedido primero');return;}
+  var de=($r('inp-de')||{}).value||CFG.defaults.de;
+  $r('informe-wrap').innerHTML='<div class="loading">⏳ Cargando detalle de recepción...</div>';
+
+  var packingPedido=DB.packing.filter(function(p){return normStr(p.pedido)===normStr(pedido);});
+
+  cargarRecepcionesPedido(pedido).then(function(recepciones){
+    // ── Construir tabla de SKUs ──────────────────────────────────
+    var filas=[];
+
+    packingPedido.forEach(function(pk){
+      var esperado=pk.cantidad;
+      // Cantidad neta: suma todos los registros (incluyendo correcciones negativas)
+      var recibidoNeto=0;
+      var totalDanado=0;
+      recepciones.forEach(function(r){
+        if(normStr(r.CodProducto||'')!==normStr(pk.sku)) return;
+        recibidoNeto+=Number(r.Cantidad)||0;
+        if(normStr(r.Estado||'')==='DAÑADO'||normStr(r.Estado||'')==='DANADO')
+          totalDanado+=Number(r.Cantidad)||0;
+      });
+      var diff=recibidoNeto-esperado;
+
+      // Descripción desde C.Barra o Packing
+      var desc=pk.desc||'';
+      if(!desc){
+        var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(pk.sku);});
+        if(cb) desc=cb.desc;
+      }
+
+      // Determinar novedades — líneas separadas
+      var novedades=[];
+      if(totalDanado>0) novedades.push({tipo:'DAÑADO',cant:totalDanado});
+      if(diff<0)        novedades.push({tipo:'FALTANTE',cant:Math.abs(diff)});
+      if(diff>0)        novedades.push({tipo:'SOBRANTE',cant:diff});
+
+      if(novedades.length===0){
+        filas.push({sku:pk.sku,desc:desc,esperado:esperado,recibido:recibidoNeto,diff:diff,novedad:'—',novCant:null,primera:true});
+      } else {
+        novedades.forEach(function(n,i){
+          filas.push({
+            sku:pk.sku,desc:desc,
+            esperado:i===0?esperado:null,
+            recibido:i===0?recibidoNeto:null,
+            diff:i===0?diff:null,
+            novedad:n.tipo,novCant:n.cant,
+            primera:i===0,
+            rowspan:i===0?novedades.length:0,
+          });
+        });
+      }
+    });
+
+    // Totales
+    var totalEsp=packingPedido.reduce(function(a,p){return a+p.cantidad;},0);
+    var totalRec=0;
+    var skusCompletos=0,skusFaltantes=0,skusSobrantes=0;
+    packingPedido.forEach(function(pk){
+      var neto=0;
+      recepciones.forEach(function(r){if(normStr(r.CodProducto||'')===normStr(pk.sku))neto+=Number(r.Cantidad)||0;});
+      totalRec+=neto;
+      var d=neto-pk.cantidad;
+      if(d===0) skusCompletos++;
+      else if(d<0) skusFaltantes++;
+      else skusSobrantes++;
+    });
+
+    // ── Renderizar informe A4 ────────────────────────────────────
+    var colorDiff=function(d){return d===0?'':'color:'+(d<0?'#cc6600':'#006600')+';font-weight:700';};
+    var colorNov=function(n){
+      if(n==='DAÑADO') return 'color:red;font-weight:700';
+      if(n==='FALTANTE') return 'color:#cc6600;font-weight:700';
+      if(n==='SOBRANTE') return 'color:#006600;font-weight:700';
+      return 'color:#666';
+    };
+    var signo=function(d){return d>0?'+'+d:d<0?String(d):'0';};
+
+    var h='<div class="informe-page">';
+    h+='<div class="inf-titulo">DETALLE DE RECEPCIÓN</div>';
+    h+='<div class="inf-meta"><table>';
+    h+='<tr><td>DE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</td><td>'+esc(de)+'</td></tr>';
+    h+='<tr><td>PEDIDO</td><td><b>'+esc(pedido)+'</b></td></tr>';
+    h+='<tr><td>FECHA</td><td>'+fechaCorta(hoy())+'</td></tr>';
+    h+='</table></div>';
+
+    // Resumen ejecutivo
+    h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0;font-size:8pt">'+
+      '<div style="border:1px solid #888;border-radius:4px;padding:5px 8px;text-align:center">'+
+        '<div style="font-size:7pt;color:#666">Total SKUs Packing</div>'+
+        '<div style="font-size:13pt;font-weight:700">'+packingPedido.length+'</div></div>'+
+      '<div style="border:1px solid #3c3;border-radius:4px;padding:5px 8px;text-align:center">'+
+        '<div style="font-size:7pt;color:#666">Completos</div>'+
+        '<div style="font-size:13pt;font-weight:700;color:green">'+skusCompletos+'</div></div>'+
+      '<div style="border:1px solid #cc6600;border-radius:4px;padding:5px 8px;text-align:center">'+
+        '<div style="font-size:7pt;color:#666">Con Faltante</div>'+
+        '<div style="font-size:13pt;font-weight:700;color:#cc6600">'+skusFaltantes+'</div></div>'+
+      '<div style="border:1px solid #006600;border-radius:4px;padding:5px 8px;text-align:center">'+
+        '<div style="font-size:7pt;color:#666">Con Sobrante</div>'+
+        '<div style="font-size:13pt;font-weight:700;color:#006600">'+skusSobrantes+'</div></div>'+
+    '</div>';
+
+    // Tabla detalle SKU
+    h+='<div class="inf-seccion">Detalle por SKU — Mercadería recibida en bodega: CND2</div>';
+    h+='<table class="inf-tabla-det"><colgroup>'+
+      '<col style="width:12%"><col style="width:30%"><col style="width:10%">'+
+      '<col style="width:10%"><col style="width:10%"><col style="width:28%">'+
+    '</colgroup>'+
+    '<thead><tr>'+
+      '<th>SKU</th><th>Descripción</th><th>Planificado</th>'+
+      '<th>Recibido Neto</th><th>Diferencia</th><th>Novedades</th>'+
+    '</tr></thead><tbody>';
+
+    filas.forEach(function(f){
+      h+='<tr>';
+      if(f.primera){
+        h+='<td>'+esc(f.sku)+'</td>'+
+          '<td class="left">'+esc(f.desc)+'</td>'+
+          '<td>'+f.esperado+'</td>'+
+          '<td>'+f.recibido+'</td>'+
+          '<td style="'+colorDiff(f.diff)+'">'+signo(f.diff)+'</td>';
+      } else {
+        h+='<td colspan="5"></td>';
+      }
+      h+='<td style="'+colorNov(f.novedad)+'">'+esc(f.novedad)+(f.novCant!==null?' ('+f.novCant+' un)':'')+'</td>';
+      h+='</tr>';
+    });
+
+    // Fila totales
+    h+='</tbody><tfoot><tr>'+
+      '<td colspan="2" style="text-align:right;font-weight:700">TOTALES</td>'+
+      '<td>'+totalEsp+'</td>'+
+      '<td>'+totalRec+'</td>'+
+      '<td style="'+colorDiff(totalRec-totalEsp)+'">'+signo(totalRec-totalEsp)+'</td>'+
+      '<td></td>'+
+    '</tr></tfoot></table>';
+
+    h+='<div class="inf-firmas">'+
+      '<div class="inf-firma-bloque"><div class="inf-firma-linea">'+esc(de)+'<br>Jefe de Bodega</div></div>'+
+      '<div class="inf-firma-bloque"><div class="inf-firma-linea">___________________________<br>Jefe de Importaciones /<br>Supervisor de Importaciones</div></div>'+
+      '<div class="inf-firma-bloque"><div class="inf-firma-linea">___________________________<br>Asistente Financiero</div></div>'+
+    '</div>';
+    h+='</div>'; // fin informe-page
+
+    $r('informe-wrap').innerHTML=h;
+  });
+}
 function esc(s){return(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 /* ── MSAL BOOT ───────────────────────────────── */
@@ -631,6 +1012,18 @@ function boot(){
 }
 
 window.generarInforme=generarInforme;
+window.generarDetalleRecepcion=generarDetalleRecepcion;
+window.filtrarPedidos=filtrarPedidos;
+window.mostrarDropdown=mostrarDropdown;
+window.ocultarDropdown=ocultarDropdown;
+window.seleccionarPedido=seleccionarPedido;
+window.getPedidoActivo=getPedidoActivo;
+window.generarDetalle=generarDetalle;
+window.filtrarPedidos=filtrarPedidos;
+window.seleccionarPedido=seleccionarPedido;
+window.limpiarPedido=limpiarPedido;
+window.getPedidoActivo=getPedidoActivo;
+window._hovPed=function(el,on){el.style.background=on?'var(--sur)':'';};
 })();
 </script>
 </body>
