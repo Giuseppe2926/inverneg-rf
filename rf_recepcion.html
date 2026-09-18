@@ -812,18 +812,14 @@ function getPacingList(pedido){
 
 // ── Helpers pendiente por pedido ────────────────────────────────
 function saldoSKU(pedido,sku){
-  // Fuente única: DB.skusPedidoCache contiene TODOS los registros SP del pedido
-  // (cargado al inicio del flujo de mercadería, incluye el contenedor actual)
-  // S.skusRegistrados tiene los del contenedor actual (los de SP + los nuevos de sesión)
-  // Para evitar doble conteo: usar caché para otros contenedores + skusRegistrados para el actual
+  // caché = otros contenedores del pedido (el contenedor actual ya fue excluido al cargar)
+  // skusRegistrados = contenedor actual (cargado desde SP + nuevos de esta sesión)
+  // Sin solapamiento → sin doble conteo
   var totalCache=0, totalSesion=0;
-  // Caché: registros de SP EXCLUYENDO el contenedor actual (esos están en skusRegistrados)
   DB.skusPedidoCache.forEach(function(r){
-    if(normStr(r.CodProducto||'')===normStr(sku)&&
-       normStr(r.Contenedor||'')!==normStr(S.contenedor))
+    if(normStr(r.CodProducto||'')===normStr(sku))
       totalCache+=Number(r.Cantidad)||0;
   });
-  // Sesión actual: S.skusRegistrados del contenedor actual (SP ya guardados + nuevos de sesión)
   S.skusRegistrados.forEach(function(r){
     if(normStr(r.sku)===normStr(sku))
       totalSesion+=Number(r.cantidad)||0;
@@ -833,22 +829,25 @@ function saldoSKU(pedido,sku){
 
 // Cargar caché de SKUs del pedido desde SP (llamar al iniciar flujo de mercadería)
 function cargarCacheSKUsPedido(pedido){
+  // Carga todos los SKUs del pedido EXCEPTO el contenedor actual
+  // S.skusRegistrados ya tiene los del contenedor actual → sin solapamiento posible
   return cargarSKUsSP(pedido, null).then(function(regs){
-    // Excluir registros de la sesión actual para no doble-contar
-    // Identificar por RecId de sesión
+    var contActual=normStr(S.contenedor||'');
     DB.skusPedidoCache=regs.filter(function(r){
-      return (r.Sesion||'')!==S.recId;
+      // Excluir registros del contenedor que está siendo recepcionado ahora
+      return normStr(r.Contenedor||'')!==contActual;
     });
-    console.log('[CACHE-SKU] Pedido='+pedido+' registros SP total:'+regs.length+' en caché:'+DB.skusPedidoCache.length+' (excluidos sesión actual RecId='+S.recId+')');
-    // Log desglosado por SKU para verificar
     var porSKU={};
     DB.skusPedidoCache.forEach(function(r){
       var k=r.CodProducto||'?';
       porSKU[k]=(porSKU[k]||0)+(Number(r.Cantidad)||0);
     });
-    console.log('[CACHE-SKU] Totales por SKU en caché:',JSON.stringify(porSKU));
+    console.log('[CACHE-SKU] Pedido='+pedido+' ContActual='+contActual+
+      ' total SP='+regs.length+' en caché='+DB.skusPedidoCache.length+
+      ' (excluidos del cont actual='+(regs.length-DB.skusPedidoCache.length)+')');
+    console.log('[CACHE-SKU] Totales otros contenedores:',JSON.stringify(porSKU));
   }).catch(function(e){
-    console.warn('[CACHE-SKU] Error cargando caché:',e.message);
+    console.warn('[CACHE-SKU] Error:',e.message);
     DB.skusPedidoCache=[];
   });
 }
@@ -1955,43 +1954,11 @@ function confCantidad(){
   var cant=parseInt(document.getElementById('inp-cant').value);
   if(isNaN(cant)||cant<0){toast('Ingresa una cantidad válida');return;}
   var sk=S.skuActual;
-
-  // Verificar que el packing esté cargado (diagnóstico por si htmlPendiente no muestra nada)
-  if(DB.packing.length===0) console.warn('[PACKING] DB.packing vacío — la hoja Packing no cargó o no tiene datos para este pedido');
-
   var esp=esperadoSKU(sk.sku);
-  // Usar saldoSKU() — fuente única y corregida (caché otros conts + sesión actual sin doble conteo)
+  // saldoSKU: caché (otros contenedores) + skusRegistrados (contenedor actual) sin doble conteo
   var reg_actual=saldoSKU(S.pedido,sk.sku);
   var total=reg_actual+cant;
-  console.log('[PACKING] --- confCantidad ---');
-  console.log('[PACKING] Pedido='+S.pedido+' SKU='+sk.sku);
-  console.log('[PACKING] Esperado='+(esp!==null?esp:'null')+' Actual='+reg_actual+' Nueva='+cant+' Total='+total);
-  console.log('[PACKING] Estado='+(esp===null?'SIN_PACKING':total>esp?'SOBRANTE':total===esp?'COMPLETO':'PENDIENTE'));
-
-  // Log detallado de componentes del saldo para diagnóstico
-  var _spSum=0;
-  DB.skusPedidoCache.forEach(function(r){
-    if(normStr(r.CodProducto||'')===normStr(sk.sku)) _spSum+=Number(r.Cantidad)||0;
-  });
-  var _sesSum=0;
-  S.skusRegistrados.forEach(function(r){
-    if(normStr(r.sku)===normStr(sk.sku)) _sesSum+=Number(r.cantidad)||0;
-  });
-  var reg_actual=_spSum+_sesSum; // = saldoSKU(S.pedido, sk.sku)
-  var total=reg_actual+cant;
-
-  console.log('[EXCESO] Pedido='+S.pedido+' SKU='+sk.sku+
-    ' Esperado='+(esp!==null?esp:'null(no en packing)')+
-    ' SPCache='+_spSum+' ('+DB.skusPedidoCache.length+' regs)'+
-    ' Sesion='+_sesSum+' ('+S.skusRegistrados.length+' regs)'+
-    ' CantNueva='+cant+
-    ' Total='+(reg_actual+cant)+
-    ' Excede='+(esp!==null&&total>esp?'SI':'NO'));
-
-  // Si el caché está vacío y hay registros anteriores, puede ser que no se cargó
-  if(DB.skusPedidoCache.length===0&&_sesSum===0){
-    console.warn('[EXCESO] ATENCION: caché SP vacío — ¿se llamó cargarCacheSKUsPedido?');
-  }
+  console.log('[PACKING] confCantidad: SKU='+sk.sku+' Esperado='+esp+' Actual='+reg_actual+' Nueva='+cant+' Total='+total+' Excede='+(esp!==null&&total>esp?'SI':'NO'));
 
   // Verificar sobrante ANTES de guardar — sin mostrar cantidades
   if(esp!==null&&total>esp){
