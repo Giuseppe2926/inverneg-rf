@@ -812,20 +812,23 @@ function getPacingList(pedido){
 
 // ── Helpers pendiente por pedido ────────────────────────────────
 function saldoSKU(pedido,sku){
-  // Suma registros de SP de otros contenedores (caché) + sesión actual
-  // La comparación es a nivel Pedido + SKU (todos los contenedores)
-  var total=0;
-  // Registros ya persistidos en SP (otros contenedores del pedido)
+  // Fuente única: DB.skusPedidoCache contiene TODOS los registros SP del pedido
+  // (cargado al inicio del flujo de mercadería, incluye el contenedor actual)
+  // S.skusRegistrados tiene los del contenedor actual (los de SP + los nuevos de sesión)
+  // Para evitar doble conteo: usar caché para otros contenedores + skusRegistrados para el actual
+  var totalCache=0, totalSesion=0;
+  // Caché: registros de SP EXCLUYENDO el contenedor actual (esos están en skusRegistrados)
   DB.skusPedidoCache.forEach(function(r){
-    if(normStr(r.CodProducto||'')===normStr(sku))
-      total+=Number(r.Cantidad)||0;
+    if(normStr(r.CodProducto||'')===normStr(sku)&&
+       normStr(r.Contenedor||'')!==normStr(S.contenedor))
+      totalCache+=Number(r.Cantidad)||0;
   });
-  // Registros de la sesión actual (aún no en el caché)
+  // Sesión actual: S.skusRegistrados del contenedor actual (SP ya guardados + nuevos de sesión)
   S.skusRegistrados.forEach(function(r){
-    if(normStr(r.sku)===normStr(sku)&&normStr(r.pedido||S.pedido)===normStr(pedido))
-      total+=Number(r.cantidad)||0;
+    if(normStr(r.sku)===normStr(sku))
+      totalSesion+=Number(r.cantidad)||0;
   });
-  return total;
+  return totalCache+totalSesion;
 }
 
 // Cargar caché de SKUs del pedido desde SP (llamar al iniciar flujo de mercadería)
