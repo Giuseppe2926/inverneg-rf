@@ -480,6 +480,15 @@ function limpiarPedido(){
   document.getElementById('informe-wrap').innerHTML='';
 }
 
+function manejarEnterBusq(e){
+  if(e.key!=='Enter') return;
+  var p=getPedidoActivo();
+  if(p){seleccionarPedido(p);}
+  else{
+    var v=(document.getElementById('inp-pedido-busq')||{}).value||'';
+    if(v) alert('Pedido no encontrado: '+v);
+  }
+}
 function getPedidoActivo(){
   return window._pedidoSeleccionado||'';
 }
@@ -1014,12 +1023,16 @@ function boot(){
 window.generarInforme=generarInforme;
 window.generarDetalleRecepcion=generarDetalleRecepcion;
 window.filtrarPedidos=filtrarPedidos;
+window.manejarEnterBusq=manejarEnterBusq;
+window.actualizarIndicador=actualizarIndicador;
 window.mostrarDropdown=mostrarDropdown;
 window.ocultarDropdown=ocultarDropdown;
 window.seleccionarPedido=seleccionarPedido;
 window.getPedidoActivo=getPedidoActivo;
 window.generarDetalle=generarDetalle;
 window.filtrarPedidos=filtrarPedidos;
+window.manejarEnterBusq=manejarEnterBusq;
+window.actualizarIndicador=actualizarIndicador;
 window.seleccionarPedido=seleccionarPedido;
 window.limpiarPedido=limpiarPedido;
 window.getPedidoActivo=getPedidoActivo;
