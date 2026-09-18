@@ -401,12 +401,51 @@ function getMarca(sku){
 
 /* ── CARGA DE DATOS SP ───────────────────────── */
 function cargarHorasPedido(pedido){
-  if(!DB.listIds.horas) return Promise.resolve([]);
+  if(!DB.listIds.horas){
+    console.error('[LHORAS-INFO] Lista horas no disponible (DB.listIds.horas=null)');
+    return Promise.resolve([]);
+  }
+  console.log('[LHORAS-INFO] Cargando LHoras para Pedido="'+pedido+'" listId='+DB.listIds.horas);
   return gGet(urlLista(DB.listIds.horas)+'/items?$expand=fields&$top=500').then(function(d){
-    return (d.value||[]).map(function(i){return i.fields||{};}).filter(function(f){
-      return normStr(f.Pedido||'')===normStr(pedido);
+    var items=(d.value||[]);
+    console.log('[LHORAS-INFO] Total ítems en LHoras:',items.length);
+    // Log primeros 3 para ver la estructura de campos
+    items.slice(0,3).forEach(function(i,idx){
+      var f=i.fields||{};
+      var keys=Object.keys(f).filter(function(k){return !k.startsWith('@');});
+      console.log('[LHORAS-INFO] Item['+idx+'] keys:',keys.join(','));
+      console.log('[LHORAS-INFO] Item['+idx+'] Pedido="'+(f.Pedido||f.pedido||'?')+
+        '" Contenedor="'+(f.Contenedor||f.contenedor||'?')+
+        '" HoraLlegada="'+(f.HoraLlegada||'?')+
+        '" Sello1="'+(f.Sello1||'?')+'"');
     });
-  }).catch(function(){return[];});
+    var fields=items.map(function(i){return i.fields||{};});
+    var filtrados=fields.filter(function(f){
+      var pedSP=f.Pedido||f.pedido||'';
+      var match=normStr(pedSP)===normStr(pedido);
+      return match;
+    });
+    console.log('[LHORAS-INFO] Pedido="'+pedido+'" -> Encontrados:',filtrados.length,
+      'de',fields.length,'totales');
+    if(filtrados.length>0){
+      filtrados.forEach(function(f,i){
+        console.log('[LHORAS-INFO] ['+i+'] Contenedor="'+(f.Contenedor||'?')+
+          '" Llegada="'+(f.HoraLlegada||'')+'" Apertura="'+(f.HoraApertura||'')+
+          '" Cierre="'+(f.HoraCierre||'')+'" Salida="'+(f.HoraSalida||'')+
+          '" Personas='+(f.Personas||0)+
+          ' Sello1="'+(f.Sello1||'')+'" Sello2="'+(f.Sello2||'')+'"');
+      });
+    } else if(fields.length>0){
+      // Mostrar los valores de Pedido que hay en SP para comparar
+      var pedidosSP=[...new Set(fields.map(function(f){return f.Pedido||f.pedido||'(vacío)';}))];
+      console.warn('[LHORAS-INFO] Pedidos en LHoras SP:',pedidosSP.join(' | '));
+      console.warn('[LHORAS-INFO] Buscando:',normStr(pedido),' vs SP:',pedidosSP.map(normStr).join(' | '));
+    }
+    return filtrados;
+  }).catch(function(e){
+    console.error('[LHORAS-INFO] Error cargando LHoras:',e.message);
+    return[];
+  });
 }
 function cargarRecepcionesPedido(pedido){
   if(!DB.listIds.recepciones) return Promise.resolve([]);
@@ -561,7 +600,9 @@ function generarInforme(){
     var horas=res[0], recepciones=res[1];
 
     function getHoras(cont){
-      return horas.find(function(h){return normStr(h.Contenedor||'')===normStr(cont);})||{};
+      var h=horas.find(function(h){return normStr(h.Contenedor||'')===normStr(cont);});
+      if(!h) console.warn('[LHORAS-INFO] getHoras("'+cont+'") -> NO ENCONTRADO en',horas.length,'registros LHoras');
+      return h||{};
     }
 
     // Fecha recepción
