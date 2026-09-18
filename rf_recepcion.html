@@ -863,9 +863,23 @@ function esperadoSKU(sku){
 }
 function htmlPendiente(sku){
   // NUNCA mostrar cantidades esperadas, registradas ni pendientes al operador
-  var esp=esperadoSKU(sku);
-  if(esp===null) return ''; // SKU no en packing list → sin indicador
+  var esp=esperadoSKU(sku);  // loguea internamente [PACKING] Esperado=...
   var reg=saldoSKU(S.pedido,sku);
+  var _spSum=0,_sesSum=0;
+  DB.skusPedidoCache.forEach(function(r){if(normStr(r.CodProducto||'')===normStr(sku))_spSum+=Number(r.Cantidad)||0;});
+  S.skusRegistrados.forEach(function(r){if(normStr(r.sku)===normStr(sku))_sesSum+=Number(r.cantidad)||0;});
+  console.log('[PACKING] --- showIngresoCantidad ---');
+  console.log('[PACKING] Pedido='+S.pedido+' SKU='+sku);
+  console.log('[PACKING] Esperado='+(esp!==null?esp:'null(no en packing)'));
+  console.log('[PACKING] SP_cache='+_spSum+' ('+DB.skusPedidoCache.length+' regs en caché)');
+  console.log('[PACKING] Sesion='+_sesSum+' ('+S.skusRegistrados.length+' regs sesión)');
+  console.log('[PACKING] Total_actual='+reg);
+  if(esp===null){
+    console.log('[PACKING] Estado=SIN_INDICADOR (SKU no en packing)');
+    return ''; // SKU no en packing list → sin indicador
+  }
+  var estado=reg>=esp?'CANTIDAD_OK':'PENDIENTE';
+  console.log('[PACKING] Estado='+estado);
   if(reg>=esp){
     // Completo o sobrante — se maneja en confCantidad, aquí solo mostrar OK
     return '<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(63,185,80,.12);'+
@@ -1935,25 +1949,19 @@ function confCantidad(){
   // Verificar que el packing esté cargado (diagnóstico por si htmlPendiente no muestra nada)
   if(DB.packing.length===0) console.warn('[PACKING] DB.packing vacío — la hoja Packing no cargó o no tiene datos para este pedido');
 
-  // LOG CRÍTICO: estado de DB.packing y S.skusRegistrados antes de evaluar
-  console.log('[CONF-CANT] ==========================================');
-  console.log('[CONF-CANT] Pedido="'+S.pedido+'" SKU="'+sk.sku+'" CantIngresada='+cant);
-  console.log('[CONF-CANT] DB.packing total='+DB.packing.length+' items');
-  console.log('[CONF-CANT] S.skusRegistrados total='+S.skusRegistrados.length+' items');
-  console.log('[CONF-CANT] DB.skusPedidoCache total='+DB.skusPedidoCache.length+' items');
-  // Mostrar items del packing para este pedido
-  var packingDelPedido=DB.packing.filter(function(r){return normStr(r.pedido)===normStr(S.pedido);});
-  console.log('[CONF-CANT] Packing del pedido "'+S.pedido+'": '+packingDelPedido.length+' SKUs');
-  packingDelPedido.forEach(function(r){
-    console.log('[CONF-CANT]   SKU="'+r.sku+'" desc="'+r.desc+'" cant='+r.cantidad+
-      ' normSKU="'+normStr(r.sku)+'" normSKUbuscado="'+normStr(sk.sku)+'" match='+(normStr(r.sku)===normStr(sk.sku)));
-  });
-  // Mostrar registros de sesión para este SKU
-  var sesionDelSKU=S.skusRegistrados.filter(function(r){return normStr(r.sku)===normStr(sk.sku);});
-  console.log('[CONF-CANT] Sesion SKU "'+sk.sku+'": '+sesionDelSKU.length+' registros, suma='+
-    sesionDelSKU.reduce(function(a,r){return a+(Number(r.cantidad)||0);},0));
-
-  var esp=esperadoSKU(sk.sku);
+  var esp=esperadoSKU(sk.sku);  // loguea [PACKING] Esperado=...
+  var _spS=0,_seS=0;
+  DB.skusPedidoCache.forEach(function(r){if(normStr(r.CodProducto||'')===normStr(sk.sku))_spS+=Number(r.Cantidad)||0;});
+  S.skusRegistrados.forEach(function(r){if(normStr(r.sku)===normStr(sk.sku))_seS+=Number(r.cantidad)||0;});
+  var _reg_actual=_spS+_seS;
+  var _total=_reg_actual+cant;
+  var _estado=esp===null?'SIN_PACKING':(_total>esp?'SOBRANTE':_total===esp?'COMPLETO':'PENDIENTE');
+  console.log('[PACKING] --- confCantidad ---');
+  console.log('[PACKING] Pedido='+S.pedido+' SKU='+sk.sku);
+  console.log('[PACKING] Esperado='+(esp!==null?esp:'null'));
+  console.log('[PACKING] SP='+_spS+' Sesion='+_seS+' Nueva='+cant+' Total='+_total);
+  console.log('[PACKING] Estado='+_estado);
+  console.log('[PACKING] DB.packing.length='+DB.packing.length+' DB.skusPedidoCache.length='+DB.skusPedidoCache.length);
 
   // Log detallado de componentes del saldo para diagnóstico
   var _spSum=0;
