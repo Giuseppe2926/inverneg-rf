@@ -1959,19 +1959,14 @@ function confCantidad(){
   // Verificar que el packing esté cargado (diagnóstico por si htmlPendiente no muestra nada)
   if(DB.packing.length===0) console.warn('[PACKING] DB.packing vacío — la hoja Packing no cargó o no tiene datos para este pedido');
 
-  var esp=esperadoSKU(sk.sku);  // loguea [PACKING] Esperado=...
-  var _spS=0,_seS=0;
-  DB.skusPedidoCache.forEach(function(r){if(normStr(r.CodProducto||'')===normStr(sk.sku))_spS+=Number(r.Cantidad)||0;});
-  S.skusRegistrados.forEach(function(r){if(normStr(r.sku)===normStr(sk.sku))_seS+=Number(r.cantidad)||0;});
-  var _reg_actual=_spS+_seS;
-  var _total=_reg_actual+cant;
-  var _estado=esp===null?'SIN_PACKING':(_total>esp?'SOBRANTE':_total===esp?'COMPLETO':'PENDIENTE');
+  var esp=esperadoSKU(sk.sku);
+  // Usar saldoSKU() — fuente única y corregida (caché otros conts + sesión actual sin doble conteo)
+  var reg_actual=saldoSKU(S.pedido,sk.sku);
+  var total=reg_actual+cant;
   console.log('[PACKING] --- confCantidad ---');
   console.log('[PACKING] Pedido='+S.pedido+' SKU='+sk.sku);
-  console.log('[PACKING] Esperado='+(esp!==null?esp:'null'));
-  console.log('[PACKING] SP='+_spS+' Sesion='+_seS+' Nueva='+cant+' Total='+_total);
-  console.log('[PACKING] Estado='+_estado);
-  console.log('[PACKING] DB.packing.length='+DB.packing.length+' DB.skusPedidoCache.length='+DB.skusPedidoCache.length);
+  console.log('[PACKING] Esperado='+(esp!==null?esp:'null')+' Actual='+reg_actual+' Nueva='+cant+' Total='+total);
+  console.log('[PACKING] Estado='+(esp===null?'SIN_PACKING':total>esp?'SOBRANTE':total===esp?'COMPLETO':'PENDIENTE'));
 
   // Log detallado de componentes del saldo para diagnóstico
   var _spSum=0;
