@@ -1887,7 +1887,14 @@ function showIngresoCantidad(){
   h+='<div style="font-size:13px;font-weight:700;color:var(--acc)">'+sk.sku+'</div>';
   h+='<div style="font-size:12px;color:var(--txt);margin-top:2px">'+sk.desc+'</div>';
   h+='<div style="font-size:11px;color:var(--mut)">Tipo: '+sk.tipo+'</div></div>';
-  h+=htmlPendiente(sk.sku);
+  var _hpResult=htmlPendiente(sk.sku);
+  console.log('[PACKING-UI] Pedido='+S.pedido+' SKU='+sk.sku);
+  console.log('[PACKING-UI] htmlPendiente()="'+(_hpResult||'(vacío — SKU no encontrado en DB.packing)').slice(0,80)+'"');
+  console.log('[PACKING-UI] DB.packing.length='+DB.packing.length);
+  console.log('[PACKING-UI] DB.packing para este pedido:',
+    DB.packing.filter(function(r){return normStr(r.pedido)===normStr(S.pedido);}).map(function(r){return r.sku;}).join(', ')||'(ninguno)');
+  console.log('[PACKING-UI] S.pedido="'+S.pedido+'"');
+  h+=_hpResult;
   h+='<details style="margin:8px 0">';
   h+='<summary style="font-size:11px;color:var(--acc);cursor:pointer">Calculadora de unidades</summary>';
   h+='<div style="background:var(--sur2);border-radius:6px;padding:10px;margin-top:6px">';
