@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Operativo — Inverneg CND</title>
+<style>
+:root {
+  --negro:   #0D0F12;
+  --dk1:     #141720;
+  --dk2:     #1C2030;
+  --dk3:     #252A3A;
+  --borde:   rgba(255,255,255,.08);
+  --borde2:  rgba(255,255,255,.14);
+  --txt:     #E8EAF0;
+  --txt2:    #8B90A4;
+  --txt3:    #545869;
+  --pick:    #3B82F6;
+  --check:   #10B981;
+  --pack:    #F59E0B;
+  --fact:    #8B5CF6;
+  --danger:  #EF4444;
+  --warn:    #F59E0B;
+  --ok:      #10B981;
+  --r:       10px;
+  --rsm:     6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--negro);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;min-height:100vh;font-size:14px}
+
+/* HEADER */
+.hdr{background:var(--dk1);border-bottom:1px solid var(--borde);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px;flex-wrap:wrap}
+.hdr-left h1{font-size:14px;font-weight:600;letter-spacing:.2px}
+.hdr-left .sub{font-size:11px;color:var(--txt3);margin-top:2px}
+.hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.last-update{font-size:11px;color:var(--txt3)}
+.btn-refresh{background:var(--dk3);border:1px solid var(--borde2);color:var(--txt2);font-size:12px;padding:6px 12px;border-radius:var(--rsm);cursor:pointer;display:flex;align-items:center;gap:5px}
+.btn-refresh:hover{border-color:var(--pick);color:var(--pick)}
+
+/* FILTROS GLOBALES */
+.filtros{background:var(--dk1);border-bottom:1px solid var(--borde);padding:8px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.filter-group{display:flex;align-items:center;gap:6px}
+.filter-label{font-size:11px;color:var(--txt3);white-space:nowrap}
+.fpill{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--borde);color:var(--txt2);cursor:pointer;background:transparent;white-space:nowrap}
+.fpill:hover{border-color:var(--borde2);color:var(--txt)}
+.fpill.active{background:rgba(59,130,246,.15);border-color:var(--pick);color:var(--pick)}
+.fsep{width:1px;height:16px;background:var(--borde)}
+select.fselect{background:var(--dk2);border:1px solid var(--borde);color:var(--txt2);font-size:11px;padding:4px 8px;border-radius:var(--rsm);outline:none;cursor:pointer}
+select.fselect:focus{border-color:var(--pick)}
+
+/* TABS */
+.tabs-bar{background:var(--dk1);border-bottom:1px solid var(--borde);padding:0 20px;display:flex;gap:2px;overflow-x:auto}
+.tabs-bar::-webkit-scrollbar{height:0}
+.tab{padding:10px 14px;font-size:12px;font-weight:500;color:var(--txt3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab:hover{color:var(--txt2)}
+.tab.active{color:var(--txt);border-bottom-color:var(--pick)}
+
+/* MAIN */
+main{padding:20px;max-width:1400px;margin:0 auto}
+.screen{display:none}.screen.active{display:block}
+
+/* KPI GRID */
+.kpi-grid{display:grid;gap:12px;margin-bottom:16px}
+.kpi-grid-4{grid-template-columns:repeat(4,1fr)}
+.kpi-grid-3{grid-template-columns:repeat(3,1fr)}
+.kpi{background:var(--dk2);border:1px solid var(--borde);border-radius:var(--r);padding:14px 16px;cursor:pointer;transition:border-color .15s}
+.kpi:hover{border-color:var(--borde2)}
+.kpi.clickable:hover{border-color:var(--pick)}
+.kpi .lbl{font-size:11px;color:var(--txt3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.kpi .val{font-size:28px;font-weight:600;line-height:1;margin-bottom:6px}
+.kpi .sub-vals{display:flex;gap:12px;font-size:11px;color:var(--txt3)}
+.kpi .delta{font-size:11px;margin-top:4px}
+.kpi .delta.up{color:var(--ok)}
+.kpi .delta.dn{color:var(--danger)}
+.kpi .delta.neu{color:var(--txt3)}
+.kpi-pick{border-left:3px solid var(--pick)}
+.kpi-check{border-left:3px solid var(--check)}
+.kpi-pack{border-left:3px solid var(--pack)}
+.kpi-fact{border-left:3px solid var(--fact)}
+
+/* CARDS */
+.card{background:var(--dk2);border:1px solid var(--borde);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.card-title{font-size:11px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+
+/* TABLA */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:7px 10px;color:var(--txt3);font-weight:500;border-bottom:1px solid var(--borde);font-size:11px;white-space:nowrap}
+td{padding:8px 10px;color:var(--txt2);border-bottom:1px solid var(--borde)}
+td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--txt)}
+td.name{color:var(--txt);font-weight:500}
+tr:hover td{background:rgba(255,255,255,.02)}
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:rgba(59,130,246,.06)}
+
+/* BADGES */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+.badge-g{background:rgba(16,185,129,.15);color:#10B981;border:1px solid rgba(16,185,129,.3)}
+.badge-y{background:rgba(245,158,11,.15);color:#F59E0B;border:1px solid rgba(245,158,11,.3)}
+.badge-r{background:rgba(239,68,68,.15);color:#EF4444;border:1px solid rgba(239,68,68,.3)}
+.badge-pick{background:rgba(59,130,246,.15);color:var(--pick);border:1px solid rgba(59,130,246,.3)}
+.badge-check{background:rgba(16,185,129,.15);color:var(--check);border:1px solid rgba(16,185,129,.3)}
+.badge-pack{background:rgba(245,158,11,.15);color:var(--pack);border:1px solid rgba(245,158,11,.3)}
+.badge-fact{background:rgba(139,92,246,.15);color:var(--fact);border:1px solid rgba(139,92,246,.3)}
+
+/* BARRAS */
+.bar-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.bar-h .bn{font-size:11px;color:var(--txt2);width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+.bar-h .bt{flex:1;height:8px;background:var(--dk3);border-radius:4px;overflow:hidden}
+.bar-fill-h{height:100%;border-radius:4px;transition:width .4s}
+.bar-h .bv{font-size:11px;color:var(--txt2);min-width:32px;text-align:right}
+
+/* HORA CHART */
+.hora-chart{display:flex;align-items:flex-end;gap:3px;height:80px;padding-bottom:0}
+.hbar{flex:1;border-radius:2px 2px 0 0;min-width:0;transition:opacity .2s}
+.hbar:hover{opacity:.8}
+.hora-lbls{display:flex;gap:3px;margin-top:5px}
+.hlbl{flex:1;font-size:9px;color:var(--txt3);text-align:center;min-width:0}
+
+/* PART CHART */
+.part-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.part-lbl{font-size:12px;color:var(--txt2);width:90px;flex-shrink:0}
+.part-bar{flex:1;height:10px;background:var(--dk3);border-radius:5px;overflow:hidden}
+.part-val{font-size:12px;color:var(--txt);font-weight:500;min-width:36px;text-align:right}
+
+/* SEMAFORO */
+.semaforoGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.sem-card{border-radius:var(--r);padding:14px;text-align:center;cursor:pointer}
+.sem-card .sn{font-size:11px;margin-bottom:6px;font-weight:500}
+.sem-card .sv{font-size:32px;font-weight:600}
+.sem-g{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25)}
+.sem-g .sn{color:#10B981}.sem-g .sv{color:#10B981}
+.sem-y{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25)}
+.sem-y .sn{color:#F59E0B}.sem-y .sv{color:#F59E0B}
+.sem-r{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25)}
+.sem-r .sn{color:#EF4444}.sem-r .sv{color:#EF4444}
+
+/* ALERTA ROWS */
+.alert-list{display:flex;flex-direction:column;gap:0}
+.alert-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--borde)}
+.alert-row:last-child{border-bottom:none}
+.dot-r{width:7px;height:7px;border-radius:50%;background:var(--danger);flex-shrink:0}
+.dot-y{width:7px;height:7px;border-radius:50%;background:var(--warn);flex-shrink:0}
+.dot-g{width:7px;height:7px;border-radius:50%;background:var(--ok);flex-shrink:0}
+.alert-info{flex:1;font-size:12px;color:var(--txt)}
+.alert-info .ao{color:var(--txt2);font-size:11px;margin-left:4px}
+.alert-time{font-size:11px;color:var(--txt3);white-space:nowrap}
+
+/* DRILL PANEL */
+.drill-panel{background:var(--dk1);border:1px solid var(--pick);border-radius:var(--r);padding:14px;margin-top:10px;display:none}
+.drill-panel.open{display:block}
+.drill-close{float:right;background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px}
+.drill-title{font-size:12px;font-weight:600;color:var(--pick);margin-bottom:12px}
+
+/* OPERADOR FICHA */
+.op-ficha{background:var(--dk1);border:1px solid var(--borde2);border-radius:var(--r);padding:16px;margin-top:10px;display:none}
+.op-ficha.open{display:block}
+.op-ficha-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.op-avatar{width:40px;height:40px;border-radius:50%;background:rgba(59,130,246,.2);border:1px solid var(--pick);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--pick);flex-shrink:0}
+.op-name{font-size:15px;font-weight:600}
+.op-sub{font-size:11px;color:var(--txt3)}
+
+/* LOADING */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:14px}
+.spinner{width:28px;height:28px;border:2px solid var(--borde);border-top-color:var(--pick);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{font-size:13px;color:var(--txt3)}
+
+/* MSAL */
+.msal-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.msal-card{background:var(--dk2);border:1px solid var(--borde);border-radius:16px;padding:36px 32px;text-align:center;max-width:360px;width:100%}
+.msal-icon{font-size:40px;margin-bottom:16px}
+.msal-card h2{font-size:17px;font-weight:600;margin-bottom:6px}
+.msal-card p{font-size:13px;color:var(--txt3);margin-bottom:24px;line-height:1.6}
+.btn-login{background:var(--pick);border:none;color:#fff;font-size:14px;font-weight:600;padding:12px 24px;border-radius:var(--rsm);cursor:pointer;width:100%}
+.btn-login:hover{opacity:.9}
+.msal-user{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:var(--rsm);padding:8px 12px;font-size:12px;color:var(--pick);margin-bottom:14px;word-break:break-all}
+.aviso-msal{font-size:12px;color:var(--danger);margin-top:12px;display:none}
+.aviso-msal.show{display:block}
+.msal-loading-txt{font-size:12px;color:var(--txt3);margin-top:12px;display:none}
+.msal-loading-txt.show{display:flex;align-items:center;gap:8px;justify-content:center}
+
+/* TREND LINE MINI */
+.trend{display:flex;align-items:flex-end;gap:2px;height:28px}
+.tb{flex:1;background:rgba(59,130,246,.3);border-radius:1px 1px 0 0;min-width:3px}
+
+/* EMPTY */
+.empty{text-align:center;padding:32px;color:var(--txt3);font-size:13px}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .kpi-grid-4{grid-template-columns:repeat(2,1fr)}
+  .kpi-grid-3{grid-template-columns:repeat(2,1fr)}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .semaforoGrid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- PANTALLA MSAL -->
+<div id="s-msal" class="msal-wrap">
+  <div class="msal-card">
+    <div class="msal-icon">📊</div>
+    <h2>Dashboard Operativo</h2>
+    <p>Inverneg · Centro de Distribución Nacional<br>Inicia sesión con tu cuenta Microsoft para acceder.</p>
+    <div class="msal-user" id="msal-user-info" style="display:none"></div>
+    <button class="btn-login" id="btn-login" onclick="msalLogin()">Iniciar sesión con Microsoft</button>
+    <div class="msal-loading-txt" id="msal-loading">
+      <div class="spinner" style="width:16px;height:16px"></div> Cargando datos...
+    </div>
+    <div class="aviso-msal" id="aviso-msal"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="s-app" style="display:none">
+
+<header class="hdr">
+  <div class="hdr-left">
+    <h1>Dashboard de despacho</h1>
+    <div class="sub">Inverneg · CND</div>
+  </div>
+  <div class="hdr-right">
+    <span class="last-update" id="last-update">—</span>
+    <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
+  </div>
+</header>
+
+<div class="filtros">
+  <div class="filter-group">
+    <span class="filter-label">Período</span>
+    <span class="fpill active" onclick="setFecha('hoy',this)">Hoy</span>
+    <span class="fpill" onclick="setFecha('semana',this)">Semana</span>
+    <span class="fpill" onclick="setFecha('mes',this)">Mes</span>
+    <span class="fpill" onclick="setFecha('30d',this)">30 días</span>
+  </div>
+  <div class="fsep"></div>
+  <div class="filter-group">
+    <span class="filter-label">Operador</span>
+    <select class="fselect" id="f-operador" onchange="aplicarFiltros()">
+      <option value="">Todos</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Etapa</span>
+    <select class="fselect" id="f-etapa" onchange="aplicarFiltros()">
+      <option value="">Todas</option>
+      <option value="PICKING">Picking</option>
+      <option value="CHECKING">Checking</option>
+      <option value="PACKING">Packing</option>
+      <option value="FACTURACION">Facturación</option>
+    </select>
+  </div>
+</div>
+
+<div class="tabs-bar">
+  <div class="tab active" onclick="showTab('resumen',this)">📊 Resumen</div>
+  <div class="tab" onclick="showTab('operacion',this)">🚚 Operación</div>
+  <div class="tab" onclick="showTab('operadores',this)">👷 Operadores</div>
+  <div class="tab" onclick="showTab('cuellos',this)">⚠ Cuellos</div>
+  <div class="tab" onclick="showTab('tiempos',this)">⏱ Tiempos</div>
+  <div class="tab" onclick="showTab('balance',this)">📉 Balance</div>
+  <div class="tab" onclick="showTab('rankings',this)">🏆 Rankings</div>
+</div>
+
+<main>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay" class="loading">
+  <div class="spinner"></div>
+  <div class="loading-txt" id="loading-txt">Cargando datos desde SharePoint...</div>
+</div>
+
+<!-- ===== RESUMEN EJECUTIVO ===== -->
+<div class="screen" id="tab-resumen">
+  <div class="kpi-grid kpi-grid-4">
+    <div class="kpi clickable" onclick="drillOTs()">
+      <div class="lbl">OT con actividad</div>
+      <div class="val" id="r-ot-total">—</div>
+      <div class="sub-vals"><span id="r-ot-hoy">hoy: —</span><span id="r-ot-semana">sem: —</span></div>
+      <div class="delta neu" id="r-ot-delta">cargando...</div>
+    </div>
+    <div class="kpi clickable" onclick="drillOperadores()">
+      <div class="lbl">Operadores activos</div>
+      <div class="val" id="r-ops-activos">—</div>
+      <div class="sub-vals"><span id="r-ops-total">de — asignados</span></div>
+      <div class="delta" id="r-ops-inactivos">—</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Eventos registrados</div>
+      <div class="val" id="r-eventos">—</div>
+      <div class="sub-vals"><span id="r-eventos-hoy">hoy: —</span></div>
+      <div class="delta neu" id="r-eventos-delta">—</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Actividades varias</div>
+      <div class="val" id="r-actvarias">—</div>
+      <div class="sub-vals"><span id="r-actvarias-hoy">hoy: —</span></div>
+      <div class="delta neu" id="r-actvarias-top">—</div>
+    </div>
+  </div>
+
+  <div class="kpi-grid kpi-grid-4">
+    <div class="kpi kpi-pick">
+      <div class="lbl">Picking</div>
+      <div class="val" id="r-pick">—</div>
+      <div class="sub-vals"><span id="r-pick-hoy">hoy: —</span><span id="r-pick-fin">finalizados: —</span></div>
+    </div>
+    <div class="kpi kpi-check">
+      <div class="lbl">Checking</div>
+      <div class="val" id="r-check">—</div>
+      <div class="sub-vals"><span id="r-check-hoy">hoy: —</span><span id="r-check-fin">finalizados: —</span></div>
+    </div>
+    <div class="kpi kpi-pack">
+      <div class="lbl">Packing</div>
+      <div class="val" id="r-pack">—</div>
+      <div class="sub-vals"><span id="r-pack-hoy">hoy: —</span><span id="r-pack-fin">finalizados: —</span></div>
+    </div>
+    <div class="kpi kpi-fact">
+      <div class="lbl">Facturación</div>
+      <div class="val" id="r-fact">—</div>
+      <div class="sub-vals"><span id="r-fact-hoy">hoy: —</span><span id="r-fact-fin">finalizados: —</span></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Productividad hoy vs ayer vs promedio 30d</div>
+      <div id="prod-comparativa">
+        <div class="bar-h"><span class="bn">Picking</span><div class="bt"><div class="bar-fill-h" id="bc-pick" style="width:0%;background:var(--pick)"></div></div><span class="bv" id="bv-pick">—</span></div>
+        <div class="bar-h"><span class="bn">Checking</span><div class="bt"><div class="bar-fill-h" id="bc-check" style="width:0%;background:var(--check)"></div></div><span class="bv" id="bv-check">—</span></div>
+        <div class="bar-h"><span class="bn">Packing</span><div class="bt"><div class="bar-fill-h" id="bc-pack" style="width:0%;background:var(--pack)"></div></div><span class="bv" id="bv-pack">—</span></div>
+        <div class="bar-h"><span class="bn">Facturación</span><div class="bt"><div class="bar-fill-h" id="bc-fact" style="width:0%;background:var(--fact)"></div></div><span class="bv" id="bv-fact">—</span></div>
+        <div style="margin-top:10px;font-size:11px;color:var(--txt3)">% respecto al promedio de 30 días</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Participación por etapa — período seleccionado</div>
+      <div id="part-etapas">
+        <div class="part-row"><span class="part-lbl" style="color:var(--pick)">Picking</span><div class="part-bar"><div id="pp-pick" style="height:100%;border-radius:5px;background:var(--pick);width:0%"></div></div><span class="part-val" id="pv-pick">—</span></div>
+        <div class="part-row"><span class="part-lbl" style="color:var(--check)">Checking</span><div class="part-bar"><div id="pp-check" style="height:100%;border-radius:5px;background:var(--check);width:0%"></div></div><span class="part-val" id="pv-check">—</span></div>
+        <div class="part-row"><span class="part-lbl" style="color:var(--pack)">Packing</span><div class="part-bar"><div id="pp-pack" style="height:100%;border-radius:5px;background:var(--pack);width:0%"></div></div><span class="part-val" id="pv-pack">—</span></div>
+        <div class="part-row"><span class="part-lbl" style="color:var(--fact)">Facturación</span><div class="part-bar"><div id="pp-fact" style="height:100%;border-radius:5px;background:var(--fact);width:0%"></div></div><span class="part-val" id="pv-fact">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="drill-ots" class="drill-panel">
+    <button class="drill-close" onclick="cerrarDrill('drill-ots')">✕</button>
+    <div class="drill-title">OT con actividad en el período</div>
+    <div class="tbl-wrap"><table id="tbl-drill-ots"><thead><tr><th>OT</th><th>Etapas completadas</th><th>Operadores</th><th>Último evento</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</div>
+
+<!-- ===== OPERACIÓN ===== -->
+<div class="screen" id="tab-operacion">
+  <div class="kpi-grid kpi-grid-4">
+    <div class="kpi"><div class="lbl">OT procesadas hoy</div><div class="val" id="op-ot-hoy">—</div><div class="delta" id="op-delta-ayer">vs ayer</div></div>
+    <div class="kpi"><div class="lbl">Hora pico</div><div class="val" id="op-hora-pico">—</div><div class="delta neu" id="op-pico-val">eventos en esa hora</div></div>
+    <div class="kpi"><div class="lbl">Hora baja</div><div class="val" id="op-hora-baja">—</div><div class="delta neu" id="op-baja-val">eventos en esa hora</div></div>
+    <div class="kpi"><div class="lbl">Operadores inactivos hoy</div><div class="val" id="op-inactivos">—</div><div class="delta neu">sin registro hoy</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Eventos por hora del día — período seleccionado (promedio)</div>
+    <div class="hora-chart" id="hora-chart"></div>
+    <div class="hora-lbls" id="hora-lbls"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Actividades varias más frecuentes</div>
+      <div id="actvarias-chart"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">OT por día — últimos 14 días</div>
+      <div class="hora-chart" id="ot-diario-chart" style="height:60px"></div>
+      <div class="hora-lbls" id="ot-diario-lbls"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== OPERADORES ===== -->
+<div class="screen" id="tab-operadores">
+  <div class="kpi-grid kpi-grid-3" style="margin-bottom:16px">
+    <div class="kpi"><div class="lbl">Operador líder del período</div><div class="val" id="op-lider-nombre" style="font-size:16px;margin-top:4px">—</div><div class="delta neu" id="op-lider-val">—</div></div>
+    <div class="kpi"><div class="lbl">Promedio del equipo</div><div class="val" id="op-promedio">—</div><div class="delta neu">eventos/operador en el período</div></div>
+    <div class="kpi"><div class="lbl">Operadores sin actividad</div><div class="val" id="op-sin-act">—</div><div class="delta neu">en el período seleccionado</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Productividad individual — clic en operador para ver ficha</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Operador</th><th style="text-align:right">Picking</th><th style="text-align:right">Checking</th><th style="text-align:right">Packing</th><th style="text-align:right">Facturación</th><th style="text-align:right">Act. Varias</th><th style="text-align:right">Total</th></tr></thead>
+        <tbody id="tbl-operadores"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="op-ficha" id="op-ficha">
+    <button class="drill-close" onclick="cerrarFicha()" style="float:right">✕</button>
+    <div class="op-ficha-header">
+      <div class="op-avatar" id="of-avatar">—</div>
+      <div><div class="op-name" id="of-nombre">—</div><div class="op-sub" id="of-sub">—</div></div>
+    </div>
+    <div class="kpi-grid kpi-grid-4" style="margin-bottom:14px">
+      <div class="kpi kpi-pick"><div class="lbl">Picking</div><div class="val" id="of-pick">—</div></div>
+      <div class="kpi kpi-check"><div class="lbl">Checking</div><div class="val" id="of-check">—</div></div>
+      <div class="kpi kpi-pack"><div class="lbl">Packing</div><div class="val" id="of-pack">—</div></div>
+      <div class="kpi kpi-fact"><div class="lbl">Facturación</div><div class="val" id="of-fact">—</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-title">Distribución por etapa</div>
+        <div id="of-dist"></div>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="card-title">Actividades varias y total OT</div>
+        <div style="display:flex;gap:16px;margin-top:6px">
+          <div><div style="font-size:11px;color:var(--txt3)">Act. Varias</div><div style="font-size:22px;font-weight:600" id="of-actvarias">—</div></div>
+          <div><div style="font-size:11px;color:var(--txt3)">Total eventos</div><div style="font-size:22px;font-weight:600" id="of-total">—</div></div>
+          <div><div style="font-size:11px;color:var(--txt3)">vs promedio equipo</div><div style="font-size:22px;font-weight:600" id="of-vs-promedio">—</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CUELLOS DE BOTELLA ===== -->
+<div class="screen" id="tab-cuellos">
+  <div class="semaforoGrid">
+    <div class="sem-card sem-g clickable" onclick="drillCuello(30)">
+      <div class="sn">OT menos de 30 min</div>
+      <div class="sv" id="cu-lt30">—</div>
+    </div>
+    <div class="sem-card sem-y clickable" onclick="drillCuello(60)">
+      <div class="sn">OT entre 30 y 60 min</div>
+      <div class="sv" id="cu-30-60">—</div>
+    </div>
+    <div class="sem-card sem-r clickable" onclick="drillCuello(120)">
+      <div class="sn">OT más de 60 min</div>
+      <div class="sv" id="cu-gt60">—</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">OT abiertas — sin FIN en la última etapa</div>
+      <div class="alert-list" id="cu-abiertas"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Etapa con mayor acumulación</div>
+      <div id="cu-etapa-chart"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Top 10 OT con mayor tiempo de procesamiento</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>OT</th><th>Última etapa</th><th>Operador</th><th style="text-align:right">Duración</th><th>Estado</th></tr></thead>
+        <tbody id="tbl-top-ots"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="drill-cuello" class="drill-panel">
+    <button class="drill-close" onclick="cerrarDrill('drill-cuello')">✕</button>
+    <div class="drill-title" id="drill-cuello-title">OT del rango</div>
+    <div class="tbl-wrap"><table><thead><tr><th>OT</th><th>Etapa</th><th>Operador</th><th style="text-align:right">Duración</th></tr></thead><tbody id="tbl-drill-cuello"></tbody></table></div>
+  </div>
+</div>
+
+<!-- ===== TIEMPOS ===== -->
+<div class="screen" id="tab-tiempos">
+  <div class="kpi-grid kpi-grid-4">
+    <div class="kpi kpi-pick"><div class="lbl">Tiempo prom. Picking</div><div class="val" id="ti-pick">—</div><div class="delta neu" id="ti-pick-vs">vs período anterior</div></div>
+    <div class="kpi kpi-check"><div class="lbl">Tiempo prom. Checking</div><div class="val" id="ti-check">—</div><div class="delta neu" id="ti-check-vs">vs período anterior</div></div>
+    <div class="kpi kpi-pack"><div class="lbl">Tiempo prom. Packing</div><div class="val" id="ti-pack">—</div><div class="delta neu" id="ti-pack-vs">vs período anterior</div></div>
+    <div class="kpi kpi-fact"><div class="lbl">Tiempo ciclo completo</div><div class="val" id="ti-ciclo">—</div><div class="delta neu">inicio → último FIN</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Tiempo promedio de Picking por operador</div>
+      <div id="ti-op-chart"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Distribución de tiempos — todas las etapas</div>
+      <div id="ti-dist-chart"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BALANCE DE CARGA ===== -->
+<div class="screen" id="tab-balance">
+  <div class="kpi-grid kpi-grid-3">
+    <div class="kpi"><div class="lbl">Promedio del equipo</div><div class="val" id="bl-promedio">—</div><div class="delta neu">eventos por operador en el período</div></div>
+    <div class="kpi"><div class="lbl">Operador más activo</div><div class="val" id="bl-max-nombre" style="font-size:14px;margin-top:4px">—</div><div class="delta" id="bl-max-val">— eventos</div></div>
+    <div class="kpi"><div class="lbl">Operadores sin actividad</div><div class="val" id="bl-inactivos">—</div><div class="delta neu">en el período seleccionado</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Distribución de carga por operador</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Operador</th><th style="text-align:right">Eventos</th><th style="text-align:right">% Participación</th><th style="text-align:right">vs Promedio</th></tr></thead>
+          <tbody id="tbl-balance"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Carga relativa al promedio del equipo</div>
+      <div id="bl-chart"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RANKINGS ===== -->
+<div class="screen" id="tab-rankings">
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Top por volumen total de eventos</div>
+      <div id="rank-volumen"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Top actividades varias más realizadas</div>
+      <div id="rank-actividades"></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Top OT por tiempo de procesamiento</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>OT</th><th>Etapas</th><th style="text-align:right">Tiempo total</th></tr></thead>
+          <tbody id="tbl-rank-ots"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Top por variabilidad de tiempos (Picking)</div>
+      <div id="rank-variabilidad"></div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+'use strict';
+(function(){
+var s=document.createElement('script');
+s.src='https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
+s.onload=function(){
+
+// ============================================================
+// CONFIG
+// ============================================================
+var CFG={
+  clientId:   'ec976114-e146-4ce4-850c-5d978e12acfd',
+  tenantId:   '5e008bd3-17b6-4f83-8d23-019691a40609',
+  redirectUri: window.location.href.split('?')[0].split('#')[0],
+  siteId:     'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
+  listas:{
+    registros: 'RF_Registros_Despacho',
+    varias:    'RF_Actividades_Varias',
+  },
+};
+var SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
+var ETAPAS=['PICKING','CHECKING','PACKING','FACTURACION'];
+var ETAPA_LABEL={PICKING:'Picking',CHECKING:'Checking',PACKING:'Packing',FACTURACION:'Facturación'};
+
+// ============================================================
+// MSAL
+// ============================================================
+var msalApp=new msal.PublicClientApplication({
+  auth:{clientId:CFG.clientId,authority:'https://login.microsoftonline.com/'+CFG.tenantId,redirectUri:CFG.redirectUri},
+  cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:false},
+});
+var account=null;
+
+function msalLogin(){
+  document.getElementById('btn-login').disabled=true;
+  msalApp.loginRedirect({scopes:SCOPES}).catch(function(e){
+    document.getElementById('btn-login').disabled=false;
+    var av=document.getElementById('aviso-msal');
+    av.textContent='Error: '+e.message; av.classList.add('show');
+  });
+}
+
+function getToken(){
+  if(!account) return Promise.reject(new Error('Sin sesion'));
+  var req={scopes:SCOPES,account:account};
+  return msalApp.acquireTokenSilent(req)
+    .catch(function(){ return msalApp.acquireTokenRedirect(req); })
+    .then(function(r){ return r?r.accessToken:null; });
+}
+
+function mostrarLoading(txt){
+  document.getElementById('loading-overlay').style.display='flex';
+  document.getElementById('loading-txt').textContent=txt||'Cargando...';
+  document.querySelectorAll('.screen').forEach(function(s){s.style.display='none';});
+}
+function ocultarLoading(){
+  document.getElementById('loading-overlay').style.display='none';
+}
+
+// ============================================================
+// GRAPH
+// ============================================================
+function graphGet(url){
+  return getToken().then(function(tok){
+    return fetch(url,{headers:{Authorization:'Bearer '+tok}});
+  }).then(function(r){
+    if(!r.ok) return r.json().then(function(e){throw new Error((e.error&&e.error.message)||'Error '+r.status);});
+    return r.json();
+  });
+}
+
+function urlLista(listId){
+  return 'https://graph.microsoft.com/v1.0/sites/'+CFG.siteId+'/lists/'+listId;
+}
+
+// ============================================================
+// DATA STORE
+// ============================================================
+var DB={
+  listIds:{},
+  registros:[],   // todos los registros cargados (30 días)
+  varias:[],      // todas las actividades varias (30 días)
+  operadores:[],  // lista de operadores únicos detectada
+};
+
+// Estado de filtros
+var filtros={
+  fechaMode:'hoy',
+  operador:'',
+  etapa:'',
+};
+
+// Datos filtrados actuales
+var DFilt={registros:[],varias:[]};
+
+// ============================================================
+// DESCUBRIR LISTAS
+// ============================================================
+function descubrirListas(){
+  var cacheKey='dash_listIds';
+  var cached=sessionStorage.getItem(cacheKey);
+  if(cached){
+    try{ DB.listIds=JSON.parse(cached); console.log('ListIds desde cache'); return Promise.resolve(); }
+    catch(e){ sessionStorage.removeItem(cacheKey); }
+  }
+  var url='https://graph.microsoft.com/v1.0/sites/'+CFG.siteId+'/lists?$select=id,name,displayName';
+  return graphGet(url).then(function(data){
+    (data.value||[]).forEach(function(l){
+      var n=l.displayName||l.name||'';
+      if(n===CFG.listas.registros) DB.listIds.registros=l.id;
+      if(n===CFG.listas.varias)    DB.listIds.varias=l.id;
+    });
+    sessionStorage.setItem(cacheKey,JSON.stringify(DB.listIds));
+    console.log('ListIds descubiertos');
+  });
+}
+
+// ============================================================
+// CARGAR DATOS (30 días)
+// ============================================================
+function fechaHace30Dias(){
+  var d=new Date(); d.setDate(d.getDate()-30); return d.toISOString();
+}
+
+function cargarPaginas(urlBase){
+  var items=[];
+  function pagina(url){
+    return graphGet(url).then(function(data){
+      if(data.value) items=items.concat(data.value);
+      if(data['@odata.nextLink']) return pagina(data['@odata.nextLink']);
+    });
+  }
+  return pagina(urlBase).then(function(){ return items; });
+}
+
+function cargarDatos(){
+  mostrarLoading('Conectando con SharePoint...');
+  descubrirListas().then(function(){
+    mostrarLoading('Cargando registros de despacho...');
+    var desde=fechaHace30Dias();
+    var filtroFecha=encodeURIComponent("fields/TimestampEvento ge '"+desde+"'");
+    var urlReg=urlLista(DB.listIds.registros)+
+      '/items?$filter='+filtroFecha+
+      '&$expand=fields($select=Orden,Etapa,Evento,Operador,Sesi_x00f3_n,TimestampEvento,DuracionMin,N_x00fa_mero)'+
+      '&$orderby=ID desc&$top=500';
+    var urlVar=urlLista(DB.listIds.varias)+
+      '/items?$filter='+filtroFecha+
+      '&$expand=fields($select=Actividad,Evento,Operador,TimestampEvento,Duraci_x00f3_nMin)'+
+      '&$orderby=ID desc&$top=500';
+
+    return Promise.all([cargarPaginas(urlReg),cargarPaginas(urlVar)]);
+  }).then(function(resultados){
+    DB.registros=parsearRegistros(resultados[0]);
+    DB.varias=parsearVarias(resultados[1]);
+    // Detectar operadores únicos
+    var opsSet={};
+    DB.registros.forEach(function(r){ if(r.operador) opsSet[r.operador]=true; });
+    DB.varias.forEach(function(r){ if(r.operador) opsSet[r.operador]=true; });
+    DB.operadores=Object.keys(opsSet).sort();
+    poblarSelectOperador();
+    var ahora=new Date();
+    document.getElementById('last-update').textContent='Actualizado: '+ahora.getHours()+':'+String(ahora.getMinutes()).padStart(2,'0');
+    aplicarFiltros();
+    ocultarLoading();
+    showTab('resumen',document.querySelector('.tab.active')||document.querySelector('.tab'));
+  }).catch(function(e){
+    ocultarLoading();
+    document.getElementById('loading-txt').textContent='Error: '+e.message;
+    document.getElementById('loading-overlay').style.display='flex';
+    console.error('cargarDatos:',e);
+  });
+}
+
+function parsearRegistros(items){
+  return (items||[]).map(function(item){
+    var f=item.fields||{};
+    var ts=f.TimestampEvento||'';
+    var d=ts?new Date(ts):null;
+    var pad=function(n){return String(n).padStart(2,'0');};
+    var tsLocal=d?d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()):'';
+    return{
+      id:item.id,
+      orden:(f.Orden||'').trim().toUpperCase(),
+      etapa:(f.Etapa||'').trim().toUpperCase(),
+      evento:(f.Evento||'').trim().toUpperCase(),
+      operador:(f.Operador||'').trim().toUpperCase(),
+      sesion:f['Sesi_x00f3_n']||'',
+      ts:tsLocal,
+      tsDate:d,
+      durMin:parseFloat(f.DuracionMin)||0,
+      fecha:tsLocal?tsLocal.substring(0,10):'',
+      hora:d?d.getHours():-1,
+    };
+  }).filter(function(r){ return r.ts && r.orden; });
+}
+
+function parsearVarias(items){
+  return (items||[]).map(function(item){
+    var f=item.fields||{};
+    var ts=f.TimestampEvento||'';
+    var d=ts?new Date(ts):null;
+    var pad=function(n){return String(n).padStart(2,'0');};
+    var tsLocal=d?d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()):'';
+    return{
+      actividad:(f.Actividad||'').trim(),
+      evento:(f.Evento||'').trim(),
+      operador:(f.Operador||'').trim().toUpperCase(),
+      ts:tsLocal,
+      tsDate:d,
+      durMin:parseFloat(f['Duraci_x00f3_nMin'])||0,
+      fecha:tsLocal?tsLocal.substring(0,10):'',
+    };
+  }).filter(function(r){ return r.ts; });
+}
+
+// ============================================================
+// FILTROS
+// ============================================================
+function poblarSelectOperador(){
+  var sel=document.getElementById('f-operador');
+  sel.innerHTML='<option value="">Todos</option>';
+  DB.operadores.forEach(function(op){
+    var o=document.createElement('option');
+    o.value=op; o.textContent=op; sel.appendChild(o);
+  });
+}
+
+function setFecha(modo,el){
+  filtros.fechaMode=modo;
+  document.querySelectorAll('.fpill').forEach(function(p){p.classList.remove('active');});
+  el.classList.add('active');
+  aplicarFiltros();
+}
+
+function getFechaRango(){
+  var hoy=new Date();
+  var pad=function(n){return String(n).padStart(2,'0');};
+  var fmt=function(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
+  var hoyStr=fmt(hoy);
+  if(filtros.fechaMode==='hoy') return{desde:hoyStr,hasta:hoyStr};
+  if(filtros.fechaMode==='semana'){
+    var ini=new Date(hoy); ini.setDate(hoy.getDate()-hoy.getDay());
+    return{desde:fmt(ini),hasta:hoyStr};
+  }
+  if(filtros.fechaMode==='mes'){
+    return{desde:hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-01',hasta:hoyStr};
+  }
+  // 30d
+  var d30=new Date(hoy); d30.setDate(hoy.getDate()-30);
+  return{desde:fmt(d30),hasta:hoyStr};
+}
+
+function aplicarFiltros(){
+  var rango=getFechaRango();
+  var opFil=(document.getElementById('f-operador').value||'').toUpperCase();
+  var etFil=(document.getElementById('f-etapa').value||'').toUpperCase();
+  filtros.operador=opFil; filtros.etapa=etFil;
+
+  DFilt.registros=DB.registros.filter(function(r){
+    if(r.fecha<rango.desde||r.fecha>rango.hasta) return false;
+    if(opFil && r.operador!==opFil) return false;
+    if(etFil && r.etapa!==etFil) return false;
+    return true;
+  });
+  DFilt.varias=DB.varias.filter(function(r){
+    if(r.fecha<rango.desde||r.fecha>rango.hasta) return false;
+    if(opFil && r.operador!==opFil) return false;
+    return true;
+  });
+
+  renderActivo();
+}
+
+function renderActivo(){
+  var activeTab=document.querySelector('.screen.active');
+  if(!activeTab) return;
+  var id=activeTab.id;
+  if(id==='tab-resumen') renderResumen();
+  else if(id==='tab-operacion') renderOperacion();
+  else if(id==='tab-operadores') renderOperadores();
+  else if(id==='tab-cuellos') renderCuellos();
+  else if(id==='tab-tiempos') renderTiempos();
+  else if(id==='tab-balance') renderBalance();
+  else if(id==='tab-rankings') renderRankings();
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function hoyStr(){
+  var d=new Date(),pad=function(n){return String(n).padStart(2,'0');};
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
+function ayerStr(){
+  var d=new Date(); d.setDate(d.getDate()-1);
+  var pad=function(n){return String(n).padStart(2,'0');};
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
+
+function countBy(arr,key){
+  var map={};
+  arr.forEach(function(r){ var v=r[key]||''; map[v]=(map[v]||0)+1; });
+  return map;
+}
+
+function getOTsUnicas(registros){
+  var ots={};
+  registros.forEach(function(r){
+    if(!ots[r.orden]) ots[r.orden]={orden:r.orden,etapas:{},operadores:{},ultimo:''};
+    var o=ots[r.orden];
+    if(!o.etapas[r.etapa]) o.etapas[r.etapa]={inicio:null,fin:null};
+    if(r.evento==='INICIO'||r.evento==='INICIADA'||r.evento==='INICIO') o.etapas[r.etapa].inicio=r.ts;
+    if(r.evento==='FIN'||r.evento==='FINALIZADA') o.etapas[r.etapa].fin=r.ts;
+    if(r.operador) o.operadores[r.operador]=true;
+    if(r.ts>o.ultimo) o.ultimo=r.ts;
+  });
+  return ots;
+}
+
+function minutos(str){
+  var n=parseFloat(str);
+  return isNaN(n)?0:n;
+}
+
+function promedio(arr){
+  if(!arr.length) return 0;
+  return arr.reduce(function(a,b){return a+b;},0)/arr.length;
+}
+
+function delta(hoy,ref){
+  if(!ref) return '';
+  var pct=Math.round(((hoy-ref)/ref)*100);
+  return (pct>=0?'+':'')+pct+'%';
+}
+
+function deltaClass(hoy,ref){
+  if(!ref) return 'neu';
+  return hoy>=ref?'up':'dn';
+}
+
+// ============================================================
+// RENDER RESUMEN
+// ============================================================
+function renderResumen(){
+  var regs=DFilt.registros, vars=DFilt.varias;
+  var hoy=hoyStr(), ayer=ayerStr();
+  var regsHoy=regs.filter(function(r){return r.fecha===hoy;});
+  var regsTodo30=DB.registros;
+
+  // OTs únicas
+  var otsUniq=getOTsUnicas(regs);
+  var otsHoyUniq=getOTsUnicas(regsHoy);
+  var totalOTs=Object.keys(otsUniq).length;
+  var otsHoy=Object.keys(otsHoyUniq).length;
+
+  // Semana
+  var rango=getFechaRango();
+  var regsSem=DB.registros.filter(function(r){
+    var ini=new Date(); ini.setDate(ini.getDate()-ini.getDay());
+    var pad=function(n){return String(n).padStart(2,'0');};
+    var semInicio=ini.getFullYear()+'-'+pad(ini.getMonth()+1)+'-'+pad(ini.getDate());
+    return r.fecha>=semInicio;
+  });
+  var otsSemUniq=Object.keys(getOTsUnicas(regsSem)).length;
+
+  setText('r-ot-total',totalOTs);
+  setText('r-ot-hoy','hoy: '+otsHoy);
+  setText('r-ot-semana','sem: '+otsSemUniq);
+
+  // Operadores activos
+  var opsActivos={};
+  regs.forEach(function(r){if(r.operador) opsActivos[r.operador]=true;});
+  var nActivos=Object.keys(opsActivos).length;
+  var nTotal=DB.operadores.length;
+  var nInact=nTotal-nActivos;
+  setText('r-ops-activos',nActivos);
+  setText('r-ops-total','de '+nTotal+' asignados');
+  var inEl=document.getElementById('r-ops-inactivos');
+  if(inEl){ inEl.textContent=nInact>0?nInact+' sin actividad en el período':'Todos activos'; inEl.className='delta '+(nInact>3?'dn':'neu'); }
+
+  // Eventos
+  setText('r-eventos',regs.length);
+  setText('r-eventos-hoy','hoy: '+regsHoy.length);
+
+  // Actividades varias
+  setText('r-actvarias',vars.length);
+  var varHoy=vars.filter(function(v){return v.fecha===hoy;}).length;
+  setText('r-actvarias-hoy','hoy: '+varHoy);
+  var actCount=countBy(vars,'actividad');
+  var topAct=Object.keys(actCount).sort(function(a,b){return actCount[b]-actCount[a];})[0]||'—';
+  setText('r-actvarias-top','top: '+topAct);
+
+  // Por etapa
+  ['PICKING','CHECKING','PACKING','FACTURACION'].forEach(function(et){
+    var key={'PICKING':'pick','CHECKING':'check','PACKING':'pack','FACTURACION':'fact'}[et];
+    var etRegs=regs.filter(function(r){return r.etapa===et;});
+    var etHoy=etRegs.filter(function(r){return r.fecha===hoy;});
+    var etFin=etRegs.filter(function(r){return r.evento==='FIN'||r.evento==='FINALIZADA';});
+    setText('r-'+key,etRegs.length);
+    setText('r-'+key+'-hoy','hoy: '+etHoy.length);
+    setText('r-'+key+'-fin','fin: '+etFin.length);
+  });
+
+  // Comparativa hoy vs promedio
+  var diasUnicos={};
+  regsTodo30.forEach(function(r){diasUnicos[r.fecha]=true;});
+  var nDias=Math.max(Object.keys(diasUnicos).length,1);
+
+  ['PICKING','CHECKING','PACKING','FACTURACION'].forEach(function(et){
+    var key={'PICKING':'pick','CHECKING':'check','PACKING':'pack','FACTURACION':'fact'}[et];
+    var tot30=regsTodo30.filter(function(r){return r.etapa===et;}).length;
+    var promDia=tot30/nDias;
+    var hoyCount=regsHoy.filter(function(r){return r.etapa===et;}).length;
+    var pct=promDia>0?Math.round((hoyCount/promDia)*100):0;
+    var fillEl=document.getElementById('bc-'+key);
+    if(fillEl) fillEl.style.width=Math.min(pct,100)+'%';
+    var valEl=document.getElementById('bv-'+key);
+    if(valEl){
+      var d=hoyCount-Math.round(promDia);
+      valEl.textContent=(d>=0?'+':'')+d;
+      valEl.style.color=d>=0?'var(--ok)':'var(--danger)';
+    }
+  });
+
+  // Participación
+  var totalEvts=regs.length||1;
+  ['PICKING','CHECKING','PACKING','FACTURACION'].forEach(function(et){
+    var key={'PICKING':'pick','CHECKING':'check','PACKING':'pack','FACTURACION':'fact'}[et];
+    var cnt=regs.filter(function(r){return r.etapa===et;}).length;
+    var pct=Math.round((cnt/totalEvts)*100);
+    var barEl=document.getElementById('pp-'+key);
+    if(barEl) barEl.style.width=pct+'%';
+    var valEl=document.getElementById('pv-'+key);
+    if(valEl) valEl.textContent=pct+'%';
+  });
+}
+
+// ============================================================
+// RENDER OPERACIÓN
+// ============================================================
+function renderOperacion(){
+  var regs=DFilt.registros, vars=DFilt.varias;
+  var hoy=hoyStr(), ayer=ayerStr();
+  var regsHoy=regs.filter(function(r){return r.fecha===hoy;});
+  var regsAyer=DB.registros.filter(function(r){return r.fecha===ayer;});
+
+  var otsHoy=Object.keys(getOTsUnicas(regsHoy)).length;
+  var otsAyer=Object.keys(getOTsUnicas(regsAyer)).length;
+  setText('op-ot-hoy',otsHoy);
+  var dEl=document.getElementById('op-delta-ayer');
+  if(dEl){ var d2=otsHoy-otsAyer; dEl.textContent='vs ayer: '+(d2>=0?'+':'')+d2; dEl.className='delta '+(d2>=0?'up':'dn'); }
+
+  // Operadores inactivos hoy
+  var opsHoy={};
+  regsHoy.forEach(function(r){opsHoy[r.operador]=true;});
+  setText('op-inactivos',DB.operadores.length-Object.keys(opsHoy).length);
+
+  // Eventos por hora (promedio de días en el período)
+  var horaMap={};
+  for(var h=6;h<=20;h++) horaMap[h]=0;
+  var diasSet={};
+  regs.forEach(function(r){
+    if(r.hora>=6&&r.hora<=20){ horaMap[r.hora]=(horaMap[r.hora]||0)+1; }
+    diasSet[r.fecha]=true;
+  });
+  var nDias=Math.max(Object.keys(diasSet).length,1);
+  var horas=Object.keys(horaMap).map(Number).sort(function(a,b){return a-b;});
+  var maxH=Math.max.apply(null,horas.map(function(h){return horaMap[h]||0;}))||1;
+
+  var picHora=horas.reduce(function(p,h){return (horaMap[h]||0)>(horaMap[p]||0)?h:p;},horas[0]);
+  var bajaHora=horas.reduce(function(p,h){return (horaMap[h]||0)<(horaMap[p]||0)?h:p;},horas[0]);
+  setText('op-hora-pico',picHora+'h');
+  setText('op-pico-val',Math.round((horaMap[picHora]||0)/nDias)+' eventos/día prom.');
+  setText('op-hora-baja',bajaHora+'h');
+  setText('op-baja-val',Math.round((horaMap[bajaHora]||0)/nDias)+' eventos/día prom.');
+
+  // Grafico horas
+  var hChart=document.getElementById('hora-chart');
+  var hLbls=document.getElementById('hora-lbls');
+  if(hChart){
+    hChart.innerHTML='';
+    hLbls.innerHTML='';
+    horas.forEach(function(h){
+      var v=(horaMap[h]||0)/nDias;
+      var pct=Math.round((v/maxH)*100);
+      var bar=document.createElement('div');
+      bar.className='hbar';
+      bar.style.height=Math.max(pct,4)+'%';
+      bar.style.background=h===picHora?'var(--pick)':'rgba(59,130,246,.3)';
+      bar.title=h+'h: '+Math.round(v)+' eventos/día';
+      hChart.appendChild(bar);
+      var lbl=document.createElement('div');
+      lbl.className='hlbl';
+      lbl.textContent=h+'h';
+      if(h===picHora) lbl.style.color='var(--pick)';
+      hLbls.appendChild(lbl);
+    });
+  }
+
+  // Act varias chart
+  var actCount=countBy(vars,'actividad');
+  var topActs=Object.keys(actCount).sort(function(a,b){return actCount[b]-actCount[a];}).slice(0,8);
+  var maxAct=actCount[topActs[0]]||1;
+  var actEl=document.getElementById('actvarias-chart');
+  if(actEl){
+    actEl.innerHTML='';
+    topActs.forEach(function(a){
+      var row=document.createElement('div');
+      row.className='bar-h';
+      var pct=Math.round((actCount[a]/maxAct)*100);
+      row.innerHTML='<span class="bn">'+a+'</span><div class="bt"><div class="bar-fill-h" style="width:'+pct+'%;background:var(--check)"></div></div><span class="bv">'+actCount[a]+'</span>';
+      actEl.appendChild(row);
+    });
+    if(!topActs.length) actEl.innerHTML='<div class="empty">Sin actividades en el período</div>';
+  }
+
+  // OT por día — últimos 14 días
+  var dias14=[];
+  for(var i=13;i>=0;i--){
+    var d=new Date(); d.setDate(d.getDate()-i);
+    var pad=function(n){return String(n).padStart(2,'0');};
+    dias14.push(d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()));
+  }
+  var otsPorDia=dias14.map(function(fecha){
+    var regsD=DB.registros.filter(function(r){return r.fecha===fecha;});
+    return Object.keys(getOTsUnicas(regsD)).length;
+  });
+  var maxOtD=Math.max.apply(null,otsPorDia)||1;
+  var dChart=document.getElementById('ot-diario-chart');
+  var dLbls=document.getElementById('ot-diario-lbls');
+  if(dChart){
+    dChart.innerHTML=''; dLbls.innerHTML='';
+    dias14.forEach(function(fecha,i){
+      var v=otsPorDia[i];
+      var pct=Math.round((v/maxOtD)*100);
+      var bar=document.createElement('div');
+      bar.className='hbar';
+      bar.style.height=Math.max(pct,4)+'%';
+      bar.style.background=fecha===hoy?'var(--pick)':'rgba(59,130,246,.3)';
+      bar.title=fecha+': '+v+' OT';
+      dChart.appendChild(bar);
+      var lbl=document.createElement('div');
+      lbl.className='hlbl';
+      lbl.textContent=fecha.substring(8);
+      if(fecha===hoy) lbl.style.color='var(--pick)';
+      dLbls.appendChild(lbl);
+    });
+  }
+}
+
+// ============================================================
+// RENDER OPERADORES
+// ============================================================
+function renderOperadores(){
+  var regs=DFilt.registros, vars=DFilt.varias;
+  var opData={};
+  DB.operadores.forEach(function(op){ opData[op]={PICKING:0,CHECKING:0,PACKING:0,FACTURACION:0,VARIAS:0,total:0}; });
+
+  regs.forEach(function(r){
+    if(!opData[r.operador]) opData[r.operador]={PICKING:0,CHECKING:0,PACKING:0,FACTURACION:0,VARIAS:0,total:0};
+    opData[r.operador][r.etapa]=(opData[r.operador][r.etapa]||0)+1;
+    opData[r.operador].total++;
+  });
+  vars.forEach(function(v){
+    if(!opData[v.operador]) opData[v.operador]={PICKING:0,CHECKING:0,PACKING:0,FACTURACION:0,VARIAS:0,total:0};
+    opData[v.operador].VARIAS++;
+    opData[v.operador].total++;
+  });
+
+  var opsOrden=Object.keys(opData).filter(function(op){return opData[op].total>0;})
+    .sort(function(a,b){return opData[b].total-opData[a].total;});
+
+  var totalEquipo=opsOrden.reduce(function(s,op){return s+opData[op].total;},0);
+  var promEquipo=opsOrden.length>0?Math.round(totalEquipo/opsOrden.length):0;
+  var liderId=opsOrden[0]||'—';
+  setText('op-lider-nombre',liderId);
+  setText('op-lider-val',liderId!=='—'?opData[liderId].total+' eventos en el período':'');
+  setText('op-promedio',promEquipo);
+  var sinAct=DB.operadores.filter(function(op){return !opData[op]||opData[op].total===0;}).length;
+  setText('op-sin-act',sinAct);
+
+  var tbody=document.getElementById('tbl-operadores');
+  if(tbody){
+    tbody.innerHTML='';
+    opsOrden.forEach(function(op){
+      var d=opData[op];
+      var tr=document.createElement('tr');
+      tr.className='clickable';
+      tr.onclick=function(){ mostrarFicha(op,d,promEquipo); };
+      tr.innerHTML='<td class="name">'+op+'</td>'+
+        '<td class="num">'+d.PICKING+'</td>'+
+        '<td class="num">'+d.CHECKING+'</td>'+
+        '<td class="num">'+d.PACKING+'</td>'+
+        '<td class="num">'+d.FACTURACION+'</td>'+
+        '<td class="num">'+d.VARIAS+'</td>'+
+        '<td class="num" style="color:var(--pick);font-weight:600">'+d.total+'</td>';
+      tbody.appendChild(tr);
+    });
+    if(!opsOrden.length) tbody.innerHTML='<tr><td colspan="7" class="empty">Sin actividad en el período</td></tr>';
+  }
+}
+
+function mostrarFicha(op,d,promEquipo){
+  var ficha=document.getElementById('op-ficha');
+  ficha.classList.add('open');
+  var ini=op.split(' ').map(function(w){return w[0]||'';}).join('').substring(0,2).toUpperCase();
+  document.getElementById('of-avatar').textContent=ini;
+  document.getElementById('of-nombre').textContent=op;
+  document.getElementById('of-sub').textContent='Período seleccionado';
+  setText('of-pick',d.PICKING);
+  setText('of-check',d.CHECKING);
+  setText('of-pack',d.PACKING);
+  setText('of-fact',d.FACTURACION);
+  setText('of-actvarias',d.VARIAS);
+  setText('of-total',d.total);
+  var vsP=promEquipo>0?Math.round(((d.total-promEquipo)/promEquipo)*100):0;
+  var vsEl=document.getElementById('of-vs-promedio');
+  if(vsEl){ vsEl.textContent=(vsP>=0?'+':'')+vsP+'%'; vsEl.style.color=vsP>=0?'var(--ok)':'var(--danger)'; }
+
+  // Distribución por etapa
+  var total=Math.max(d.total,1);
+  var distEl=document.getElementById('of-dist');
+  if(distEl){
+    distEl.innerHTML='';
+    var etapas2=[{k:'PICKING',lbl:'Picking',c:'var(--pick)'},{k:'CHECKING',lbl:'Checking',c:'var(--check)'},{k:'PACKING',lbl:'Packing',c:'var(--pack)'},{k:'FACTURACION',lbl:'Facturación',c:'var(--fact)'}];
+    etapas2.forEach(function(e){
+      var v=d[e.k]||0; var pct=Math.round((v/total)*100);
+      var row=document.createElement('div');
+      row.className='part-row';
+      row.innerHTML='<span class="part-lbl" style="color:'+e.c+'">'+e.lbl+'</span><div class="part-bar"><div style="height:100%;border-radius:5px;background:'+e.c+';width:'+pct+'%"></div></div><span class="part-val">'+pct+'%</span>';
+      distEl.appendChild(row);
+    });
+  }
+
+  ficha.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function cerrarFicha(){ document.getElementById('op-ficha').classList.remove('open'); }
+
+// ============================================================
+// RENDER CUELLOS DE BOTELLA
+// ============================================================
+function renderCuellos(){
+  var regs=DFilt.registros;
+  // Calcular duración por OT
+  var otTiempos=calcularTiemposOT(regs);
+  var lt30=0, bt30_60=0, gt60=0;
+  otTiempos.forEach(function(o){
+    if(o.durTotal<30) lt30++;
+    else if(o.durTotal<60) bt30_60++;
+    else gt60++;
+  });
+  setText('cu-lt30',lt30);
+  setText('cu-30-60',bt30_60);
+  setText('cu-gt60',gt60);
+
+  // OT abiertas (inicio sin fin en última etapa procesada)
+  var abiertas=detectarOTAbiertas(regs);
+  var listaEl=document.getElementById('cu-abiertas');
+  if(listaEl){
+    listaEl.innerHTML='';
+    abiertas.slice(0,10).forEach(function(o){
+      var mins=o.minsSinAvanzar;
+      var dot=mins>60?'dot-r':mins>30?'dot-y':'dot-g';
+      var row=document.createElement('div');
+      row.className='alert-row';
+      row.innerHTML='<div class="'+dot+'"></div><div class="alert-info"><strong>'+o.orden+'</strong> <span class="ao">'+o.etapa+' iniciado</span></div><div class="alert-time">'+Math.round(mins)+' min</div>';
+      listaEl.appendChild(row);
+    });
+    if(!abiertas.length) listaEl.innerHTML='<div class="empty">Sin OT abiertas en el período</div>';
+  }
+
+  // Acumulación por etapa
+  var etapaCount={};
+  abiertas.forEach(function(o){ etapaCount[o.etapa]=(etapaCount[o.etapa]||0)+1; });
+  var cuEtEl=document.getElementById('cu-etapa-chart');
+  if(cuEtEl){
+    cuEtEl.innerHTML='';
+    var maxE=Math.max.apply(null,Object.values(etapaCount))||1;
+    ETAPAS.forEach(function(et){
+      var v=etapaCount[et]||0;
+      var pct=Math.round((v/maxE)*100);
+      var col={PICKING:'var(--pick)',CHECKING:'var(--check)',PACKING:'var(--pack)',FACTURACION:'var(--fact)'}[et];
+      var row=document.createElement('div');
+      row.className='bar-h';
+      row.innerHTML='<span class="bn">'+ETAPA_LABEL[et]+'</span><div class="bt"><div class="bar-fill-h" style="width:'+pct+'%;background:'+col+'"></div></div><span class="bv">'+v+'</span>';
+      cuEtEl.appendChild(row);
+    });
+  }
+
+  // Top 10 OT por duración
+  var top10=otTiempos.sort(function(a,b){return b.durTotal-a.durTotal;}).slice(0,10);
+  var tbody=document.getElementById('tbl-top-ots');
+  if(tbody){
+    tbody.innerHTML='';
+    top10.forEach(function(o){
+      var badge=o.durTotal>60?'badge-r':o.durTotal>30?'badge-y':'badge-g';
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td class="name">'+o.orden+'</td>'+
+        '<td><span class="badge badge-'+({'PICKING':'pick','CHECKING':'check','PACKING':'pack','FACTURACION':'fact'}[o.ultimaEtapa]||'g')+'">'+ETAPA_LABEL[o.ultimaEtapa||'']+'</span></td>'+
+        '<td class="name">'+o.operadores.join(', ')+'</td>'+
+        '<td class="num"><span class="badge '+badge+'">'+Math.round(o.durTotal)+' min</span></td>'+
+        '<td><span class="badge '+(o.abierta?'badge-y':'badge-g')+'">'+(o.abierta?'Abierta':'Completa')+'</span></td>';
+      tbody.appendChild(tr);
+    });
+    if(!top10.length) tbody.innerHTML='<tr><td colspan="5" class="empty">Sin datos</td></tr>';
+  }
+}
+
+function calcularTiemposOT(regs){
+  var ots={};
+  regs.forEach(function(r){
+    if(!ots[r.orden]) ots[r.orden]={orden:r.orden,eventos:[],operadores:{}};
+    ots[r.orden].eventos.push(r);
+    if(r.operador) ots[r.orden].operadores[r.operador]=true;
+  });
+  return Object.values(ots).map(function(o){
+    var evts=o.eventos.sort(function(a,b){return a.ts.localeCompare(b.ts);});
+    var primerInicio=evts.find(function(e){return e.evento==='INICIO'||e.evento==='INICIADA';});
+    var ultimoFin=null;
+    evts.forEach(function(e){if(e.evento==='FIN'||e.evento==='FINALIZADA') ultimoFin=e;});
+    var durTotal=0;
+    if(primerInicio&&ultimoFin&&primerInicio.tsDate&&ultimoFin.tsDate){
+      durTotal=(ultimoFin.tsDate-primerInicio.tsDate)/60000;
+    }
+    var ultimaEtapa=evts[evts.length-1]?evts[evts.length-1].etapa:'';
+    return{orden:o.orden,durTotal:Math.max(0,durTotal),ultimaEtapa:ultimaEtapa,operadores:Object.keys(o.operadores),abierta:!ultimoFin};
+  });
+}
+
+function detectarOTAbiertas(regs){
+  var ots={};
+  regs.forEach(function(r){
+    if(!ots[r.orden]) ots[r.orden]={};
+    var et=r.etapa;
+    if(!ots[r.orden][et]) ots[r.orden][et]={inicio:null,fin:null};
+    if(r.evento==='INICIO'||r.evento==='INICIADA') ots[r.orden][et].inicio=r;
+    if(r.evento==='FIN'||r.evento==='FINALIZADA') ots[r.orden][et].fin=r;
+  });
+  var abiertas=[];
+  var ahora=new Date();
+  Object.keys(ots).forEach(function(orden){
+    ETAPAS.forEach(function(et){
+      var e=ots[orden][et];
+      if(e&&e.inicio&&!e.fin){
+        var mins=(ahora-e.inicio.tsDate)/60000;
+        abiertas.push({orden:orden,etapa:et,minsSinAvanzar:mins,tsInicio:e.inicio.ts});
+      }
+    });
+  });
+  return abiertas.sort(function(a,b){return b.minsSinAvanzar-a.minsSinAvanzar;});
+}
+
+// ============================================================
+// RENDER TIEMPOS
+// ============================================================
+function renderTiempos(){
+  var regs=DFilt.registros;
+  var durPorEtapa={PICKING:[],CHECKING:[],PACKING:[],FACTURACION:[]};
+
+  regs.filter(function(r){return r.durMin>0&&(r.evento==='FIN'||r.evento==='FINALIZADA');}).forEach(function(r){
+    if(durPorEtapa[r.etapa]) durPorEtapa[r.etapa].push(r.durMin);
+  });
+
+  ['PICKING','CHECKING','PACKING','FACTURACION'].forEach(function(et){
+    var key={'PICKING':'pick','CHECKING':'check','PACKING':'pack','FACTURACION':'fact'}[et];
+    var arr=durPorEtapa[et];
+    var prom=arr.length?Math.round(promedio(arr)):0;
+    setText('ti-'+key,prom?prom+' min':'—');
+  });
+
+  // Ciclo completo
+  var ciclos=calcularTiemposOT(regs).filter(function(o){return o.durTotal>0;});
+  var promCiclo=ciclos.length?Math.round(promedio(ciclos.map(function(o){return o.durTotal;}))):0;
+  setText('ti-ciclo',promCiclo?promCiclo+' min':'—');
+
+  // Picking por operador
+  var opPick={};
+  regs.filter(function(r){return r.etapa==='PICKING'&&r.durMin>0&&(r.evento==='FIN'||r.evento==='FINALIZADA');}).forEach(function(r){
+    if(!opPick[r.operador]) opPick[r.operador]=[];
+    opPick[r.operador].push(r.durMin);
+  });
+  var opPickData=Object.keys(opPick).map(function(op){return{op:op,prom:Math.round(promedio(opPick[op]))};})
+    .sort(function(a,b){return b.prom-a.prom;}).slice(0,10);
+  var maxPick=opPickData.length?opPickData[0].prom:1;
+  var tiOpEl=document.getElementById('ti-op-chart');
+  if(tiOpEl){
+    tiOpEl.innerHTML='';
+    opPickData.forEach(function(d){
+      var pct=Math.round((d.prom/maxPick)*100);
+      var row=document.createElement('div');
+      row.className='bar-h';
+      row.innerHTML='<span class="bn">'+d.op+'</span><div class="bt"><div class="bar-fill-h" style="width:'+pct+'%;background:var(--pick)"></div></div><span class="bv">'+d.prom+' min</span>';
+      tiOpEl.appendChild(row);
+    });
+    if(!opPickData.length) tiOpEl.innerHTML='<div class="empty">Sin datos de duración</div>';
+  }
+
+  // Distribución por etapa
+  var tiDistEl=document.getElementById('ti-dist-chart');
+  if(tiDistEl){
+    tiDistEl.innerHTML='';
+    ETAPAS.forEach(function(et){
+      var col={PICKING:'var(--pick)',CHECKING:'var(--check)',PACKING:'var(--pack)',FACTURACION:'var(--fact)'}[et];
+      var arr2=durPorEtapa[et];
+      var p=arr2.length?Math.round(promedio(arr2)):0;
+      var row=document.createElement('div');
+      row.className='bar-h';
+      var maxD=Math.max(30,p);
+      var pct=Math.round((p/maxD)*100);
+      row.innerHTML='<span class="bn" style="color:'+col+'">'+ETAPA_LABEL[et]+'</span><div class="bt"><div class="bar-fill-h" style="width:'+pct+'%;background:'+col+'"></div></div><span class="bv">'+(p||'—')+(p?' min':'')+'</span>';
+      tiDistEl.appendChild(row);
+    });
+  }
+}
+
+// ============================================================
+// RENDER BALANCE
+// ============================================================
+function renderBalance(){
+  var regs=DFilt.registros, vars=DFilt.varias;
+  var opTotales={};
+  DB.operadores.forEach(function(op){ opTotales[op]=0; });
+  regs.forEach(function(r){ opTotales[r.operador]=(opTotales[r.operador]||0)+1; });
+  vars.forEach(function(v){ opTotales[v.operador]=(opTotales[v.operador]||0)+1; });
+
+  var activos=Object.keys(opTotales).filter(function(op){return opTotales[op]>0;});
+  var totalEvts=Object.values(opTotales).reduce(function(a,b){return a+b;},0);
+  var prom=activos.length>0?Math.round(totalEvts/activos.length):0;
+  var inact=DB.operadores.filter(function(op){return !opTotales[op]||opTotales[op]===0;}).length;
+
+  setText('bl-promedio',prom);
+  setText('bl-inactivos',inact);
+
+  var sorted=Object.keys(opTotales).sort(function(a,b){return opTotales[b]-opTotales[a];});
+  var lider=sorted[0]||'—';
+  setText('bl-max-nombre',lider);
+  setText('bl-max-val',lider!=='—'?opTotales[lider]+' eventos':'');
+
+  var tbody=document.getElementById('tbl-balance');
+  if(tbody){
+    tbody.innerHTML='';
+    sorted.forEach(function(op){
+      var v=opTotales[op]||0;
+      var pct=totalEvts>0?Math.round((v/totalEvts)*100):0;
+      var vsP=prom>0?Math.round(((v-prom)/prom)*100):0;
+      var vsStr=(vsP>=0?'+':'')+vsP+'%';
+      var vsColor=vsP>30?'var(--danger)':vsP<-30?'var(--warn)':'var(--ok)';
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td class="name">'+op+'</td>'+
+        '<td class="num">'+v+'</td>'+
+        '<td class="num">'+pct+'%</td>'+
+        '<td class="num" style="color:'+vsColor+'">'+vsStr+'</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Chart de barras
+  var blEl=document.getElementById('bl-chart');
+  if(blEl){
+    blEl.innerHTML='';
+    var max=sorted.length?opTotales[sorted[0]]||1:1;
+    sorted.slice(0,12).forEach(function(op){
+      var v=opTotales[op]||0;
+      var pct=Math.round((v/max)*100);
+      var vsP=prom>0?((v-prom)/prom)*100:0;
+      var col=vsP>30?'var(--danger)':vsP<-30?'var(--warn)':'var(--check)';
+      var row=document.createElement('div');
+      row.className='bar-h';
+      row.innerHTML='<span class="bn">'+op+'</span><div class="bt"><div class="bar-fill-h" style="width:'+pct+'%;background:'+col+'"></div></div><span class="bv">'+v+'</span>';
+      blEl.appendChild(row);
+    });
+  }
+}
+
+// ============================================================
+// RENDER RANKINGS
+// ============================================================
+function renderRankings(){
+  var regs=DFilt.registros, vars=DFilt.varias;
+  var opTot={};
+  regs.forEach(function(r){ opTot[r.operador]=(opTot[r.operador]||0)+1; });
+  vars.forEach(function(v){ opTot[v.operador]=(opTot[v.operador]||0)+1; });
+  var topOps=Object.keys(opTot).sort(function(a,b){return opTot[b]-opTot[a];}).slice(0,10);
+
+  var rkEl=document.getElementById('rank-volumen');
+  if(rkEl){
+    rkEl.innerHTML='';
+    var maxV=opTot[topOps[0]]||1;
+    topOps.forEach(function(op,i){
+      var v=opTot[op];
+      var pct=Math.round((v/maxV)*100);
+      var row=document.createElement('div');
+      row.className='bar-h';
+      row.innerHTML='<span class="bn" style="width:20px;color:var(--txt3)">'+(i+1)+'</span><span class="bn" style="flex:1;width:auto">'+op+'</span><div class="bt"><div class="bar-fill-h" style="width:'+pct+'%;background:var(--pick)"></div></div><span class="bv">'+v+'</span>';
+      rkEl.appendChild(row);
+    });
+    if(!topOps.length) rkEl.innerHTML='<div class="empty">Sin datos</div>';
+  }
+
+  // Top actividades
+  var actCount=countBy(vars,'actividad');
+  var topActs=Object.keys(actCount).sort(function(a,b){return actCount[b]-actCount[a];}).slice(0,8);
+  var rkActEl=document.getElementById('rank-actividades');
+  if(rkActEl){
+    rkActEl.innerHTML='';
+    var maxA=actCount[topActs[0]]||1;
+    topActs.forEach(function(a,i){
+      var v=actCount[a];
+      var pct=Math.round((v/maxA)*100);
+      var row=document.createElement('div');
+      row.className='bar-h';
+      row.innerHTML='<span class="bn" style="width:20px;color:var(--txt3)">'+(i+1)+'</span><span class="bn" style="flex:1;width:auto">'+a+'</span><div class="bt"><div class="bar-fill-h" style="width:'+pct+'%;background:var(--check)"></div></div><span class="bv">'+v+'</span>';
+      rkActEl.appendChild(row);
+    });
+    if(!topActs.length) rkActEl.innerHTML='<div class="empty">Sin actividades</div>';
+  }
+
+  // Top OT por tiempo
+  var topOTs=calcularTiemposOT(regs).sort(function(a,b){return b.durTotal-a.durTotal;}).slice(0,10);
+  var tbody=document.getElementById('tbl-rank-ots');
+  if(tbody){
+    tbody.innerHTML='';
+    topOTs.forEach(function(o){
+      var tr=document.createElement('tr');
+      var etapas=Object.keys(o.ultimaEtapa?{[o.ultimaEtapa]:1}:{});
+      tr.innerHTML='<td class="name">'+o.orden+'</td><td><span class="badge badge-'+({'PICKING':'pick','CHECKING':'check','PACKING':'pack','FACTURACION':'fact'}[o.ultimaEtapa]||'g')+'">'+ETAPA_LABEL[o.ultimaEtapa||'']+'</span></td><td class="num">'+Math.round(o.durTotal)+' min</td>';
+      tbody.appendChild(tr);
+    });
+    if(!topOTs.length) tbody.innerHTML='<tr><td colspan="3" class="empty">Sin datos</td></tr>';
+  }
+
+  // Variabilidad
+  var opPickData2={};
+  regs.filter(function(r){return r.etapa==='PICKING'&&r.durMin>0;}).forEach(function(r){
+    if(!opPickData2[r.operador]) opPickData2[r.operador]=[];
+    opPickData2[r.operador].push(r.durMin);
+  });
+  var topVar=Object.keys(opPickData2).filter(function(op){return opPickData2[op].length>1;})
+    .map(function(op){
+      var arr=opPickData2[op];
+      var p=promedio(arr);
+      var vari=Math.round(Math.sqrt(arr.reduce(function(s,v){return s+(v-p)*(v-p);},0)/arr.length));
+      return{op:op,vari:vari,prom:Math.round(p)};
+    }).sort(function(a,b){return b.vari-a.vari;}).slice(0,8);
+
+  var rkVarEl=document.getElementById('rank-variabilidad');
+  if(rkVarEl){
+    rkVarEl.innerHTML='';
+    var maxVar=topVar.length?topVar[0].vari:1;
+    topVar.forEach(function(d,i){
+      var pct=Math.round((d.vari/maxVar)*100);
+      var col=d.vari>15?'var(--danger)':d.vari>8?'var(--warn)':'var(--check)';
+      var row=document.createElement('div');
+      row.className='bar-h';
+      row.innerHTML='<span class="bn" style="width:20px;color:var(--txt3)">'+(i+1)+'</span><span class="bn" style="flex:1;width:auto">'+d.op+'</span><div class="bt"><div class="bar-fill-h" style="width:'+pct+'%;background:'+col+'"></div></div><span class="bv">±'+d.vari+' min</span>';
+      rkVarEl.appendChild(row);
+    });
+    if(!topVar.length) rkVarEl.innerHTML='<div class="empty">Insuficientes datos</div>';
+  }
+}
+
+// ============================================================
+// DRILL DOWNS
+// ============================================================
+function drillOTs(){
+  var panel=document.getElementById('drill-ots');
+  panel.classList.toggle('open');
+  if(!panel.classList.contains('open')) return;
+  var ots=getOTsUnicas(DFilt.registros);
+  var tbody=document.querySelector('#tbl-drill-ots tbody');
+  tbody.innerHTML='';
+  Object.values(ots).sort(function(a,b){return b.ultimo.localeCompare(a.ultimo);}).forEach(function(o){
+    var etapas=Object.keys(o.etapas).map(function(e){return ETAPA_LABEL[e]||e;}).join(', ');
+    var ops=Object.keys(o.operadores).join(', ');
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td class="name">'+o.orden+'</td><td>'+etapas+'</td><td>'+ops+'</td><td>'+o.ultimo.substring(0,16)+'</td>';
+    tbody.appendChild(tr);
+  });
+  panel.scrollIntoView({behavior:'smooth'});
+}
+
+function drillOperadores(){
+  showTab('operadores',document.querySelectorAll('.tab')[2]);
+}
+
+function drillCuello(umbral){
+  var panel=document.getElementById('drill-cuello');
+  var title=document.getElementById('drill-cuello-title');
+  panel.classList.add('open');
+  var tbody=document.querySelector('#tbl-drill-cuello tbody');
+  tbody.innerHTML='';
+  var ots=calcularTiemposOT(DFilt.registros);
+  var filtradas;
+  if(umbral===30){ title.textContent='OT menos de 30 min'; filtradas=ots.filter(function(o){return o.durTotal>0&&o.durTotal<30;}); }
+  else if(umbral===60){ title.textContent='OT entre 30 y 60 min'; filtradas=ots.filter(function(o){return o.durTotal>=30&&o.durTotal<60;}); }
+  else { title.textContent='OT más de 60 min'; filtradas=ots.filter(function(o){return o.durTotal>=60;}); }
+  filtradas.sort(function(a,b){return b.durTotal-a.durTotal;}).forEach(function(o){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td class="name">'+o.orden+'</td><td><span class="badge badge-'+({'PICKING':'pick','CHECKING':'check','PACKING':'pack','FACTURACION':'fact'}[o.ultimaEtapa]||'g')+'">'+ETAPA_LABEL[o.ultimaEtapa||'']+'</span></td><td>'+o.operadores.join(', ')+'</td><td class="num">'+Math.round(o.durTotal)+' min</td>';
+    tbody.appendChild(tr);
+  });
+  if(!filtradas.length) tbody.innerHTML='<tr><td colspan="4" class="empty">Sin OT en este rango</td></tr>';
+  panel.scrollIntoView({behavior:'smooth'});
+}
+
+function cerrarDrill(id){ document.getElementById(id).classList.remove('open'); }
+
+// ============================================================
+// NAVEGACIÓN
+// ============================================================
+function showTab(id,el){
+  document.querySelectorAll('.screen').forEach(function(s){s.style.display='none';});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  var screen=document.getElementById('tab-'+id);
+  if(screen) screen.style.display='block';
+  if(el) el.classList.add('active');
+  renderActivo();
+}
+
+function setText(id,val){
+  var el=document.getElementById(id);
+  if(el) el.textContent=val;
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function postLogin(){
+  var email=account.username||account.name||'';
+  document.getElementById('msal-user-info').textContent='✓ '+email;
+  document.getElementById('msal-user-info').style.display='block';
+  document.getElementById('btn-login').style.display='none';
+  document.getElementById('msal-loading').classList.add('show');
+  document.getElementById('s-msal').style.display='none';
+  document.getElementById('s-app').style.display='block';
+  cargarDatos();
+}
+
+msalApp.handleRedirectPromise().then(function(result){
+  if(result&&result.account){ account=result.account; postLogin(); }
+  else{
+    var accs=msalApp.getAllAccounts();
+    if(accs.length>0){ account=accs[0]; postLogin(); }
+  }
+}).catch(function(e){
+  var av=document.getElementById('aviso-msal');
+  av.textContent='Error de autenticación: '+e.message; av.classList.add('show');
+});
+
+window.msalLogin=msalLogin;
+window.showTab=showTab;
+window.setFecha=setFecha;
+window.aplicarFiltros=aplicarFiltros;
+window.cargarDatos=cargarDatos;
+window.drillOTs=drillOTs;
+window.drillOperadores=drillOperadores;
+window.drillCuello=drillCuello;
+window.cerrarDrill=cerrarDrill;
+window.cerrarFicha=cerrarFicha;
+
+}; // fin onload
+document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
