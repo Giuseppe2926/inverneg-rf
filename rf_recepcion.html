@@ -2008,6 +2008,8 @@ function _guardarSKU(cant){
 
 function showCorreccion(){
   S.step='correccion';
+  // Resetear filtros al entrar
+  window._filtSKU=''; window._filtCont=''; window._filtLPN='';
   render('<div class="loading"><div class="loading-icon">...</div><div class="loading-txt">Cargando registros...</div></div>');
   cargarSKUsSP(S.pedido,null).then(function(spRegs){
     window._regsCorreccion=spRegs;
@@ -2018,45 +2020,84 @@ function showCorreccion(){
   });
 }
 function renderCorreccion(regs,filtSKU,filtCont){
+  // BUG FIX: separar el render inicial (con filtros) del re-render de resultados.
+  // oninput solo actualiza el contenedor #lista-corr, no reconstruye los inputs.
+  window._filtSKU=filtSKU||'';
+  window._filtCont=filtCont||'';
+  window._filtLPN=window._filtLPN||'';
+  _actualizarListaCorreccion();
+}
+
+function _actualizarListaCorreccion(){
+  var regs=window._regsCorreccion||[];
+  var filtSKU=window._filtSKU||'';
+  var filtCont=window._filtCont||'';
+  var filtLPN=window._filtLPN||'';
   var filtrados=regs.filter(function(r){
     if((r.Estado||r.estado||'')==='CORRECCION') return false;
     var sku=(r.CodProducto||r.sku||'').toUpperCase();
     var cont=(r.Contenedor||r.contenedor||'').toUpperCase();
+    var lpn=(r.LPN||r.lpn||'').toUpperCase();
     if(filtSKU&&sku.indexOf(filtSKU.toUpperCase())<0) return false;
     if(filtCont&&cont.indexOf(filtCont.toUpperCase())<0) return false;
+    if(filtLPN&&lpn.indexOf(filtLPN.toUpperCase())<0) return false;
     return true;
   });
   window._filtrados=filtrados;
-  var h='<div class="badge badge-rec">CORREGIR REGISTRO</div>';
-  h+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Pedido: <strong>'+S.pedido+'</strong>';
-  h+=' '+filtrados.length+' registros</div>';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">';
-  h+='<input class="inp inp-sm" id="filt-sku" placeholder="Filtrar SKU" value="'+filtSKU+'" ';
-  h+='oninput="renderCorreccion(window._regsCorreccion,this.value,document.getElementById(\'filt-cont\').value)">';
-  h+='<input class="inp inp-sm" id="filt-cont" placeholder="Filtrar contenedor" value="'+filtCont+'" ';
-  h+='oninput="renderCorreccion(window._regsCorreccion,document.getElementById(\'filt-sku\').value,this.value)">'+
-  '</div><div style="max-height:50vh;overflow-y:auto">';
-  if(!filtrados.length){
-    h+='<div class="alert-w">Sin registros.</div>';
-  } else {
-    filtrados.slice().reverse().slice(0,50).forEach(function(r,i){
-      var sku=r.CodProducto||r.sku||'';
-      var desc=r.Nombre||r.desc||'';
-      var cant=Number(r.Cantidad!==undefined?r.Cantidad:r.cantidad)||0;
-      var cont=r.Contenedor||r.contenedor||'';
-      var op=r.Operario||r.operario||'';
-      h+='<div class="card-item" style="margin-bottom:6px" onclick="iniciarCorreccion('+i+',\'' +sku+ '\','+cant+')">';
-      h+='<div style="display:flex;justify-content:space-between">';
-      h+='<div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--acc)">'+sku+'</div>';
-      h+='<div style="font-size:11px;color:var(--txt)">'+desc+'</div>';
-      h+='<div style="font-size:10px;color:var(--mut)">'+cont+(op?' · '+op:'')+'</div></div>';
-      h+='<div style="text-align:right;margin-left:10px">';
-      h+='<div style="font-size:16px;font-weight:700">'+cant+'</div>';
-      h+='<div style="font-size:10px;color:var(--mut)">un</div></div></div></div>';
-    });
+
+  // Si ya existe el contenedor de lista, solo actualizarlo (sin tocar los inputs)
+  var listaEl=document.getElementById('lista-corr');
+  if(!listaEl){
+    // Primera vez: construir pantalla completa con inputs
+    var h='<div class="badge badge-rec">CORREGIR REGISTRO</div>';
+    h+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Pedido: <strong>'+S.pedido+'</strong> · <span id="count-corr">'+filtrados.length+'</span> registros</div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">';
+    h+='<input class="inp inp-sm" id="filt-sku" placeholder="Filtrar SKU" value="'+filtSKU+'" oninput="window._filtSKU=this.value;_actualizarListaCorreccion()">';
+    h+='<input class="inp inp-sm" id="filt-cont" placeholder="Filtrar contenedor" value="'+filtCont+'" oninput="window._filtCont=this.value;_actualizarListaCorreccion()">';
+    h+='<input class="inp inp-sm" id="filt-lpn" placeholder="Filtrar LPN" value="'+filtLPN+'" oninput="window._filtLPN=this.value;_actualizarListaCorreccion()">';
+    h+='</div>';
+    h+='<div id="lista-corr" style="max-height:50vh;overflow-y:auto"></div>';
+    h+='<button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">Volver</button>';
+    render(h);
+    listaEl=document.getElementById('lista-corr');
   }
-  h+='</div><button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">Volver</button>';
-  render(h);
+
+  // Actualizar contador
+  var countEl=document.getElementById('count-corr');
+  if(countEl) countEl.textContent=filtrados.length;
+
+  // Actualizar SOLO la lista — sin tocar los inputs → sin perder el foco
+  if(!listaEl) return;
+  if(!filtrados.length){
+    listaEl.innerHTML='<div class="alert-w">Sin registros que coincidan.</div>';
+    return;
+  }
+  var items='';
+  filtrados.slice().reverse().slice(0,80).forEach(function(r,i){
+    var sku=r.CodProducto||r.sku||'';
+    var desc=r.Nombre||r.desc||'';
+    var cant=Number(r.Cantidad!==undefined?r.Cantidad:r.cantidad)||0;
+    var cont=r.Contenedor||r.contenedor||'';
+    var lpn=r.LPN||r.lpn||'';
+    var op=r.Operario||r.operario||'';
+    var est=r.Estado||r.estado||'';
+    var colorEst=est==='DAÑADO'||est==='DANADO'?'color:var(--dan)':'color:var(--mut)';
+    items+='<div class="card-item" style="margin-bottom:6px;cursor:pointer" onclick="iniciarCorreccion('+i+',\''+sku.replace(/'/g,"\\'")+'\''+','+cant+')">';
+    items+='<div style="flex:1">';
+    items+='<div style="font-size:12px;font-weight:700;color:var(--acc)">'+sku+'</div>';
+    items+='<div style="font-size:11px;color:var(--txt)">'+desc+'</div>';
+    items+='<div style="font-size:10px;color:var(--mut);margin-top:2px">';
+    if(lpn) items+='LPN: <span style="color:var(--warn)">'+lpn+'</span> · ';
+    items+=cont;
+    if(op) items+=' · '+op;
+    if(est) items+=' · <span style="'+colorEst+'">'+est+'</span>';
+    items+='</div></div>';
+    items+='<div style="text-align:right;margin-left:10px;flex-shrink:0">';
+    items+='<div style="font-size:18px;font-weight:700">'+cant+'</div>';
+    items+='<div style="font-size:10px;color:var(--mut)">un</div></div>';
+    items+='</div>';
+  });
+  listaEl.innerHTML=items;
 }
 function iniciarCorreccion(idx,sku,cantOrig){
   window._corrSKU=sku; window._corrOriginal=cantOrig; window._corrIdx=idx;
@@ -2663,6 +2704,7 @@ window.recargarCatalogos=recargarCatalogos;
 window.actualizarStatusContenedorExcel=actualizarStatusContenedorExcel;
 window.refrescarContenedoresExcel=refrescarContenedoresExcel;
 window.showCorreccion=showCorreccion;
+window._actualizarListaCorreccion=_actualizarListaCorreccion;
 window.renderCorreccion=renderCorreccion;
 window.iniciarCorreccion=iniciarCorreccion;
 window.confCorreccion=confCorreccion;
