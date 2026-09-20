@@ -697,11 +697,11 @@ function cargarDatos(){
     var urlReg=urlLista(DB.listIds.registros)+
       '/items?$filter='+filtroFecha+
       '&$expand=fields($select=Orden,Etapa,Evento,Operador,Sesi_x00f3_n,TimestampEvento,DuracionMin,N_x00fa_mero)'+
-      '&$orderby=ID desc&$top=500';
+      '&$top=500';
     var urlVar=urlLista(DB.listIds.varias)+
       '/items?$filter='+filtroFecha+
       '&$expand=fields($select=Actividad,Evento,Operador,TimestampEvento,Duraci_x00f3_nMin)'+
-      '&$orderby=ID desc&$top=500';
+      '&$top=500';
 
     return Promise.all([cargarPaginas(urlReg),cargarPaginas(urlVar)]);
   }).then(function(resultados){
