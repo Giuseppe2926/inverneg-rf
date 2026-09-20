@@ -707,11 +707,19 @@ function cargarDatos(){
   }).then(function(resultados){
     DB.registros=parsearRegistros(resultados[0]);
     DB.varias=parsearVarias(resultados[1]);
+    console.log('[DASH] RF_Registros_Despacho encontrados =', DB.registros.length);
+    console.log('[DASH] RF_Actividades_Varias encontrados =', DB.varias.length);
+    if(DB.registros.length>0) console.log('[DASH] Primer registro despacho:', JSON.stringify(DB.registros[0]));
+    if(DB.varias.length>0) console.log('[DASH] Primer registro actividades:', JSON.stringify(DB.varias[0]));
     // Detectar operadores únicos
     var opsSet={};
     DB.registros.forEach(function(r){ if(r.operador) opsSet[r.operador]=true; });
     DB.varias.forEach(function(r){ if(r.operador) opsSet[r.operador]=true; });
     DB.operadores=Object.keys(opsSet).sort();
+    console.log('[DASH] Operadores cargados =', DB.operadores.length, DB.operadores);
+    var etapasSet={};
+    DB.registros.forEach(function(r){if(r.etapa) etapasSet[r.etapa]=true;});
+    console.log('[DASH] Etapas encontradas =', Object.keys(etapasSet).join(', '));
     poblarSelectOperador();
     var ahora=new Date();
     document.getElementById('last-update').textContent='Actualizado: '+ahora.getHours()+':'+String(ahora.getMinutes()).padStart(2,'0');
@@ -823,6 +831,13 @@ function aplicarFiltros(){
     return true;
   });
 
+  console.log('[DASH] Período seleccionado =', filtros.fechaMode, '| desde:', rango.desde, 'hasta:', rango.hasta);
+  console.log('[DASH] Registros después del filtro de fecha =', DFilt.registros.length);
+  console.log('[DASH] Actividades después del filtro =', DFilt.varias.length);
+  if(DB.registros.length>0 && DFilt.registros.length===0){
+    var sample=DB.registros[0];
+    console.log('[DASH] Primer registro tiene fecha:', sample.fecha, '| rango esperado:', rango.desde, '-', rango.hasta);
+  }
   renderActivo();
 }
 
@@ -897,6 +912,7 @@ function deltaClass(hoy,ref){
 // RENDER RESUMEN
 // ============================================================
 function renderResumen(){
+  console.log('[DASH] Renderizando KPIs | regs:', DFilt.registros.length, '| vars:', DFilt.varias.length);
   var regs=DFilt.registros, vars=DFilt.varias;
   var hoy=hoyStr(), ayer=ayerStr();
   var regsHoy=regs.filter(function(r){return r.fecha===hoy;});
@@ -1565,6 +1581,7 @@ function cerrarDrill(id){ document.getElementById(id).classList.remove('open'); 
 // NAVEGACIÓN
 // ============================================================
 function showTab(id,el){
+  console.log('[DASH] Navegando a tab:', id);
   document.querySelectorAll('.screen').forEach(function(s){s.style.display='none';});
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   var screen=document.getElementById('tab-'+id);
