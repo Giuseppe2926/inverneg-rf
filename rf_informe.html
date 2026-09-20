@@ -124,6 +124,19 @@ select.inp{appearance:none}
 .inf-tabla-det td.left{text-align:left}
 .inf-tabla-det td.right{text-align:right}
 .inf-tabla-det tfoot td{font-weight:700;background:#ddd;border:1px solid #666;padding:2px 4px;font-size:8pt}
+
+/* Tabla detalle LPN */
+.inf-tabla-lpn{width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:4px;table-layout:fixed}
+.inf-tabla-lpn th{background:#d8d8d8;border:1px solid #666;padding:2px 4px;text-align:center;font-size:7.5pt;font-weight:700}
+.inf-tabla-lpn td{border:1px solid #aaa;padding:2px 5px;font-size:8pt}
+.inf-tabla-lpn td.right{text-align:right}
+.inf-tabla-lpn td.center{text-align:center}
+.inf-tabla-lpn tfoot td{font-weight:700;background:#eee;border:1px solid #888;padding:2px 5px;font-size:8pt}
+.inf-bloque-sku{border:1px solid #bbb;border-radius:4px;padding:8px 10px;margin-bottom:10px;page-break-inside:avoid}
+.inf-sku-hdr{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:6px;margin-bottom:6px;font-size:8pt}
+.inf-sku-cell{border:1px solid #ccc;border-radius:3px;padding:3px 6px}
+.inf-sku-cell .lbl{font-size:6.5pt;color:#666;text-transform:uppercase}
+.inf-sku-cell .val{font-weight:700;font-size:9pt}
 /* ── PRINT — eliminar headers/footers del navegador ─────────────── */
 @page{
   size:A4 portrait;
@@ -472,6 +485,7 @@ function showPanel(){
     '<div class="btn-row">'+
       '<button class="btn btn-rec" onclick="generarInforme()">📋 Generar Informe</button>'+
       '<button class="btn" style="background:#8B949E;color:#000" onclick="generarDetalleRecepcion()">📊 Detalle de Recepción</button>'+
+      '<button class="btn" style="background:#388bfd;color:#000" onclick="generarDetalleLPN()">📦 Detalle por LPN</button>'+
       '<button class="btn btn-sec" onclick="window.print()">🖨 Imprimir / PDF</button>'+
     '</div>'+
     '<div id="informe-wrap"></div>'
@@ -1081,6 +1095,146 @@ function generarDetalleRecepcion(){
     $r('informe-wrap').innerHTML=h;
   });
 }
+
+// ── Reporte: Detalle por LPN ───────────────────────────────────────
+function generarDetalleLPN(){
+  var pedido=getPedidoActivo();
+  if(!pedido){alert('Selecciona un pedido primero');return;}
+  var de=($r('inp-de')||{}).value||CFG.defaults.de;
+  $r('informe-wrap').innerHTML='<div class="loading">⏳ Cargando detalle por LPN...</div>';
+
+  var packingPedido=DB.packing.filter(function(p){return normStr(p.pedido)===normStr(pedido);});
+
+  cargarRecepcionesPedido(pedido).then(function(recepciones){
+    // Calcular saldo neto por SKU (incluyendo correcciones negativas)
+    var skuMap={};
+    packingPedido.forEach(function(pk){skuMap[normStr(pk.sku)]={packing:pk,regs:[]};});
+
+    // Agrupar registros por SKU (excluir CORRECCION de las líneas, pero incluirlo en el neto)
+    recepciones.forEach(function(r){
+      var k=normStr(r.CodProducto||'');
+      if(!skuMap[k]) skuMap[k]={packing:null,regs:[]};
+      skuMap[k].regs.push(r);
+    });
+
+    // Filtrar solo SKUs con FALTANTE o SOBRANTE
+    var skusConNovedad=[];
+    Object.keys(skuMap).forEach(function(k){
+      var entry=skuMap[k];
+      var packing=entry.packing?entry.packing.cantidad:null;
+      if(packing===null) return; // sin packing → ignorar
+      // Neto incluye correcciones
+      var neto=0;
+      entry.regs.forEach(function(r){neto+=Number(r.Cantidad)||0;});
+      var diff=neto-packing;
+      if(diff===0) return; // completo → no mostrar
+      skusConNovedad.push({
+        sku:entry.packing.sku,
+        desc:entry.packing.desc,
+        packing:packing,
+        neto:neto,
+        diff:diff,
+        tipo:diff<0?'FALTANTE':'SOBRANTE',
+        regs:entry.regs,
+      });
+    });
+
+    // Ordenar: FALTANTE primero, luego por SKU
+    skusConNovedad.sort(function(a,b){
+      if(a.tipo!==b.tipo) return a.tipo==='FALTANTE'?-1:1;
+      return a.sku<b.sku?-1:a.sku>b.sku?1:0;
+    });
+
+    // ── Renderizar ────────────────────────────────────────────────
+    var colorNov=function(t){return t==='FALTANTE'?'color:#b85c00;font-weight:700':'color:#006600;font-weight:700';};
+    var signo=function(d){return d>0?'+'+d:String(d);};
+
+    var h='<div class="informe-page">';
+    h+='<div class="inf-titulo">DETALLE POR LPN — NOVEDADES</div>';
+    h+='<div class="inf-meta"><table>';
+    h+='<tr><td>DE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</td><td>'+esc(de)+'</td></tr>';
+    h+='<tr><td>PEDIDO</td><td><b>'+esc(pedido)+'</b></td></tr>';
+    h+='<tr><td>FECHA</td><td>'+fechaCorta(hoy())+'</td></tr>';
+    h+='</table></div>';
+
+    // Resumen
+    var nFalt=skusConNovedad.filter(function(s){return s.tipo==='FALTANTE';}).length;
+    var nSobr=skusConNovedad.filter(function(s){return s.tipo==='SOBRANTE';}).length;
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:8px 0;font-size:8pt">'+
+      '<div style="border:1px solid #888;border-radius:4px;padding:5px 8px;text-align:center">'+
+        '<div style="font-size:7pt;color:#666">SKUs con Novedad</div>'+
+        '<div style="font-size:13pt;font-weight:700">'+skusConNovedad.length+'</div></div>'+
+      '<div style="border:1px solid #cc6600;border-radius:4px;padding:5px 8px;text-align:center">'+
+        '<div style="font-size:7pt;color:#666">Faltantes</div>'+
+        '<div style="font-size:13pt;font-weight:700;color:#cc6600">'+nFalt+'</div></div>'+
+      '<div style="border:1px solid #006600;border-radius:4px;padding:5px 8px;text-align:center">'+
+        '<div style="font-size:7pt;color:#666">Sobrantes</div>'+
+        '<div style="font-size:13pt;font-weight:700;color:#006600">'+nSobr+'</div></div>'+
+    '</div>';
+
+    if(skusConNovedad.length===0){
+      h+='<div style="text-align:center;padding:20px;font-size:10pt;color:#555">'+
+        '✅ Sin novedades — todos los SKUs coinciden con el Packing List.</div>';
+    } else {
+      h+='<div class="inf-seccion">Detalle por SKU y LPN</div>';
+      skusConNovedad.forEach(function(s){
+        // Agrupar registros no-corrección por LPN para mostrar desglose
+        var porLPN={};
+        s.regs.forEach(function(r){
+          if(normStr(r.Estado||'')==='CORRECCION') return; // no mostrar correcciones
+          var lpn=(r.LPN||'(sin LPN)').toString().trim()||'(sin LPN)';
+          if(!porLPN[lpn]) porLPN[lpn]=0;
+          porLPN[lpn]+=Number(r.Cantidad)||0;
+        });
+        var lpnKeys=Object.keys(porLPN).sort();
+        var totalLPN=lpnKeys.reduce(function(a,k){return a+porLPN[k];},0);
+
+        h+='<div class="inf-bloque-sku">';
+        // Cabecera del SKU
+        h+='<div class="inf-sku-hdr">'+
+          '<div class="inf-sku-cell"><div class="lbl">SKU</div><div class="val">'+esc(s.sku)+'</div></div>'+
+          '<div class="inf-sku-cell" style="grid-column:span 2"><div class="lbl">Descripción</div><div class="val" style="font-size:8pt">'+esc(s.desc)+'</div></div>'+
+          '<div class="inf-sku-cell"><div class="lbl">Packing</div><div class="val">'+s.packing+'</div></div>'+
+          '<div class="inf-sku-cell"><div class="lbl">Novedad</div>'+
+            '<div class="val" style="'+colorNov(s.tipo)+'">'+s.tipo+'</div></div>'+
+        '</div>';
+        h+='<div style="display:flex;gap:12px;font-size:8pt;margin-bottom:6px">'+
+          '<span>Recibido neto: <b>'+s.neto+'</b></span>'+
+          '<span style="'+colorNov(s.tipo)+'">Diferencia: <b>'+signo(s.diff)+'</b></span>'+
+        '</div>';
+
+        // Tabla de LPNs
+        if(lpnKeys.length===0){
+          h+='<div style="font-size:8pt;color:#888;font-style:italic">Sin registros de LPN.</div>';
+        } else {
+          h+='<table class="inf-tabla-lpn"><colgroup>'+
+            '<col style="width:55%"><col style="width:45%">'+
+            '</colgroup>'+
+            '<thead><tr><th>LPN</th><th>Cantidad registrada</th></tr></thead><tbody>';
+          lpnKeys.forEach(function(lpn){
+            h+='<tr>'+
+              '<td>'+esc(lpn)+'</td>'+
+              '<td class="right">'+porLPN[lpn]+'</td>'+
+            '</tr>';
+          });
+          h+='</tbody><tfoot><tr>'+
+            '<td>TOTAL</td>'+
+            '<td class="right">'+totalLPN+'</td>'+
+          '</tr></tfoot></table>';
+        }
+        h+='</div>'; // fin bloque SKU
+      });
+    }
+
+    h+='<div class="inf-firmas">'+
+      '<div class="inf-firma-bloque"><div class="inf-firma-linea">'+esc(de)+'<br>Jefe de Bodega</div></div>'+
+      '<div class="inf-firma-bloque"><div class="inf-firma-linea">___________________________<br>Jefe de Importaciones /<br>Supervisor de Importaciones</div></div>'+
+      '<div class="inf-firma-bloque"><div class="inf-firma-linea">___________________________<br>Asistente Financiero</div></div>'+
+    '</div>';
+    h+='</div>'; // fin informe-page
+    $r('informe-wrap').innerHTML=h;
+  });
+}
 function esc(s){return(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 /* ── MSAL BOOT ───────────────────────────────── */
@@ -1117,6 +1271,7 @@ function boot(){
 }
 
 window.generarInforme=generarInforme;
+window.generarDetalleLPN=generarDetalleLPN;
 window.seleccionarPedido=seleccionarPedido;
 window.getPedidoActivo=getPedidoActivo;
 window.generarDetalleRecepcion=generarDetalleRecepcion;
