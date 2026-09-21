@@ -189,6 +189,25 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
 /* EMPTY */
 .empty{text-align:center;padding:32px;color:var(--txt3);font-size:13px}
 
+/* LÍNEA DE TIEMPO DETALLE OT */
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-etapa{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--borde)}
+.tl-etapa:last-child{border-bottom:none}
+.tl-left{display:flex;flex-direction:column;align-items:center;width:40px;flex-shrink:0}
+.tl-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
+.tl-line{width:2px;flex:1;margin-top:4px;min-height:20px}
+.tl-content{flex:1}
+.tl-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.tl-etapa-nombre{font-size:13px;font-weight:600}
+.tl-duracion{font-size:12px;color:var(--txt3)}
+.tl-ops{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.tl-op-chip{font-size:11px;padding:3px 9px;border-radius:20px;background:var(--dk3);color:var(--txt2);border:1px solid var(--borde)}
+.tl-timestamps{display:flex;gap:16px;font-size:11px;color:var(--txt3);flex-wrap:wrap}
+.tl-ts-item{display:flex;gap:5px}
+.tl-ts-lbl{color:var(--txt3)}
+.tl-ts-val{color:var(--txt2)}
+.tl-abierta{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(245,158,11,.15);color:var(--warn);border:1px solid rgba(245,158,11,.3)}
+
 /* BUSCADOR OT */
 .ot-search-wrap{position:relative}
 .ot-search-input{background:var(--dk2);border:1px solid var(--borde);color:var(--txt);font-size:11px;padding:4px 8px;border-radius:var(--rsm);outline:none;width:140px}
@@ -285,6 +304,7 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
   <div class="tab" onclick="showTab('tiempos',this)">⏱ Tiempos</div>
   <div class="tab" onclick="showTab('balance',this)">📉 Balance</div>
   <div class="tab" onclick="showTab('rankings',this)">🏆 Rankings</div>
+  <div class="tab" onclick="showTab('detalle',this)">🔍 Detalle OT</div>
 </div>
 
 <main>
@@ -579,6 +599,61 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
     <div class="card">
       <div class="card-title">Top por variabilidad de tiempos (Picking)</div>
       <div id="rank-variabilidad"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DETALLE OT ===== -->
+<div class="screen" id="tab-detalle">
+  <div id="detalle-sin-ot" style="text-align:center;padding:48px 20px;color:var(--txt3)">
+    <div style="font-size:32px;margin-bottom:12px">🔍</div>
+    <div style="font-size:14px;font-weight:500;margin-bottom:6px">Busca una orden de trabajo</div>
+    <div style="font-size:12px">Usa el filtro OT en la barra superior para ver el detalle completo de una orden</div>
+  </div>
+  <div id="detalle-contenido" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Orden de trabajo</div>
+        <div style="font-size:22px;font-weight:700" id="det-ot-id">—</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="kpi" style="min-width:120px;padding:10px 14px">
+          <div class="lbl">Tiempo total</div>
+          <div style="font-size:20px;font-weight:600" id="det-tiempo-total">—</div>
+        </div>
+        <div class="kpi" style="min-width:120px;padding:10px 14px">
+          <div class="lbl">Etapas completadas</div>
+          <div style="font-size:20px;font-weight:600" id="det-etapas-comp">—</div>
+        </div>
+        <div class="kpi" style="min-width:120px;padding:10px 14px">
+          <div class="lbl">Operadores</div>
+          <div style="font-size:20px;font-weight:600" id="det-operadores-count">—</div>
+        </div>
+        <div class="kpi" style="min-width:120px;padding:10px 14px">
+          <div class="lbl">Estado</div>
+          <div style="font-size:13px;font-weight:600;margin-top:4px" id="det-estado">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LÍNEA DE TIEMPO -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Línea de tiempo por etapa</div>
+      <div id="det-timeline"></div>
+    </div>
+
+    <!-- DETALLE POR ETAPA -->
+    <div id="det-etapas-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:16px"></div>
+
+    <!-- TODOS LOS EVENTOS -->
+    <div class="card">
+      <div class="card-title">Todos los eventos registrados para esta OT</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Fecha/Hora</th><th>Etapa</th><th>Evento</th><th>Operador</th><th style="text-align:right">Duración</th></tr></thead>
+          <tbody id="det-eventos-tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -948,6 +1023,177 @@ function limpiarOT(){
   aplicarFiltros();
 }
 
+// ============================================================
+// RENDER DETALLE OT
+// ============================================================
+function renderDetalle(){
+  var otFiltro=filtros.ot.trim().toUpperCase();
+  var sinOt=document.getElementById('detalle-sin-ot');
+  var contenido=document.getElementById('detalle-contenido');
+
+  if(!otFiltro){
+    sinOt.style.display='block';
+    contenido.style.display='none';
+    return;
+  }
+
+  var regsOT=DB.registros.filter(function(r){return r.orden===otFiltro;});
+  if(!regsOT.length){
+    sinOt.style.display='block';
+    sinOt.querySelector('div:nth-child(2)').textContent='Sin registros para esta OT';
+    sinOt.querySelector('div:nth-child(3)').textContent='La orden '+otFiltro+' no tiene eventos en los últimos 30 días';
+    contenido.style.display='none';
+    return;
+  }
+
+  sinOt.style.display='none';
+  contenido.style.display='block';
+  setText('det-ot-id', otFiltro);
+
+  // Ordenar todos los eventos por timestamp
+  var eventos=regsOT.slice().sort(function(a,b){return a.ts.localeCompare(b.ts);});
+
+  // Construir estructura por etapa
+  var etapaData={};
+  ETAPAS.forEach(function(et){
+    etapaData[et]={inicios:[],fins:[],operadores:{}};
+  });
+  eventos.forEach(function(r){
+    if(!etapaData[r.etapa]) return;
+    if(r.evento==='INICIO'||r.evento==='INICIADA') etapaData[r.etapa].inicios.push(r);
+    if(r.evento==='FIN'||r.evento==='FINALIZADA') etapaData[r.etapa].fins.push(r);
+    if(r.operador) etapaData[r.etapa].operadores[r.operador]=true;
+  });
+
+  // Calcular estado general
+  var ahora=new Date();
+  var primerEvento=eventos[0];
+  var ultimoFin=null;
+  eventos.forEach(function(r){if(r.evento==='FIN'||r.evento==='FINALIZADA') ultimoFin=r;});
+
+  var tiempoTotal='—';
+  if(primerEvento&&ultimoFin&&primerEvento.tsDate&&ultimoFin.tsDate){
+    var mins=Math.round((ultimoFin.tsDate-primerEvento.tsDate)/60000);
+    tiempoTotal=mins<60?mins+' min':Math.floor(mins/60)+'h '+( mins%60)+'min';
+  } else if(primerEvento&&primerEvento.tsDate){
+    var minsAbierta=Math.round((ahora-primerEvento.tsDate)/60000);
+    tiempoTotal=(minsAbierta<60?minsAbierta+' min':Math.floor(minsAbierta/60)+'h '+(minsAbierta%60)+'min')+' (en curso)';
+  }
+
+  var etapasComp=ETAPAS.filter(function(et){return etapaData[et].fins.length>0;}).length;
+  var opsUnicos={};
+  eventos.forEach(function(r){if(r.operador) opsUnicos[r.operador]=true;});
+  var hayAbierta=ETAPAS.some(function(et){
+    return etapaData[et].inicios.length>0&&etapaData[et].fins.length===0;
+  });
+
+  setText('det-tiempo-total',tiempoTotal);
+  setText('det-etapas-comp',etapasComp+' / '+ETAPAS.length);
+  setText('det-operadores-count',Object.keys(opsUnicos).length);
+  var estadoEl=document.getElementById('det-estado');
+  if(estadoEl){
+    if(etapasComp===ETAPAS.length){ estadoEl.textContent='Completa ✓'; estadoEl.style.color='var(--ok)'; }
+    else if(hayAbierta){ estadoEl.textContent='En curso ⏳'; estadoEl.style.color='var(--warn)'; }
+    else{ estadoEl.textContent='Parcial'; estadoEl.style.color='var(--txt3)'; }
+  }
+
+  // ---- LÍNEA DE TIEMPO ----
+  var tl=document.getElementById('det-timeline');
+  tl.innerHTML='';
+  var tlDiv=document.createElement('div');
+  tlDiv.className='timeline';
+
+  var colores={PICKING:'var(--pick)',CHECKING:'var(--check)',PACKING:'var(--pack)',FACTURACION:'var(--fact)'};
+  var iconos={PICKING:'📦',CHECKING:'✅',PACKING:'📫',FACTURACION:'🧾'};
+  var etapasConActividad=ETAPAS.filter(function(et){
+    return etapaData[et].inicios.length>0||etapaData[et].fins.length>0;
+  });
+  // Si ninguna tiene actividad mostrar todas
+  if(!etapasConActividad.length) etapasConActividad=ETAPAS;
+
+  etapasConActividad.forEach(function(et,idx){
+    var d=etapaData[et];
+    var col=colores[et];
+    var tieneInicio=d.inicios.length>0;
+    var tieneFin=d.fins.length>0;
+    var ops=Object.keys(d.operadores);
+
+    // Calcular duración de esta etapa
+    var durEtapa='—';
+    var estaAbierta=false;
+    if(tieneInicio){
+      var priIni=d.inicios[0];
+      if(tieneFin){
+        var ultFin2=d.fins[d.fins.length-1];
+        if(priIni.tsDate&&ultFin2.tsDate){
+          var m=Math.round((ultFin2.tsDate-priIni.tsDate)/60000);
+          durEtapa=m+' min';
+        }
+      } else {
+        estaAbierta=true;
+        if(priIni.tsDate){
+          var mAb=Math.round((ahora-priIni.tsDate)/60000);
+          durEtapa=mAb+' min (en curso)';
+        }
+      }
+    }
+
+    var row=document.createElement('div');
+    row.className='tl-etapa';
+
+    var iconBg=tieneInicio?(tieneFin?col:'rgba(245,158,11,.2)'):'var(--dk3)';
+    var iconColor=tieneInicio?(tieneFin?'#fff':'var(--warn)'):'var(--txt3)';
+    var lineColor=tieneFin?col:'var(--borde)';
+    var esUltima=idx===etapasConActividad.length-1;
+
+    var tsIni=d.inicios.length?d.inicios[0].ts.substring(11,16):'—';
+    var tsFin2=d.fins.length?d.fins[d.fins.length-1].ts.substring(11,16):'—';
+    var fechaIni=d.inicios.length?d.inicios[0].ts.substring(0,10):'—';
+
+    row.innerHTML=
+      '<div class="tl-left">'+
+        '<div class="tl-icon" style="background:'+iconBg+';color:'+iconColor+'">'+iconos[et]+'</div>'+
+        (!esUltima?'<div class="tl-line" style="background:'+lineColor+'"></div>':'')+
+      '</div>'+
+      '<div class="tl-content">'+
+        '<div class="tl-header">'+
+          '<span class="tl-etapa-nombre" style="color:'+col+'">'+ETAPA_LABEL[et]+'</span>'+
+          (tieneInicio?'<span class="tl-duracion">'+durEtapa+'</span>':'<span class="tl-duracion">Sin actividad</span>')+
+          (estaAbierta?'<span class="tl-abierta">⏳ Abierta</span>':'')+
+          (tieneFin?'<span class="badge badge-g">Completada</span>':'')+
+        '</div>'+
+        (ops.length?'<div class="tl-ops">'+ops.map(function(op){return '<span class="tl-op-chip">'+op+'</span>';}).join('')+'</div>':'')+
+        (tieneInicio?
+          '<div class="tl-timestamps">'+
+            '<div class="tl-ts-item"><span class="tl-ts-lbl">Inicio:</span><span class="tl-ts-val">'+fechaIni+' '+tsIni+'</span></div>'+
+            (tieneFin?'<div class="tl-ts-item"><span class="tl-ts-lbl">Fin:</span><span class="tl-ts-val">'+tsFin2+'</span></div>':'')+
+          '</div>':'<div class="tl-timestamps"><span class="tl-ts-lbl">Esta etapa no fue registrada</span></div>')+
+      '</div>';
+    tlDiv.appendChild(row);
+  });
+  tl.appendChild(tlDiv);
+
+  // ---- TABLA DE TODOS LOS EVENTOS ----
+  var tbody=document.getElementById('det-eventos-tbody');
+  tbody.innerHTML='';
+  eventos.forEach(function(r){
+    var etCol=colores[r.etapa]||'var(--txt2)';
+    var esInicio=r.evento==='INICIO'||r.evento==='INICIADA';
+    var esFin=r.evento==='FIN'||r.evento==='FINALIZADA';
+    var tr=document.createElement('tr');
+    tr.innerHTML=
+      '<td style="color:var(--txt3);font-size:11px">'+r.ts.substring(0,16)+'</td>'+
+      '<td><span class="badge badge-'+(
+        {PICKING:'pick',CHECKING:'check',PACKING:'pack',FACTURACION:'fact'}[r.etapa]||'g'
+      )+'">'+ETAPA_LABEL[r.etapa]+'</span></td>'+
+      '<td><span style="font-size:11px;font-weight:600;color:'+(esInicio?'var(--ok)':esFin?'var(--pick)':'var(--txt2)')+'">'+r.evento+'</span></td>'+
+      '<td class="name" style="font-size:12px">'+r.operador+'</td>'+
+      '<td class="num">'+(r.durMin>0?r.durMin+' min':'—')+'</td>';
+    tbody.appendChild(tr);
+  });
+  if(!eventos.length) tbody.innerHTML='<tr><td colspan="5" class="empty">Sin eventos</td></tr>';
+}
+
 function renderActivo(){
   var activeTab=document.querySelector('.screen.active');
   if(!activeTab) return;
@@ -959,6 +1205,7 @@ function renderActivo(){
   else if(id==='tab-tiempos') renderTiempos();
   else if(id==='tab-balance') renderBalance();
   else if(id==='tab-rankings') renderRankings();
+  else if(id==='tab-detalle') renderDetalle();
 }
 
 // ============================================================
