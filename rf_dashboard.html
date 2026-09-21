@@ -305,24 +305,28 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
 
   <div class="kpi-grid kpi-grid-4">
     <div class="kpi kpi-pick">
-      <div class="lbl">Picking</div>
+      <div class="lbl">Picking completado</div>
       <div class="val" id="r-pick">—</div>
-      <div class="sub-vals"><span id="r-pick-hoy">hoy: —</span><span id="r-pick-fin">finalizados: —</span></div>
+      <div class="sub-vals"><span id="r-pick-hoy" style="color:var(--txt3)">Iniciadas: —</span></div>
+      <div class="delta neu" id="r-pick-fin">Completadas: —</div>
     </div>
     <div class="kpi kpi-check">
-      <div class="lbl">Checking</div>
+      <div class="lbl">Checking completado</div>
       <div class="val" id="r-check">—</div>
-      <div class="sub-vals"><span id="r-check-hoy">hoy: —</span><span id="r-check-fin">finalizados: —</span></div>
+      <div class="sub-vals"><span id="r-check-hoy" style="color:var(--txt3)">Iniciadas: —</span></div>
+      <div class="delta neu" id="r-check-fin">Completadas: —</div>
     </div>
     <div class="kpi kpi-pack">
-      <div class="lbl">Packing</div>
+      <div class="lbl">Packing completado</div>
       <div class="val" id="r-pack">—</div>
-      <div class="sub-vals"><span id="r-pack-hoy">hoy: —</span><span id="r-pack-fin">finalizados: —</span></div>
+      <div class="sub-vals"><span id="r-pack-hoy" style="color:var(--txt3)">Iniciadas: —</span></div>
+      <div class="delta neu" id="r-pack-fin">Completadas: —</div>
     </div>
     <div class="kpi kpi-fact">
-      <div class="lbl">Facturación</div>
+      <div class="lbl">Facturación completada</div>
       <div class="val" id="r-fact">—</div>
-      <div class="sub-vals"><span id="r-fact-hoy">hoy: —</span><span id="r-fact-fin">finalizados: —</span></div>
+      <div class="sub-vals"><span id="r-fact-hoy" style="color:var(--txt3)">Iniciadas: —</span></div>
+      <div class="delta neu" id="r-fact-fin">Completadas: —</div>
     </div>
   </div>
 
@@ -972,15 +976,24 @@ function renderResumen(){
   var topAct=Object.keys(actCount).sort(function(a,b){return actCount[b]-actCount[a];})[0]||'—';
   setText('r-actvarias-top','top: '+topAct);
 
-  // Por etapa
+  // Por etapa — OT únicas con FIN (producción real)
   ['PICKING','CHECKING','PACKING','FACTURACION'].forEach(function(et){
     var key={'PICKING':'pick','CHECKING':'check','PACKING':'pack','FACTURACION':'fact'}[et];
     var etRegs=regs.filter(function(r){return r.etapa===et;});
-    var etHoy=etRegs.filter(function(r){return r.fecha===hoy;});
-    var etFin=etRegs.filter(function(r){return r.evento==='FIN'||r.evento==='FINALIZADA';});
-    setText('r-'+key,etRegs.length);
-    setText('r-'+key+'-hoy','hoy: '+etHoy.length);
-    setText('r-'+key+'-fin','fin: '+etFin.length);
+    // OT únicas que tienen al menos un INICIO en esta etapa
+    var otsIniciadas={};
+    etRegs.filter(function(r){return r.evento==='INICIO'||r.evento==='INICIADA';})
+      .forEach(function(r){otsIniciadas[r.orden]=true;});
+    var nIniciadas=Object.keys(otsIniciadas).length;
+    // OT únicas que tienen al menos un FIN en esta etapa
+    var otsCompletadas={};
+    etRegs.filter(function(r){return r.evento==='FIN'||r.evento==='FINALIZADA';})
+      .forEach(function(r){otsCompletadas[r.orden]=true;});
+    var nCompletadas=Object.keys(otsCompletadas).length;
+    console.log('[DASH-KPI]',et,'| Iniciadas:',nIniciadas,'| Completadas:',nCompletadas);
+    setText('r-'+key,nCompletadas);
+    setText('r-'+key+'-hoy','Iniciadas: '+nIniciadas);
+    setText('r-'+key+'-fin','Completadas: '+nCompletadas);
   });
 
   // Comparativa hoy vs promedio
