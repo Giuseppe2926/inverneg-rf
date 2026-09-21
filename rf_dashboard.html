@@ -723,9 +723,10 @@ function cargarDatos(){
     poblarSelectOperador();
     var ahora=new Date();
     document.getElementById('last-update').textContent='Actualizado: '+ahora.getHours()+':'+String(ahora.getMinutes()).padStart(2,'0');
-    aplicarFiltros();
     ocultarLoading();
-    showTab('resumen',document.querySelector('.tab.active')||document.querySelector('.tab'));
+    aplicarFiltros();
+    var firstTab=document.querySelector('.tab');
+    showTab('resumen', firstTab);
   }).catch(function(e){
     ocultarLoading();
     document.getElementById('loading-txt').textContent='Error: '+e.message;
@@ -915,9 +916,10 @@ function deltaClass(hoy,ref){
 // RENDER RESUMEN
 // ============================================================
 function renderResumen(){
-  console.log('[DASH] Renderizando KPIs | regs:', DFilt.registros.length, '| vars:', DFilt.varias.length);
+  console.log('[DASH-KPI] Renderizando Resumen con regs =', DFilt.registros.length, '| vars =', DFilt.varias.length);
   var regs=DFilt.registros, vars=DFilt.varias;
   var hoy=hoyStr(), ayer=ayerStr();
+  console.log('[DASH-KPI] hoyStr() =', hoy);
   var regsHoy=regs.filter(function(r){return r.fecha===hoy;});
   var regsTodo30=DB.registros;
 
@@ -937,6 +939,9 @@ function renderResumen(){
   });
   var otsSemUniq=Object.keys(getOTsUnicas(regsSem)).length;
 
+  console.log('[DASH-KPI] OT con actividad =', totalOTs);
+  var elOT=document.getElementById('r-ot-total');
+  console.log('[DASH-KPI] Elemento r-ot-total existe:', !!elOT, '| display padre:', elOT?window.getComputedStyle(elOT).display:'N/A');
   setText('r-ot-total',totalOTs);
   setText('r-ot-hoy','hoy: '+otsHoy);
   setText('r-ot-semana','sem: '+otsSemUniq);
@@ -947,16 +952,19 @@ function renderResumen(){
   var nActivos=Object.keys(opsActivos).length;
   var nTotal=DB.operadores.length;
   var nInact=nTotal-nActivos;
+  console.log('[DASH-KPI] Operadores activos =', nActivos, '| total DB =', nTotal);
   setText('r-ops-activos',nActivos);
   setText('r-ops-total','de '+nTotal+' asignados');
   var inEl=document.getElementById('r-ops-inactivos');
   if(inEl){ inEl.textContent=nInact>0?nInact+' sin actividad en el período':'Todos activos'; inEl.className='delta '+(nInact>3?'dn':'neu'); }
 
   // Eventos
+  console.log('[DASH-KPI] Eventos registrados =', regs.length);
   setText('r-eventos',regs.length);
   setText('r-eventos-hoy','hoy: '+regsHoy.length);
 
   // Actividades varias
+  console.log('[DASH-KPI] Actividades varias =', vars.length);
   setText('r-actvarias',vars.length);
   var varHoy=vars.filter(function(v){return v.fecha===hoy;}).length;
   setText('r-actvarias-hoy','hoy: '+varHoy);
@@ -1585,10 +1593,10 @@ function cerrarDrill(id){ document.getElementById(id).classList.remove('open'); 
 // ============================================================
 function showTab(id,el){
   console.log('[DASH] Navegando a tab:', id);
-  document.querySelectorAll('.screen').forEach(function(s){s.style.display='none';});
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active'); s.style.display='none';});
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   var screen=document.getElementById('tab-'+id);
-  if(screen) screen.style.display='block';
+  if(screen){ screen.classList.add('active'); screen.style.display='block'; }
   if(el) el.classList.add('active');
   renderActivo();
 }
