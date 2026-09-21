@@ -189,6 +189,17 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
 /* EMPTY */
 .empty{text-align:center;padding:32px;color:var(--txt3);font-size:13px}
 
+/* BUSCADOR OT */
+.ot-search-wrap{position:relative}
+.ot-search-input{background:var(--dk2);border:1px solid var(--borde);color:var(--txt);font-size:11px;padding:4px 8px;border-radius:var(--rsm);outline:none;width:140px}
+.ot-search-input:focus{border-color:var(--pick);width:180px;transition:width .2s}
+.ot-dropdown{position:absolute;top:calc(100% + 4px);left:0;background:var(--dk1);border:1px solid var(--borde2);border-radius:var(--rsm);min-width:200px;max-height:200px;overflow-y:auto;z-index:200;display:none}
+.ot-dropdown.open{display:block}
+.ot-opt{padding:7px 10px;font-size:12px;color:var(--txt2);cursor:pointer}
+.ot-opt:hover{background:rgba(59,130,246,.1);color:var(--txt)}
+.ot-clear{font-size:10px;color:var(--danger);cursor:pointer;padding:4px 8px;display:none}
+.ot-clear.show{display:inline}
+
 /* RESPONSIVE */
 @media(max-width:768px){
   .kpi-grid-4{grid-template-columns:repeat(2,1fr)}
@@ -254,6 +265,16 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
       <option value="FACTURACION">Facturación</option>
     </select>
   </div>
+  <div class="fsep"></div>
+  <div class="filter-group">
+    <span class="filter-label">OT</span>
+    <div class="ot-search-wrap">
+      <input class="ot-search-input" id="f-ot-input" type="text" placeholder="Buscar OT..."
+             autocomplete="off" oninput="otInputChange()" onfocus="otMostrarDropdown()" onblur="otOcultarDropdown()">
+      <div class="ot-dropdown" id="ot-dropdown"></div>
+    </div>
+    <span class="ot-clear" id="ot-clear" onclick="limpiarOT()">✕ Limpiar</span>
+  </div>
 </div>
 
 <div class="tabs-bar">
@@ -305,28 +326,36 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
 
   <div class="kpi-grid kpi-grid-4">
     <div class="kpi kpi-pick">
-      <div class="lbl">Picking completado</div>
+      <div class="lbl">OT en Picking</div>
       <div class="val" id="r-pick">—</div>
-      <div class="sub-vals"><span id="r-pick-hoy" style="color:var(--txt3)">Iniciadas: —</span></div>
-      <div class="delta neu" id="r-pick-fin">Completadas: —</div>
+      <div class="sub-vals">
+        <span id="r-pick-hoy" style="color:var(--ok)">Finalizadas: —</span>
+        <span id="r-pick-fin" style="color:var(--warn)">Pendientes: —</span>
+      </div>
     </div>
     <div class="kpi kpi-check">
-      <div class="lbl">Checking completado</div>
+      <div class="lbl">OT en Checking</div>
       <div class="val" id="r-check">—</div>
-      <div class="sub-vals"><span id="r-check-hoy" style="color:var(--txt3)">Iniciadas: —</span></div>
-      <div class="delta neu" id="r-check-fin">Completadas: —</div>
+      <div class="sub-vals">
+        <span id="r-check-hoy" style="color:var(--ok)">Finalizadas: —</span>
+        <span id="r-check-fin" style="color:var(--warn)">Pendientes: —</span>
+      </div>
     </div>
     <div class="kpi kpi-pack">
-      <div class="lbl">Packing completado</div>
+      <div class="lbl">OT en Packing</div>
       <div class="val" id="r-pack">—</div>
-      <div class="sub-vals"><span id="r-pack-hoy" style="color:var(--txt3)">Iniciadas: —</span></div>
-      <div class="delta neu" id="r-pack-fin">Completadas: —</div>
+      <div class="sub-vals">
+        <span id="r-pack-hoy" style="color:var(--ok)">Finalizadas: —</span>
+        <span id="r-pack-fin" style="color:var(--warn)">Pendientes: —</span>
+      </div>
     </div>
     <div class="kpi kpi-fact">
-      <div class="lbl">Facturación completada</div>
+      <div class="lbl">OT en Facturación</div>
       <div class="val" id="r-fact">—</div>
-      <div class="sub-vals"><span id="r-fact-hoy" style="color:var(--txt3)">Iniciadas: —</span></div>
-      <div class="delta neu" id="r-fact-fin">Completadas: —</div>
+      <div class="sub-vals">
+        <span id="r-fact-hoy" style="color:var(--ok)">Finalizadas: —</span>
+        <span id="r-fact-fin" style="color:var(--warn)">Pendientes: —</span>
+      </div>
     </div>
   </div>
 
@@ -644,9 +673,10 @@ var DB={
 
 // Estado de filtros
 var filtros={
-  fechaMode:'semana',  // debe coincidir con el fpill.active en el HTML
+  fechaMode:'semana',
   operador:'',
   etapa:'',
+  ot:'',
 };
 
 // Datos filtrados actuales
@@ -824,10 +854,12 @@ function aplicarFiltros(){
   var etFil=(document.getElementById('f-etapa').value||'').toUpperCase();
   filtros.operador=opFil; filtros.etapa=etFil;
 
+  var otFil=(filtros.ot||'').toUpperCase().trim();
   DFilt.registros=DB.registros.filter(function(r){
     if(r.fecha<rango.desde||r.fecha>rango.hasta) return false;
     if(opFil && r.operador!==opFil) return false;
     if(etFil && r.etapa!==etFil) return false;
+    if(otFil && r.orden.indexOf(otFil)===-1) return false;
     return true;
   });
   DFilt.varias=DB.varias.filter(function(r){
@@ -847,6 +879,73 @@ function aplicarFiltros(){
     console.log('[DASH] Primer registro tiene fecha:', sample.fecha, '| rango esperado:', rango.desde, '-', rango.hasta);
   }
   renderActivo();
+}
+
+// ============================================================
+// BUSCADOR OT
+// ============================================================
+function otGetOrdenes(){
+  var set={};
+  DB.registros.forEach(function(r){if(r.orden) set[r.orden]=true;});
+  return Object.keys(set).sort();
+}
+
+function otInputChange(){
+  var val=document.getElementById('f-ot-input').value.trim().toUpperCase();
+  filtros.ot=val;
+  var dropdown=document.getElementById('ot-dropdown');
+  var clearBtn=document.getElementById('ot-clear');
+  if(!val){
+    dropdown.classList.remove('open');
+    dropdown.innerHTML='';
+    clearBtn.classList.remove('show');
+    aplicarFiltros();
+    return;
+  }
+  clearBtn.classList.add('show');
+  var matches=otGetOrdenes().filter(function(o){return o.indexOf(val)!==-1;}).slice(0,20);
+  dropdown.innerHTML='';
+  matches.forEach(function(o){
+    var div=document.createElement('div');
+    div.className='ot-opt';
+    var idx=o.indexOf(val);
+    div.innerHTML=o.substring(0,idx)+'<strong style="color:var(--pick)">'+o.substring(idx,idx+val.length)+'</strong>'+o.substring(idx+val.length);
+    div.onmousedown=function(e){
+      e.preventDefault();
+      seleccionarOT(o);
+    };
+    dropdown.appendChild(div);
+  });
+  if(matches.length) dropdown.classList.add('open');
+  else dropdown.classList.remove('open');
+  aplicarFiltros();
+}
+
+function otMostrarDropdown(){
+  var val=document.getElementById('f-ot-input').value.trim();
+  if(val) otInputChange();
+}
+
+function otOcultarDropdown(){
+  setTimeout(function(){
+    document.getElementById('ot-dropdown').classList.remove('open');
+  },150);
+}
+
+function seleccionarOT(orden){
+  filtros.ot=orden;
+  document.getElementById('f-ot-input').value=orden;
+  document.getElementById('ot-dropdown').classList.remove('open');
+  document.getElementById('ot-clear').classList.add('show');
+  aplicarFiltros();
+}
+
+function limpiarOT(){
+  filtros.ot='';
+  document.getElementById('f-ot-input').value='';
+  document.getElementById('ot-clear').classList.remove('show');
+  document.getElementById('ot-dropdown').classList.remove('open');
+  aplicarFiltros();
 }
 
 function renderActivo(){
@@ -976,24 +1075,25 @@ function renderResumen(){
   var topAct=Object.keys(actCount).sort(function(a,b){return actCount[b]-actCount[a];})[0]||'—';
   setText('r-actvarias-top','top: '+topAct);
 
-  // Por etapa — OT únicas con FIN (producción real)
+  // Por etapa — OT únicas con actividad, finalizadas y pendientes
   ['PICKING','CHECKING','PACKING','FACTURACION'].forEach(function(et){
     var key={'PICKING':'pick','CHECKING':'check','PACKING':'pack','FACTURACION':'fact'}[et];
     var etRegs=regs.filter(function(r){return r.etapa===et;});
-    // OT únicas que tienen al menos un INICIO en esta etapa
-    var otsIniciadas={};
-    etRegs.filter(function(r){return r.evento==='INICIO'||r.evento==='INICIADA';})
-      .forEach(function(r){otsIniciadas[r.orden]=true;});
-    var nIniciadas=Object.keys(otsIniciadas).length;
-    // OT únicas que tienen al menos un FIN en esta etapa
-    var otsCompletadas={};
+    // OT únicas con cualquier actividad en la etapa
+    var otsTotal={};
+    etRegs.forEach(function(r){otsTotal[r.orden]=true;});
+    var nTotal=Object.keys(otsTotal).length;
+    // OT únicas con FIN registrado
+    var otsFin={};
     etRegs.filter(function(r){return r.evento==='FIN'||r.evento==='FINALIZADA';})
-      .forEach(function(r){otsCompletadas[r.orden]=true;});
-    var nCompletadas=Object.keys(otsCompletadas).length;
-    console.log('[DASH-KPI]',et,'| Iniciadas:',nIniciadas,'| Completadas:',nCompletadas);
-    setText('r-'+key,nCompletadas);
-    setText('r-'+key+'-hoy','Iniciadas: '+nIniciadas);
-    setText('r-'+key+'-fin','Completadas: '+nCompletadas);
+      .forEach(function(r){otsFin[r.orden]=true;});
+    var nFin=Object.keys(otsFin).length;
+    // Pendientes: tuvieron actividad pero no tienen FIN
+    var nPend=nTotal-nFin;
+    console.log('[DASH-KPI]',et,'| Total:',nTotal,'| Finalizadas:',nFin,'| Pendientes:',nPend);
+    setText('r-'+key,nTotal);
+    setText('r-'+key+'-hoy','Finalizadas: '+nFin);
+    setText('r-'+key+'-fin','Pendientes: '+nPend);
   });
 
   // Comparativa hoy vs promedio
@@ -1645,6 +1745,10 @@ msalApp.handleRedirectPromise().then(function(result){
 });
 
 window.msalLogin=msalLogin;
+window.otInputChange=otInputChange;
+window.otMostrarDropdown=otMostrarDropdown;
+window.otOcultarDropdown=otOcultarDropdown;
+window.limpiarOT=limpiarOT;
 window.showTab=showTab;
 window.setFecha=setFecha;
 window.aplicarFiltros=aplicarFiltros;
