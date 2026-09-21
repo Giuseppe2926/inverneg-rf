@@ -232,8 +232,8 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
 <div class="filtros">
   <div class="filter-group">
     <span class="filter-label">Período</span>
-    <span class="fpill active" onclick="setFecha('hoy',this)">Hoy</span>
-    <span class="fpill" onclick="setFecha('semana',this)">Semana</span>
+    <span class="fpill" onclick="setFecha('hoy',this)">Hoy</span>
+    <span class="fpill active" onclick="setFecha('semana',this)">Semana</span>
     <span class="fpill" onclick="setFecha('mes',this)">Mes</span>
     <span class="fpill" onclick="setFecha('30d',this)">30 días</span>
   </div>
@@ -640,7 +640,7 @@ var DB={
 
 // Estado de filtros
 var filtros={
-  fechaMode:'hoy',
+  fechaMode:'semana',  // debe coincidir con el fpill.active en el HTML
   operador:'',
   etapa:'',
 };
@@ -831,7 +831,10 @@ function aplicarFiltros(){
     return true;
   });
 
-  console.log('[DASH] Período seleccionado =', filtros.fechaMode, '| desde:', rango.desde, 'hasta:', rango.hasta);
+  var pillActiva=document.querySelector('.fpill.active');
+  var pillTxt=pillActiva?pillActiva.textContent.trim():'ninguna';
+  console.log('[DASH] Período visual =', pillTxt, '| Período interno =', filtros.fechaMode);
+  console.log('[DASH] Rango calculado: desde', rango.desde, 'hasta', rango.hasta);
   console.log('[DASH] Registros después del filtro de fecha =', DFilt.registros.length);
   console.log('[DASH] Actividades después del filtro =', DFilt.varias.length);
   if(DB.registros.length>0 && DFilt.registros.length===0){
