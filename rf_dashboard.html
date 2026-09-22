@@ -887,8 +887,13 @@ function cargarDatos(){
     DB.varias=parsearVarias(resultados[1]);
     console.log('[DASH] RF_Registros_Despacho encontrados =', DB.registros.length);
     console.log('[DASH] RF_Actividades_Varias encontrados =', DB.varias.length);
-    if(DB.registros.length>0) console.log('[DASH] Primer registro despacho:', JSON.stringify(DB.registros[0]));
-    if(DB.varias.length>0) console.log('[DASH] Primer registro actividades:', JSON.stringify(DB.varias[0]));
+    if(DB.registros.length>0){
+      var r0=DB.registros[0];
+      console.log('[DASH-HORA] Primer registro:');
+      console.log('  Hora original SharePoint (TimestampEvento raw):', resultados[0][0]&&resultados[0][0].fields?resultados[0][0].fields.TimestampEvento:'N/A');
+      console.log('  Hora interpretada por JS (ts):', r0.ts);
+      console.log('  Hora mostrada en pantalla:', r0.ts.substring(11,16));
+    }
     // Detectar operadores únicos
     var opsSet={};
     DB.registros.forEach(function(r){ if(r.operador) opsSet[r.operador]=true; });
@@ -918,13 +923,42 @@ function cargarDatos(){
   });
 }
 
+// Parsea timestamp de SharePoint como hora LOCAL sin conversión UTC
+// SharePoint devuelve "2026-08-24 11:18:33" o "2026-08-24T16:18:33Z"
+// Si viene con Z (UTC), convertir a local. Si no tiene Z, tratar como local.
+function parsearTs(raw){
+  if(!raw) return{ts:'',tsDate:null};
+  var str=raw.toString().trim();
+  var d;
+  if(str.indexOf('Z')!==-1||str.indexOf('+')!==-1){
+    // Viene en UTC — new Date() lo convierte a local correctamente
+    d=new Date(str);
+  } else {
+    // Viene como hora local "YYYY-MM-DD HH:MM:SS" o "YYYY-MM-DDTHH:MM:SS"
+    // Parsear manualmente para evitar que JS lo interprete como UTC
+    var clean=str.replace('T',' ');
+    var parts=clean.split(/[\s\-:]/);
+    var yr=parseInt(parts[0])||2026;
+    var mo=(parseInt(parts[1])||1)-1;
+    var dy=parseInt(parts[2])||1;
+    var hh=parseInt(parts[3])||0;
+    var mm=parseInt(parts[4])||0;
+    var ss=parseInt(parts[5])||0;
+    d=new Date(yr,mo,dy,hh,mm,ss);
+  }
+  if(isNaN(d)) return{ts:'',tsDate:null};
+  var pad=function(n){return String(n).padStart(2,'0');};
+  var ts=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+
+         ' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+  return{ts:ts,tsDate:d};
+}
+
 function parsearRegistros(items){
   return (items||[]).map(function(item){
     var f=item.fields||{};
-    var ts=f.TimestampEvento||'';
-    var d=ts?new Date(ts):null;
-    var pad=function(n){return String(n).padStart(2,'0');};
-    var tsLocal=d?d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()):'';
+    var parsed=parsearTs(f.TimestampEvento||'');
+    var ts=parsed.ts, d=parsed.tsDate;
+    if(!ts||!f.Orden) return null;
     return{
       id:item.id,
       orden:(f.Orden||'').trim().toUpperCase(),
@@ -932,32 +966,31 @@ function parsearRegistros(items){
       evento:(f.Evento||'').trim().toUpperCase(),
       operador:(f.Operador||'').trim().toUpperCase(),
       sesion:f['Sesi_x00f3_n']||'',
-      ts:tsLocal,
+      ts:ts,
       tsDate:d,
       durMin:parseFloat(f.DuracionMin)||0,
-      fecha:tsLocal?tsLocal.substring(0,10):'',
+      fecha:ts.substring(0,10),
       hora:d?d.getHours():-1,
     };
-  }).filter(function(r){ return r.ts && r.orden; });
+  }).filter(Boolean);
 }
 
 function parsearVarias(items){
   return (items||[]).map(function(item){
     var f=item.fields||{};
-    var ts=f.TimestampEvento||'';
-    var d=ts?new Date(ts):null;
-    var pad=function(n){return String(n).padStart(2,'0');};
-    var tsLocal=d?d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()):'';
+    var parsed=parsearTs(f.TimestampEvento||'');
+    var ts=parsed.ts, d=parsed.tsDate;
+    if(!ts) return null;
     return{
       actividad:(f.Actividad||'').trim(),
       evento:(f.Evento||'').trim(),
       operador:(f.Operador||'').trim().toUpperCase(),
-      ts:tsLocal,
+      ts:ts,
       tsDate:d,
       durMin:parseFloat(f['Duraci_x00f3_nMin'])||0,
-      fecha:tsLocal?tsLocal.substring(0,10):'',
+      fecha:ts.substring(0,10),
     };
-  }).filter(function(r){ return r.ts; });
+  }).filter(Boolean);
 }
 
 // ============================================================
