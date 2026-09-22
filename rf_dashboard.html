@@ -189,6 +189,34 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
 /* EMPTY */
 .empty{text-align:center;padding:32px;color:var(--txt3);font-size:13px}
 
+/* LÍNEA DE TIEMPO OPERADOR */
+.lt-filtros{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.lt-filtros label{font-size:11px;color:var(--txt3)}
+.lt-input{background:var(--dk2);border:1px solid var(--borde);color:var(--txt);font-size:12px;padding:6px 10px;border-radius:var(--rsm);outline:none}
+.lt-input:focus{border-color:var(--pick)}
+.lt-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.gantt-wrap{overflow-x:auto;margin-bottom:12px}
+.gantt{position:relative;background:var(--dk2);border:1px solid var(--borde);border-radius:var(--r);padding:14px}
+.gantt-header{display:flex;justify-content:space-between;font-size:10px;color:var(--txt3);margin-bottom:8px;padding:0 0 6px;border-bottom:1px solid var(--borde)}
+.gantt-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;min-height:24px}
+.gantt-lbl{font-size:10px;color:var(--txt3);width:80px;flex-shrink:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gantt-track{position:relative;flex:1;height:20px;background:var(--dk3);border-radius:3px;overflow:visible}
+.gantt-block{position:absolute;height:100%;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;overflow:hidden;cursor:pointer;transition:opacity .15s}
+.gantt-block:hover{opacity:.8}
+.gantt-gap{position:absolute;height:100%;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;overflow:hidden}
+.lt-evento{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--borde);align-items:flex-start}
+.lt-evento:last-child{border-bottom:none}
+.lt-hora{font-size:11px;color:var(--txt3);width:44px;flex-shrink:0;font-variant-numeric:tabular-nums}
+.lt-dot-col{display:flex;flex-direction:column;align-items:center;width:16px;flex-shrink:0;padding-top:2px}
+.lt-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.lt-v-line{width:2px;flex:1;margin-top:3px;min-height:14px}
+.lt-info{flex:1}
+.lt-tipo{font-size:12px;font-weight:500}
+.lt-sub{font-size:11px;color:var(--txt3);margin-top:2px}
+.lt-gap-row{display:flex;gap:10px;padding:6px 0;align-items:center}
+.lt-gap-icon{width:16px;text-align:center;font-size:12px;flex-shrink:0}
+.lt-gap-info{font-size:11px}
+
 /* LÍNEA DE TIEMPO DETALLE OT */
 .timeline{display:flex;flex-direction:column;gap:0}
 .tl-etapa{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--borde)}
@@ -305,6 +333,7 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
   <div class="tab" onclick="showTab('balance',this)">📉 Balance</div>
   <div class="tab" onclick="showTab('rankings',this)">🏆 Rankings</div>
   <div class="tab" onclick="showTab('detalle',this)">🔍 Detalle OT</div>
+  <div class="tab" onclick="showTab('linea',this)">🕒 Línea de Tiempo</div>
 </div>
 
 <main>
@@ -658,6 +687,46 @@ tr.clickable:hover td{background:rgba(59,130,246,.06)}
   </div>
 </div>
 
+<!-- ===== LÍNEA DE TIEMPO ===== -->
+<div class="screen" id="tab-linea">
+  <div class="lt-filtros">
+    <div style="display:flex;gap:6px;align-items:center">
+      <label>Fecha</label>
+      <input class="lt-input" type="date" id="lt-fecha" onchange="renderLinea()">
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <label>Operador</label>
+      <select class="lt-input" id="lt-operador" onchange="renderLinea()" style="min-width:180px">
+        <option value="">— Selecciona —</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="lt-sin-datos" style="text-align:center;padding:48px 20px;color:var(--txt3)">
+    <div style="font-size:32px;margin-bottom:12px">🕒</div>
+    <div style="font-size:14px;font-weight:500;margin-bottom:6px">Selecciona una fecha y un operador</div>
+    <div style="font-size:12px">Se mostrará la cronología completa de la jornada</div>
+  </div>
+
+  <div id="lt-contenido" style="display:none">
+    <div class="lt-kpis" id="lt-kpis"></div>
+
+    <!-- GANTT -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">Diagrama de jornada</div>
+      <div class="gantt-wrap">
+        <div class="gantt" id="lt-gantt"></div>
+      </div>
+    </div>
+
+    <!-- CRONOLOGÍA -->
+    <div class="card">
+      <div class="card-title">Cronología de eventos</div>
+      <div id="lt-cronologia"></div>
+    </div>
+  </div>
+</div>
+
 </main>
 </div>
 
@@ -834,6 +903,11 @@ function cargarDatos(){
     document.getElementById('last-update').textContent='Actualizado: '+ahora.getHours()+':'+String(ahora.getMinutes()).padStart(2,'0');
     ocultarLoading();
     aplicarFiltros();
+    // Inicializar fecha de línea de tiempo con hoy
+    var hoyLt=hoyStr();
+    var ltFechaEl=document.getElementById('lt-fecha');
+    if(ltFechaEl) ltFechaEl.value=hoyLt;
+    poblarLtOperador();
     var firstTab=document.querySelector('.tab');
     showTab('resumen', firstTab);
   }).catch(function(e){
@@ -1194,6 +1268,227 @@ function renderDetalle(){
   if(!eventos.length) tbody.innerHTML='<tr><td colspan="5" class="empty">Sin eventos</td></tr>';
 }
 
+// ============================================================
+// LÍNEA DE TIEMPO DEL OPERADOR
+// ============================================================
+function poblarLtOperador(){
+  var sel=document.getElementById('lt-operador');
+  if(!sel) return;
+  var cur=sel.value;
+  sel.innerHTML='<option value="">— Selecciona —</option>';
+  DB.operadores.forEach(function(op){
+    var o=document.createElement('option');
+    o.value=op; o.textContent=op;
+    if(op===cur) o.selected=true;
+    sel.appendChild(o);
+  });
+}
+
+function renderLinea(){
+  var fecha=document.getElementById('lt-fecha').value;   // YYYY-MM-DD
+  var op=(document.getElementById('lt-operador').value||'').toUpperCase().trim();
+  var sinDatos=document.getElementById('lt-sin-datos');
+  var contenido=document.getElementById('lt-contenido');
+
+  if(!fecha||!op){
+    sinDatos.style.display='block';
+    contenido.style.display='none';
+    return;
+  }
+
+  // Recopilar todos los eventos del operador en esa fecha
+  var pad=function(n){return String(n).padStart(2,'0');};
+  var regsOp=DB.registros.filter(function(r){return r.fecha===fecha&&r.operador===op;});
+  var varsOp=DB.varias.filter(function(r){return r.fecha===fecha&&r.operador===op;});
+
+  // Unificar y ordenar
+  var todos=[];
+  regsOp.forEach(function(r){
+    todos.push({
+      ts:r.ts, tsDate:r.tsDate, tipo:'OT',
+      etapa:r.etapa, evento:r.evento, orden:r.orden,
+      durMin:r.durMin||0,
+      label:ETAPA_LABEL[r.etapa]||r.etapa,
+      color:{PICKING:'var(--pick)',CHECKING:'var(--check)',PACKING:'var(--pack)',FACTURACION:'var(--fact)'}[r.etapa]||'var(--txt2)',
+    });
+  });
+  varsOp.forEach(function(v){
+    todos.push({
+      ts:v.ts, tsDate:v.tsDate, tipo:'ACT',
+      etapa:'VARIA', evento:v.evento, orden:v.actividad,
+      durMin:v.durMin||0,
+      label:v.actividad,
+      color:'var(--teal,#2EC4B6)',
+    });
+  });
+  todos.sort(function(a,b){return a.ts.localeCompare(b.ts);});
+
+  if(!todos.length){
+    sinDatos.style.display='block';
+    sinDatos.querySelectorAll('div')[1].textContent='Sin actividad registrada';
+    sinDatos.querySelectorAll('div')[2].textContent=op+' no tiene eventos el '+fecha;
+    contenido.style.display='none';
+    return;
+  }
+
+  sinDatos.style.display='none';
+  contenido.style.display='block';
+
+  // ---- GAPS (períodos sin actividad) ----
+  var GAP_WARN=15, GAP_ERR=30;
+  var cronologia=[]; // items mezclados con gaps
+  var ahora=new Date();
+
+  for(var i=0;i<todos.length;i++){
+    if(i>0){
+      var prev=todos[i-1];
+      var cur2=todos[i];
+      if(prev.tsDate&&cur2.tsDate){
+        var gapMin=(cur2.tsDate-prev.tsDate)/60000;
+        if(gapMin>=GAP_WARN){
+          cronologia.push({tipo:'GAP',minutos:Math.round(gapMin),
+            tsInicio:prev.ts.substring(11,16),tsFin:cur2.ts.substring(11,16)});
+        }
+      }
+    }
+    cronologia.push(todos[i]);
+  }
+
+  // ---- KPIs ----
+  var totRegistrado=0;
+  todos.forEach(function(e){if(e.durMin>0) totRegistrado+=e.durMin;});
+  var totGap=0;
+  cronologia.forEach(function(e){if(e.tipo==='GAP') totGap+=e.minutos;});
+  var nOTs={};
+  todos.filter(function(e){return e.tipo==='OT';}).forEach(function(e){nOTs[e.orden]=true;});
+
+  var kpisEl=document.getElementById('lt-kpis');
+  kpisEl.innerHTML=
+    '<div class="kpi"><div class="lbl">Tiempo registrado</div><div class="val">'+
+      (totRegistrado<60?totRegistrado+' min':Math.floor(totRegistrado/60)+'h '+(totRegistrado%60)+'min')+
+    '</div></div>'+
+    '<div class="kpi"><div class="lbl">Tiempo sin actividad</div><div class="val" style="color:'+(totGap>60?'var(--danger)':'var(--warn)')+'">'+
+      (totGap<60?totGap+' min':Math.floor(totGap/60)+'h '+(totGap%60)+'min')+
+    '</div></div>'+
+    '<div class="kpi"><div class="lbl">Eventos registrados</div><div class="val">'+todos.length+'</div></div>'+
+    '<div class="kpi"><div class="lbl">OT trabajadas</div><div class="val">'+Object.keys(nOTs).length+'</div></div>';
+
+  // ---- GANTT ----
+  var gantt=document.getElementById('lt-gantt');
+  gantt.innerHTML='';
+
+  if(todos.length&&todos[0].tsDate&&todos[todos.length-1].tsDate){
+    var tInicio=todos[0].tsDate;
+    var tFin=todos[todos.length-1].tsDate;
+    var spanMs=tFin-tInicio||1;
+
+    // Encabezado de horas
+    var hIni=tInicio.getHours();
+    var hFin2=tFin.getHours();
+    var headerEl=document.createElement('div');
+    headerEl.className='gantt-header';
+    var hSpan=hFin2-hIni||1;
+    var hHtml='';
+    for(var h=hIni;h<=hFin2;h++){
+      var pct=Math.round(((h-hIni)/hSpan)*100);
+      hHtml+='<span style="position:absolute;left:'+pct+'%;transform:translateX(-50%)">'+pad(h)+':00</span>';
+    }
+    headerEl.style.position='relative';
+    headerEl.style.height='16px';
+    headerEl.innerHTML=hHtml;
+    gantt.appendChild(headerEl);
+
+    // Una fila por OT + una fila de actividades varias
+    var otsSet={};
+    todos.forEach(function(e){if(e.tipo==='OT') otsSet[e.orden]=true;});
+    var otsList=Object.keys(otsSet);
+
+    function crearFilaGantt(lbl,eventosFila){
+      var row=document.createElement('div');
+      row.className='gantt-row';
+      var lblEl=document.createElement('div');
+      lblEl.className='gantt-lbl';
+      lblEl.textContent=lbl;
+      lblEl.title=lbl;
+      var track=document.createElement('div');
+      track.className='gantt-track';
+
+      eventosFila.forEach(function(e){
+        if(!e.tsDate) return;
+        var ini2=((e.tsDate-tInicio)/spanMs)*100;
+        var dur2=e.durMin>0?(e.durMin*60000/spanMs)*100:1.5;
+        dur2=Math.max(dur2,0.8);
+        var blk=document.createElement('div');
+        blk.className='gantt-block';
+        blk.style.left=Math.max(0,ini2)+'%';
+        blk.style.width=Math.min(dur2,100-ini2)+'%';
+        blk.style.background=e.color;
+        blk.style.color='#fff';
+        blk.title=e.label+' '+e.evento+' '+e.ts.substring(11,16)+(e.durMin?' ('+e.durMin+' min)':'');
+        track.appendChild(blk);
+      });
+
+      row.appendChild(lblEl);
+      row.appendChild(track);
+      return row;
+    }
+
+    otsList.slice(0,20).forEach(function(ot){
+      var evOT=todos.filter(function(e){return e.tipo==='OT'&&e.orden===ot;});
+      gantt.appendChild(crearFilaGantt(ot,evOT));
+    });
+
+    var evVarias=todos.filter(function(e){return e.tipo==='ACT';});
+    if(evVarias.length){
+      gantt.appendChild(crearFilaGantt('Act. Varias',evVarias));
+    }
+  } else {
+    gantt.innerHTML='<div class="empty">Sin suficientes datos para el diagrama</div>';
+  }
+
+  // ---- CRONOLOGÍA ----
+  var cronoEl=document.getElementById('lt-cronologia');
+  cronoEl.innerHTML='';
+
+  cronologia.forEach(function(item){
+    if(item.tipo==='GAP'){
+      var esRojo=item.minutos>=GAP_ERR;
+      var row=document.createElement('div');
+      row.className='lt-gap-row';
+      row.innerHTML=
+        '<div class="lt-gap-icon">'+(esRojo?'🔴':'🟡')+'</div>'+
+        '<div class="lt-gap-info" style="color:'+(esRojo?'var(--danger)':'var(--warn)')+'">'+
+          'Sin actividad: <strong>'+item.minutos+' min</strong> ('+item.tsInicio+' → '+item.tsFin+')'+
+        '</div>';
+      cronoEl.appendChild(row);
+      return;
+    }
+
+    var esInicio=item.evento==='INICIO'||item.evento==='INICIADA';
+    var esFin=item.evento==='FIN'||item.evento==='FINALIZADA';
+    var evColor=esInicio?'var(--ok)':esFin?item.color:'var(--txt3)';
+
+    var row=document.createElement('div');
+    row.className='lt-evento';
+    row.innerHTML=
+      '<div class="lt-hora">'+item.ts.substring(11,16)+'</div>'+
+      '<div class="lt-dot-col">'+
+        '<div class="lt-dot" style="background:'+item.color+'"></div>'+
+        '<div class="lt-v-line" style="background:'+item.color+';opacity:.2"></div>'+
+      '</div>'+
+      '<div class="lt-info">'+
+        '<div class="lt-tipo" style="color:'+item.color+'">'+item.label+
+          ' <span style="color:'+evColor+';font-size:11px">'+item.evento+'</span>'+
+        '</div>'+
+        '<div class="lt-sub">'+
+          (item.tipo==='OT'?'OT: '+item.orden:'Act. Varia')+
+          (item.durMin>0?' · '+item.durMin+' min':'')+
+        '</div>'+
+      '</div>';
+    cronoEl.appendChild(row);
+  });
+}
+
 function renderActivo(){
   var activeTab=document.querySelector('.screen.active');
   if(!activeTab) return;
@@ -1206,6 +1501,7 @@ function renderActivo(){
   else if(id==='tab-balance') renderBalance();
   else if(id==='tab-rankings') renderRankings();
   else if(id==='tab-detalle') renderDetalle();
+  else if(id==='tab-linea'){ poblarLtOperador(); renderLinea(); }
 }
 
 // ============================================================
