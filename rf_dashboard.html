@@ -889,10 +889,20 @@ function cargarDatos(){
     console.log('[DASH] RF_Actividades_Varias encontrados =', DB.varias.length);
     if(DB.registros.length>0){
       var r0=DB.registros[0];
-      console.log('[DASH-HORA] Primer registro:');
-      console.log('  Hora original SharePoint (TimestampEvento raw):', resultados[0][0]&&resultados[0][0].fields?resultados[0][0].fields.TimestampEvento:'N/A');
-      console.log('  Hora interpretada por JS (ts):', r0.ts);
-      console.log('  Hora mostrada en pantalla:', r0.ts.substring(11,16));
+      var rawTs=(resultados[0][0]&&resultados[0][0].fields)?resultados[0][0].fields.TimestampEvento:'N/A';
+      var dRaw=new Date(rawTs);
+      console.log('[DASH-HORA] === DIAGNÓSTICO TIMESTAMP ===');
+      console.log('[DASH-HORA] 1. RAW SharePoint:', rawTs);
+      console.log('[DASH-HORA] 2. tipo:', typeof rawTs);
+      console.log('[DASH-HORA] 3. new Date().toString():', dRaw.toString());
+      console.log('[DASH-HORA] 4. toISOString():', dRaw.toISOString());
+      console.log('[DASH-HORA] 5. toLocaleString():', dRaw.toLocaleString());
+      console.log('[DASH-HORA] 6. getHours():', dRaw.getHours());
+      console.log('[DASH-HORA] 7. getUTCHours():', dRaw.getUTCHours());
+      console.log('[DASH-HORA] 8. offset navegador (min):', new Date().getTimezoneOffset());
+      console.log('[DASH-HORA] 9. ts calculado:', r0.ts);
+      console.log('[DASH-HORA] 10. hora en pantalla:', r0.ts.substring(11,16));
+      console.log('[DASH-HORA] === FIN ===');
     }
     // Detectar operadores únicos
     var opsSet={};
@@ -1372,19 +1382,25 @@ function renderLinea(){
   var cronologia=[]; // items mezclados con gaps
   var ahora=new Date();
 
+  // Gap = tiempo entre FIN de un evento y el INICIO del siguiente
+  // El tiempo entre INICIO y FIN es trabajo productivo, nunca inactividad
+  var ultimoFin2=null; // último evento de tipo FIN procesado
   for(var i=0;i<todos.length;i++){
-    if(i>0){
-      var prev=todos[i-1];
-      var cur2=todos[i];
-      if(prev.tsDate&&cur2.tsDate){
-        var gapMin=(cur2.tsDate-prev.tsDate)/60000;
-        if(gapMin>=GAP_WARN){
-          cronologia.push({tipo:'GAP',minutos:Math.round(gapMin),
-            tsInicio:prev.ts.substring(11,16),tsFin:cur2.ts.substring(11,16)});
-        }
+    var evActual=todos[i];
+    var esInicio2=evActual.evento==='INICIO'||evActual.evento==='INICIADA';
+    var esFin2=evActual.evento==='FIN'||evActual.evento==='FINALIZADA';
+    // Si el evento actual es un INICIO y tenemos un FIN previo, calcular gap
+    if(esInicio2 && ultimoFin2 && ultimoFin2.tsDate && evActual.tsDate){
+      var gapMin=(evActual.tsDate-ultimoFin2.tsDate)/60000;
+      if(gapMin>=GAP_WARN){
+        cronologia.push({tipo:'GAP',minutos:Math.round(gapMin),
+          tsInicio:ultimoFin2.ts.substring(11,16),
+          tsFin:evActual.ts.substring(11,16)});
       }
     }
-    cronologia.push(todos[i]);
+    cronologia.push(evActual);
+    // Actualizar último FIN
+    if(esFin2) ultimoFin2=evActual;
   }
 
   // ---- KPIs ----
