@@ -502,16 +502,17 @@ function renderSepWarn(pedido,sku){
 /* ── Pantalla 1: Menú principal ──────────────────────────────── */
 function showMenuPrincipal(){
   S.historial=[showMenuPrincipal];
+  window._pedidoActualMenu='';
   actualizarBack();
-  var pedOpts=DB.pedidos.map(function(p){
-    return '<option value="'+p+'">'+p+'</option>';
-  }).join('');
   render(
     '<div class="lbl">pedido</div>'+
-    '<select class="inp" id="sel-pedido" style="font-size:15px">'+
-      '<option value="">— seleccionar pedido —</option>'+
-      pedOpts+
-    '</select>'+
+    '<input class="inp" id="inp-busca-pedido" type="text" placeholder="Escribe para buscar pedido..." '+
+      'autocomplete="off" autocorrect="off" spellcheck="false" style="font-size:15px">'+
+    '<div id="drop-pedidos" style="background:var(--sur2);border:1px solid var(--bor);'+
+      'border-top:none;border-radius:0 0 7px 7px;display:none;max-height:200px;overflow-y:auto"></div>'+
+    '<div id="badge-pedido-sel" style="display:none;margin-top:5px;padding:5px 10px;'+
+      'border-radius:6px;background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.25);'+
+      'font-size:12px;color:var(--acc);font-weight:700"></div>'+
     '<div style="margin-top:16px">'+
       '<div class="mode-card perc" onclick="seleccionarModo(\'PERCHADO\')">'+
         '<div class="mode-icon">📦</div>'+
@@ -529,10 +530,64 @@ function showMenuPrincipal(){
       '</div>'+
     '</div>'
   );
+  // Inicializar buscador de pedidos via DOM — sin strings en eventos
+  setTimeout(function(){
+    var inp=document.getElementById('inp-busca-pedido');
+    var drop=document.getElementById('drop-pedidos');
+    if(!inp||!drop) return;
+
+    function filtrar(){
+      var q=(inp.value||'').trim().toUpperCase();
+      drop.innerHTML='';
+      var matches=DB.pedidos.filter(function(p){return !q||p.toUpperCase().indexOf(q)>=0;}).slice(0,25);
+      if(!matches.length||!q){drop.style.display='none';return;}
+      matches.forEach(function(p){
+        var item=document.createElement('div');
+        item.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);font-size:14px;font-weight:600';
+        item.textContent=p;
+        item.addEventListener('mousedown',function(e){
+          e.preventDefault();
+          selPedidoBuscador(p);
+        });
+        item.addEventListener('mouseover',function(){this.style.background='var(--bor)';});
+        item.addEventListener('mouseout',function(){this.style.background='';});
+        drop.appendChild(item);
+      });
+      drop.style.display='block';
+    }
+
+    inp.addEventListener('input',filtrar);
+    inp.addEventListener('focus',filtrar);
+    inp.addEventListener('blur',function(){setTimeout(function(){drop.style.display='none';},180);});
+    inp.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){
+        var q=(inp.value||'').trim().toUpperCase();
+        var exacto=DB.pedidos.find(function(p){return p.toUpperCase()===q;});
+        if(exacto) selPedidoBuscador(exacto);
+        else if(window._pedidoActualMenu) selPedidoBuscador(window._pedidoActualMenu);
+      }
+    });
+  },0);
+}
+
+function selPedidoBuscador(p){
+  window._pedidoActualMenu=p;
+  var inp=document.getElementById('inp-busca-pedido');
+  var drop=document.getElementById('drop-pedidos');
+  var badge=document.getElementById('badge-pedido-sel');
+  if(inp) inp.value=p;
+  if(drop) drop.style.display='none';
+  if(badge){badge.textContent='✓ '+p;badge.style.display='block';}
+}
+
+function getPedidoMenu(){
+  if(window._pedidoActualMenu) return window._pedidoActualMenu;
+  var v=(document.getElementById('inp-busca-pedido')||{}).value||'';
+  return DB.pedidos.find(function(p){return p.toUpperCase()===v.trim().toUpperCase();})||'';
 }
 
 function seleccionarModo(modo){
-  var pedido=$r('sel-pedido').value;
+  var pedido=getPedidoMenu();
   if(!pedido){toast('Selecciona un pedido primero');return;}
   S.pedido=pedido;
   S.modo=modo;
@@ -608,26 +663,48 @@ function showListaLPNParaSKU(sku,lpns){
   var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
   var desc=cb?cb.desc:'';
 
+  // Construir shell HTML — los onclick de LPN se agregan via addEventListener
   var h='<div class="badge badge-perc">PERCHAR POR SKU</div>'+
     '<div class="saldo-panel">'+
       '<div class="saldo-sku">'+sku+'</div>'+
       (desc?'<div class="saldo-desc">'+desc+'</div>':'')+
       warnHtml+
-      '<div class="saldo-row"><span class="saldo-row-lbl">Total disponible</span><span class="saldo-disponible">'+total+'</span></div>'+
+      '<div class="saldo-row"><span class="saldo-row-lbl">Total disponible</span>'+
+        '<span class="saldo-disponible">'+total+'</span></div>'+
     '</div>';
 
   if(!lpns.length){
-    h+='<div class="empty-state"><div class="empty-icon">✓</div>Sin stock pendiente para este SKU en este pedido</div>';
-  } else {
-    h+='<div class="lbl">selecciona el LPN donde perchar</div>';
-    lpns.forEach(function(s){
-      h+='<div class="item-card" onclick="showFormMovimiento(\''+s.lpn+'\',\''+sku+'\','+s.saldo+')">'+
-        '<div><div class="item-main">'+s.lpn+'</div><div class="item-sub">Pallet</div></div>'+
-        '<div class="item-qty"><div class="item-qty-num">'+s.saldo+'</div><div class="item-qty-lbl">disponibles</div></div>'+
-      '</div>';
-    });
+    h+='<div class="empty-state"><div class="empty-icon">✓</div>'+
+       'Sin stock pendiente para este SKU en este pedido</div>';
+    render(h);
+    return;
   }
+
+  h+='<div class="lbl">selecciona el LPN donde perchar</div>'+
+     '<div id="lista-lpns"></div>';
   render(h);
+
+  // Construir tarjetas LPN con DOM — sin strings con valores en onclick
+  var contenedor=document.getElementById('lista-lpns');
+  if(!contenedor) return;
+  lpns.forEach(function(s){
+    var card=document.createElement('div');
+    card.className='item-card';
+    card.innerHTML=
+      '<div>'+
+        '<div class="item-main">'+s.lpn+'</div>'+
+        '<div class="item-sub">Pallet</div>'+
+      '</div>'+
+      '<div class="item-qty">'+
+        '<div class="item-qty-num">'+s.saldo+'</div>'+
+        '<div class="item-qty-lbl">disponibles</div>'+
+      '</div>';
+    // Closure sobre s.lpn, sku, s.saldo — sin serialización de strings
+    card.addEventListener('click', (function(lpn,sk,saldo){
+      return function(){ showFormMovimiento(lpn,sk,saldo); };
+    })(s.lpn, sku, s.saldo));
+    contenedor.appendChild(card);
+  });
 }
 
 /* ── Pantalla 3b: Perchar por LPN ────────────────────────────── */
@@ -670,17 +747,29 @@ function showListaSKUParaLPN(lpn,skus){
   if(!skus.length){
     h+='<div class="empty-state"><div class="empty-icon">✓</div>Todos los SKUs de este pallet ya fueron perchados</div>';
   } else {
+    // Tarjetas SKU via DOM — sin serializar strings en onclick
+    render(h+'<div id="lista-skus-lpn"></div>');
+    var cont2=document.getElementById('lista-skus-lpn');
+    if(!cont2) return;
     skus.forEach(function(s){
       var warnPD=sepPendienteSKU(S.pedido,s.sku);
       var warnTotal=warnPD?Object.values(warnPD).reduce(function(a,v){return a+v;},0):0;
-      h+='<div class="item-card" onclick="showFormMovimiento(\''+lpn+'\',\''+s.sku+'\','+s.saldo+')">'+
+      var card=document.createElement('div');
+      card.className='item-card';
+      card.innerHTML=
         '<div style="flex:1">'+
           '<div class="item-main">'+s.sku+'</div>'+
           (s.desc?'<div class="item-sub">'+s.desc+'</div>':'')+
           (warnTotal>0?'<div style="font-size:10px;color:var(--sep-warn);margin-top:2px">⚠ Sep. pendiente: '+warnTotal+' un</div>':'')+
         '</div>'+
-        '<div class="item-qty"><div class="item-qty-num">'+s.saldo+'</div><div class="item-qty-lbl">disponibles</div></div>'+
-      '</div>';
+        '<div class="item-qty">'+
+          '<div class="item-qty-num">'+s.saldo+'</div>'+
+          '<div class="item-qty-lbl">disponibles</div>'+
+        '</div>';
+      card.addEventListener('click',(function(lp,sk,sa){
+        return function(){ showFormMovimiento(lp,sk,sa); };
+      })(lpn,s.sku,s.saldo));
+      cont2.appendChild(card);
     });
   }
   render(h);
@@ -1324,6 +1413,8 @@ window.showMenuPrincipal=showMenuPrincipal;
 window.showResumenPerchado=showResumenPerchado;
 window.selPedidoResumen=selPedidoResumen;
 window.selResumenPedido=selResumenPedido;
+window.selPedidoBuscador=selPedidoBuscador;
+window.getPedidoMenu=getPedidoMenu;
 window.tipoUbicacion=tipoUbicacion;
 window.categorizarMovimiento=categorizarMovimiento;
 window.showFormMovimiento=showFormMovimiento;
