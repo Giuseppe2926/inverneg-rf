@@ -471,22 +471,63 @@ function parsearCBarra(d){
 
 /* ── Carga de catálogos ──────────────────────────────────────── */
 function cargarCatalogos(){
+  console.log('[CATALOGOS] Iniciando carga...');
   return Promise.all([
     descubrirExcel(CFG.perchadoNombre).then(function(f){
       DB.perchadoDriveId=f.driveId;DB.perchadoItemId=f.itemId;
+      console.log('[CATALOGOS] Archivo perchado encontrado. Cargando hojas...');
       return Promise.all([
-        gGet(urlWB(f.driveId,f.itemId,'Ubicaciones')).then(parsearUbicaciones).catch(function(){}),
-        gGet(urlWB(f.driveId,f.itemId,'DestinosSeparacion')).then(parsearDestinos).catch(function(){}),
-        gGet(urlWB(f.driveId,f.itemId,'Separacion')).then(parsearSeparacion).catch(function(){}),
-        gGet(urlWB(f.driveId,f.itemId,'Operadores')).then(parsearOperadores).catch(function(){}),
+        gGet(urlWB(f.driveId,f.itemId,'Ubicaciones'))
+          .then(function(d){
+            parsearUbicaciones(d);
+            console.log('[CATALOGOS] Ubicaciones cargadas =',DB.ubicaciones.length);
+          })
+          .catch(function(e){ console.error('[CATALOGOS] Ubicaciones ERROR:',e.message); }),
+        gGet(urlWB(f.driveId,f.itemId,'DestinosSeparacion'))
+          .then(function(d){
+            parsearDestinos(d);
+            console.log('[CATALOGOS] DestinosSeparacion cargados =',DB.destinosSep.length);
+          })
+          .catch(function(e){ console.error('[CATALOGOS] DestinosSeparacion ERROR:',e.message); }),
+        gGet(urlWB(f.driveId,f.itemId,'Separacion'))
+          .then(function(d){
+            parsearSeparacion(d);
+            console.log('[CATALOGOS] Separacion cargada =',DB.separacionPendiente.length);
+          })
+          .catch(function(e){ console.error('[CATALOGOS] Separacion ERROR:',e.message); }),
+        gGet(urlWB(f.driveId,f.itemId,'Operadores'))
+          .then(function(d){
+            parsearOperadores(d);
+            console.log('[CATALOGOS] Operadores cargados =',DB.operadores.length);
+          })
+          .catch(function(e){
+            console.error('[CATALOGOS] Operadores ERROR:',e.message);
+            console.warn('[CATALOGOS] Continuando sin operadores — verifica que la hoja se llama exactamente "Operadores"');
+            DB.operadores=[];  // garantizar array vacío para que la pantalla funcione igual
+          }),
       ]);
+    }).catch(function(e){
+      console.error('[CATALOGOS] Error encontrando archivo perchado:',e.message);
     }),
     descubrirExcel(CFG.recepcionNombre).then(function(f){
       DB.recepDriveId=f.driveId;DB.recepItemId=f.itemId;
-      return gGet(urlWB(f.driveId,f.itemId,'C.Barra')).then(parsearCBarra).catch(function(){});
+      return gGet(urlWB(f.driveId,f.itemId,'C.Barra'))
+        .then(function(d){
+          parsearCBarra(d);
+          console.log('[CATALOGOS] C.Barra cargada =',DB.codigosBarra.length);
+        })
+        .catch(function(e){ console.error('[CATALOGOS] C.Barra ERROR:',e.message); });
+    }).catch(function(e){
+      console.error('[CATALOGOS] Error encontrando archivo recepcion:',e.message);
     }),
-    descubrirListas(),
-  ]);
+    descubrirListas().then(function(){
+      console.log('[CATALOGOS] Listas SP:',JSON.stringify(DB.listIds));
+    }).catch(function(e){
+      console.error('[CATALOGOS] Error descubriendo listas:',e.message);
+    }),
+  ]).then(function(){
+    console.log('[CATALOGOS] Carga completa. Mostrando selección de operador.');
+  });
 }
 
 /* ── Consultas SP: recepciones y movimientos ─────────────────── */
@@ -606,6 +647,62 @@ function renderSepWarn(pedido,sku){
 /* ══════════════════════════════════════════════════════════════
    PANTALLAS
    ══════════════════════════════════════════════════════════════ */
+
+
+// ── Pantalla 0: Selección de Operador ────────────────────────────
+function showSeleccionOperador(){
+  S.historial=[{id:'sel-op',fn:showSeleccionOperador}];
+  actualizarBack();
+
+  if(DB.operadores.length===0){
+    console.warn('[OPS] Sin operadores — hoja Operadores no cargada o vacía');
+    render(
+      '<div style="text-align:center;padding:24px 16px">'+
+        '<div style="font-size:32px;margin-bottom:12px">⚠</div>'+
+        '<div style="font-size:14px;font-weight:700;color:var(--warn);margin-bottom:8px">Sin operadores disponibles</div>'+
+        '<div style="font-size:12px;color:var(--mut);margin-bottom:4px">'+
+          'Verifica que la hoja "Operadores" existe en Inverneg_PerchadoRF</div>'+
+        '<div style="font-size:11px;color:var(--mut);margin-bottom:20px">'+
+          'La hoja debe tener una columna llamada Operadores</div>'+
+        '<button class="btn btn-perc" style="max-width:260px;margin:0 auto" '+
+          'onclick="S.operador=\'—\';showMenuPrincipal()">'+
+          'Continuar sin operador</button>'+
+      '</div>'
+    );
+    return;
+  }
+
+  var h=
+    '<div style="text-align:center;padding:16px 0 10px">'+
+      '<div style="font-size:32px;margin-bottom:6px">👤</div>'+
+      '<div style="font-size:16px;font-weight:700;color:var(--perc);margin-bottom:4px">¿Quién eres?</div>'+
+      '<div style="font-size:12px;color:var(--mut)">Toca tu nombre para continuar</div>'+
+    '</div>'+
+    '<div id="op-grid" class="op-grid"></div>';
+  render(h);
+
+  var grid=document.getElementById('op-grid');
+  if(!grid){ console.error('[OPS] Contenedor op-grid no encontrado'); return; }
+
+  DB.operadores.forEach(function(op){
+    var chip=document.createElement('div');
+    chip.className='op-chip';
+    var iniciales=op.split(' ').filter(Boolean).map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+    chip.innerHTML=
+      '<div class="op-avatar">'+iniciales+'</div>'+
+      '<span>'+op+'</span>';
+    chip.addEventListener('click',function(){
+      S.operador=op;
+      var banner=document.getElementById('op-banner');
+      var bannerTxt=document.getElementById('op-banner-txt');
+      if(banner) banner.style.display='flex';
+      if(bannerTxt) bannerTxt.textContent='Operador activo: '+op;
+      console.log('[OPS] Operador seleccionado:',op);
+      showMenuPrincipal();
+    });
+    grid.appendChild(chip);
+  });
+}
 
 /* ── Pantalla 1: Menú principal ──────────────────────────────── */
 function showMenuPrincipal(){
