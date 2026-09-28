@@ -1332,9 +1332,13 @@ function ejecutarMovimiento(sku,cant,alm,ubic,obs){
     AlmacenDestino: alm,
     UbicacionDestino:ubic,
     Operador:       S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'',
-    FechaMovimiento:t.fecha,
+    FechaMovimiento:t.ts,  // ISO completo con hora para trazabilidad
     Observacion:    obs,
   };
+  var _d=new Date();
+  console.log('[POST-MOV] new Date()='+_d.toString());
+  console.log('[POST-MOV] new Date().toISOString()='+_d.toISOString());
+  console.log('[POST-MOV] FechaMovimiento enviado='+fields.FechaMovimiento);
   console.log('[POST-MOV] Body enviado a SP:',JSON.stringify(fields,null,2));
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Guardando movimiento...</div></div>');
   gPost(urlLista(DB.listIds.movimientos)+'/items',{fields:fields}).then(function(){
@@ -1499,7 +1503,7 @@ function ejecutarSeparacion(idx,sku,cantReq,destino,saldoDisp){
         DestinoSeparacion:destino,
         // Empresa no existe en SP
         Operador:       S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'',
-        FechaMovimiento:t.fecha,
+        FechaMovimiento:t.ts,  // ISO completo con hora para trazabilidad
         Observacion:    '',
       }});
       pendiente-=tomar;
@@ -1796,8 +1800,22 @@ function showVistaOperativa(){
     cargarRecepcionesPedido(S.pedido),
     cargarMovimientosPedido(S.pedido),
   ]).then(function(res){
-    var movs=res[1].sort(function(a,b){
-      return (a.FechaMovimiento||'').localeCompare(b.FechaMovimiento||'');
+    var movs=res[1];
+    console.log('[VISTA-OP] Pedido='+S.pedido+' movimientos encontrados:',movs.length);
+    if(movs.length>0){
+      console.log('[VISTA-OP] Primer mov raw:',JSON.stringify({
+        SKU:movs[0].SKU, Cantidad:movs[0].Cantidad,
+        FechaMovimiento:movs[0].FechaMovimiento,
+        AlmacenDestino:movs[0].AlmacenDestino,
+        Created:movs[0].Created,
+        Pedido:movs[0].Pedido,
+      }));
+    }
+    // Ordenar por Created de SP (timestamp exacto) o FechaMovimiento ISO
+    movs.sort(function(a,b){
+      var ta=a.Created||a.FechaMovimiento||'';
+      var tb=b.Created||b.FechaMovimiento||'';
+      return ta.localeCompare(tb);
     });
     var resumen=calcularResumenPerchado(res[0],res[1]);
 
@@ -1827,7 +1845,18 @@ function showVistaOperativa(){
       '</div>';
       // Mostrar hasta los últimos 50 movimientos, más recientes abajo
       movs.slice(-50).forEach(function(m){
-        var hora=(m.FechaMovimiento||'').slice(11,16)||'—';
+        // FechaMovimiento puede ser ISO "2026-09-28T14:32:00Z" o solo fecha "2026-09-28"
+        var _fm=m.FechaMovimiento||m.Created||'';
+        var hora='—';
+        if(_fm.length>=16){
+          // Convertir UTC a local para mostrar hora correcta
+          try{
+            var _dt=new Date(_fm);
+            if(!isNaN(_dt)){
+              hora=pad(_dt.getHours())+':'+pad(_dt.getMinutes());
+            }
+          }catch(e){ hora=_fm.slice(11,16)||'—'; }
+        }
         var tipoCols={'PERCHADO':'var(--ok)','SEPARACION':'var(--sep)','DANA':'var(--dan)','OBSE':'var(--warn)','PEND':'var(--warn)'};
         var tipo=categorizarMovimiento(m);
         var color=tipoCols[tipo]||'var(--txt)';
