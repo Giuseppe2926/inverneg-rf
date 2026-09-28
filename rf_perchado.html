@@ -204,11 +204,14 @@ body{
 </head>
 <body>
 <div class="hdr">
-  <div>
-    <div class="hdr-brand">▸ RF PERCHADO</div>
-    <div class="hdr-sub">Inverneg · CND</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div id="btn-atras" onclick="goBack()" style="display:none;cursor:pointer;font-size:13px;color:var(--mut);padding:4px 8px;border:1px solid var(--bor);border-radius:6px">← Atrás</div>
+    <div>
+      <div class="hdr-brand">▸ RF PERCHADO</div>
+      <div class="hdr-sub">Inverneg · CND</div>
+    </div>
   </div>
-  <div class="hdr-back" id="btn-back" onclick="goBack()" style="display:none">← Atrás</div>
+  <div onclick="showMenuPrincipal()" style="cursor:pointer;font-size:13px;color:var(--mut);padding:4px 8px;border:1px solid var(--bor);border-radius:6px">🏠 Inicio</div>
 </div>
 
 <div id="screen">
@@ -307,7 +310,7 @@ function goBack(){
   actualizarBack();
 }
 function actualizarBack(){
-  var btn=$r('btn-back');
+  var btn=$r('btn-atras');
   if(btn) btn.style.display=S.historial.length>1?'flex':'none';
 }
 
@@ -782,13 +785,18 @@ function showFormMovimiento(lpn,sku,saldoDisp){
   var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
   var desc=cb?cb.desc:'';
   var warnHtml=renderSepWarn(S.pedido,sku);
+  var origData=CFG.empresas[S.empresa]||CFG.empresas['INV'];
 
-  // Ubicaciones disponibles para empresa seleccionada
+  // LOG ubicaciones — diagnóstico
+  console.log('[UBIC] DB.ubicaciones total:',DB.ubicaciones.length);
+  console.log('[UBIC] Empresa actual:',S.empresa);
   var ubics=DB.ubicaciones.filter(function(u){return normStr(u.empresa)===normStr(S.empresa);});
   var almacenes=[...new Set(ubics.map(function(u){return u.almacen;}))];
-  var almOpts=almacenes.map(function(a){return '<option value="'+a+'">'+a+'</option>';}).join('');
-
-  var origData=CFG.empresas[S.empresa]||CFG.empresas['INV'];
+  console.log('[UBIC] Almacenes para empresa',S.empresa,':',almacenes.length,'→',almacenes.join(' | ')||'(ninguno)');
+  if(DB.ubicaciones.length>0&&ubics.length===0){
+    console.warn('[UBIC] Hay ubicaciones pero ninguna para empresa "'+S.empresa+
+      '". Primeras 3 empresas en hoja:',DB.ubicaciones.slice(0,3).map(function(u){return '"'+u.empresa+'"';}).join(', '));
+  }
 
   render(
     '<div class="badge badge-perc">PERCHADO</div>'+
@@ -796,42 +804,183 @@ function showFormMovimiento(lpn,sku,saldoDisp){
       '<div class="saldo-sku">'+sku+'</div>'+
       (desc?'<div class="saldo-desc">'+desc+'</div>':'')+
       '<div class="saldo-row"><span class="saldo-row-lbl">LPN</span><span class="saldo-row-val">'+lpn+'</span></div>'+
-      '<div class="saldo-row"><span class="saldo-row-lbl">Disponible</span><span class="saldo-disponible" id="lbl-saldo">'+saldoDisp+'</span></div>'+
+      '<div class="saldo-row"><span class="saldo-row-lbl">Disponible</span><span class="saldo-disponible">'+saldoDisp+'</span></div>'+
       warnHtml+
     '</div>'+
-
     '<div class="qty-wrap">'+
       '<div class="qty-lbl">cantidad a perchar</div>'+
       '<input class="qty-input" id="inp-qty" type="number" min="1" max="'+saldoDisp+'" placeholder="0" inputmode="numeric">'+
     '</div>'+
-
     '<div class="lbl">empresa</div>'+
-    '<div class="empresa-row" id="empresa-row">'+
-      Object.keys(CFG.empresas).map(function(k){
-        return '<div class="empresa-chip'+(k===S.empresa?' active':'')+'" onclick="setEmpresa(\''+k+'\')" id="chip-'+k+'">'+k+'</div>';
-      }).join('')+
+    '<div class="empresa-row" id="empresa-row-form"></div>'+
+    '<div class="dest-panel" id="dest-panel-form">'+
+      '<div class="dest-row"><span class="dest-lbl">Origen (automático)</span>'+
+        '<span class="dest-val" id="lbl-origen">'+origData.almacenOrigen+' / '+origData.ubicOrigen+'</span></div>'+
     '</div>'+
-
-    '<div class="dest-panel" id="dest-panel">'+
-      '<div class="dest-row"><span class="dest-lbl">Origen</span><span class="dest-val">'+origData.almacenOrigen+' / '+origData.ubicOrigen+'</span><span class="dest-auto">automático</span></div>'+
-    '</div>'+
-
     '<div class="lbl">almacén destino</div>'+
-    '<select class="inp" id="sel-almacen" onchange="actualizarUbicaciones()">'+
-      '<option value="">— seleccionar —</option>'+almOpts+
-    '</select>'+
+    '<input class="inp" id="inp-alm-dest" type="text" placeholder="Buscar almacén..." autocomplete="off">'+
+    '<div id="drop-alm" style="background:var(--sur2);border:1px solid var(--bor);border-top:none;border-radius:0 0 7px 7px;display:none;max-height:160px;overflow-y:auto"></div>'+
+    '<div id="badge-alm" style="display:none;font-size:11px;color:var(--acc);padding:3px 8px;margin-top:2px"></div>'+
     '<div class="lbl">ubicación destino</div>'+
-    '<select class="inp" id="sel-ubic"><option value="">— primero selecciona almacén —</option></select>'+
-
+    '<input class="inp" id="inp-ubic-dest" type="text" placeholder="Buscar ubicación..." autocomplete="off">'+
+    '<div id="drop-ubic" style="background:var(--sur2);border:1px solid var(--bor);border-top:none;border-radius:0 0 7px 7px;display:none;max-height:160px;overflow-y:auto"></div>'+
+    '<div id="badge-ubic" style="display:none;font-size:11px;color:var(--acc);padding:3px 8px;margin-top:2px"></div>'+
     '<div class="lbl" style="margin-top:8px">observación (opcional)</div>'+
     '<input class="inp" id="inp-obs" type="text" placeholder="...">'+
-
-    '<div class="btn-row" style="margin-top:14px">'+
-      '<button class="btn btn-sec" onclick="goBack()">← Atrás</button>'+
-      '<button class="btn btn-perc" onclick="confirmarMovimiento(\''+sku+'\','+saldoDisp+')">✓ Confirmar perchado</button>'+
-    '</div>'
+    '<div id="btn-confirmar-wrap" style="margin-top:14px"></div>'
   );
-  setTimeout(function(){var el=$r('inp-qty');if(el)el.focus();},80);
+
+  // Chips de empresa — DOM puro
+  var empRow=document.getElementById('empresa-row-form');
+  if(empRow) Object.keys(CFG.empresas).forEach(function(k){
+    var chip=document.createElement('div');
+    chip.className='empresa-chip'+(k===S.empresa?' active':'');
+    chip.id='chip-'+k;
+    chip.textContent=k;
+    chip.addEventListener('click',function(){_setEmpresaForm(k,sku,saldoDisp);});
+    empRow.appendChild(chip);
+  });
+
+  // Botón confirmar — DOM puro (sin serializar sku en onclick string)
+  var btnWrap=document.getElementById('btn-confirmar-wrap');
+  if(btnWrap){
+    var btnRow=document.createElement('div');
+    btnRow.className='btn-row';
+    var btnAtras=document.createElement('button');
+    btnAtras.className='btn btn-sec';
+    btnAtras.textContent='← Atrás';
+    btnAtras.addEventListener('click',function(){goBack();});
+    var btnConf=document.createElement('button');
+    btnConf.className='btn btn-perc';
+    btnConf.textContent='✓ Confirmar perchado';
+    btnConf.addEventListener('click',function(){_confirmarFormMovimiento(sku,saldoDisp);});
+    btnRow.appendChild(btnAtras);
+    btnRow.appendChild(btnConf);
+    btnWrap.appendChild(btnRow);
+  }
+
+  // Inicializar buscadores de almacén y ubicación
+  setTimeout(function(){
+    _initBuscadorAlmacen(sku,saldoDisp);
+    var qtyEl=document.getElementById('inp-qty');
+    if(qtyEl) qtyEl.focus();
+  },0);
+}
+
+function _setEmpresaForm(emp,sku,saldoDisp){
+  S.empresa=emp;
+  Object.keys(CFG.empresas).forEach(function(k){
+    var c=document.getElementById('chip-'+k);
+    if(c) c.className='empresa-chip'+(k===emp?' active':'');
+  });
+  var origData=CFG.empresas[emp]||CFG.empresas['INV'];
+  var lbl=document.getElementById('lbl-origen');
+  if(lbl) lbl.textContent=origData.almacenOrigen+' / '+origData.ubicOrigen;
+  // Resetear selecciones destino
+  window._almSeleccionado=''; window._ubicSeleccionada='';
+  var ia=document.getElementById('inp-alm-dest'); if(ia) ia.value='';
+  var iu=document.getElementById('inp-ubic-dest'); if(iu) iu.value='';
+  var ba=document.getElementById('badge-alm'); if(ba) ba.style.display='none';
+  var bu=document.getElementById('badge-ubic'); if(bu) bu.style.display='none';
+  _initBuscadorAlmacen(sku,saldoDisp);
+}
+
+function _initBuscadorAlmacen(sku,saldoDisp){
+  window._almSeleccionado=window._almSeleccionado||'';
+  window._ubicSeleccionada=window._ubicSeleccionada||'';
+  var ubics=DB.ubicaciones.filter(function(u){return normStr(u.empresa)===normStr(S.empresa);});
+  var almacenes=[...new Set(ubics.map(function(u){return u.almacen;}))].sort();
+  console.log('[UBIC-FORM] Empresa:',S.empresa,'Almacenes:',almacenes.length,'→',almacenes.join('|'));
+
+  _initBuscadorDrop('inp-alm-dest','drop-alm','badge-alm',almacenes,function(alm){
+    window._almSeleccionado=alm;
+    // Poblar ubicaciones para este almacén
+    var ubicsAlm=ubics.filter(function(u){return normStr(u.almacen)===normStr(alm);}).map(function(u){return u.ubicacion;}).sort();
+    window._ubicSeleccionada='';
+    var iu=document.getElementById('inp-ubic-dest'); if(iu){iu.value='';iu.placeholder='Buscar ubicación en '+alm+'...';}
+    var bu=document.getElementById('badge-ubic'); if(bu) bu.style.display='none';
+    _initBuscadorDrop('inp-ubic-dest','drop-ubic','badge-ubic',ubicsAlm,function(ubic){
+      window._ubicSeleccionada=ubic;
+      // Mostrar Tipo de la ubicación seleccionada
+      var u=DB.ubicaciones.find(function(x){return normStr(x.almacen)===normStr(alm)&&normStr(x.ubicacion)===normStr(ubic);});
+      if(u&&u.tipo){
+        var bu2=document.getElementById('badge-ubic');
+        var tipoCol={'PERCHADO':'var(--ok)','IMPO':'var(--acc)','DANA':'var(--dan)','OBSE':'var(--warn)','PEND':'var(--warn)'};
+        if(bu2) bu2.style.color=tipoCol[u.tipo]||'var(--acc)';
+      }
+    });
+  });
+}
+
+function _initBuscadorDrop(inpId,dropId,badgeId,opciones,onSelect){
+  var inp=document.getElementById(inpId);
+  var drop=document.getElementById(dropId);
+  var badge=document.getElementById(badgeId);
+  if(!inp||!drop) return;
+
+  // Limpiar listeners anteriores clonando el nodo
+  var nuevoInp=inp.cloneNode(true);
+  inp.parentNode.replaceChild(nuevoInp,inp);
+  inp=nuevoInp;
+
+  function filtrar(){
+    var q=(inp.value||'').trim().toUpperCase();
+    drop.innerHTML='';
+    var matches=opciones.filter(function(o){return !q||o.toUpperCase().indexOf(q)>=0;}).slice(0,30);
+    if(!matches.length||!q){drop.style.display='none';return;}
+    matches.forEach(function(o){
+      var item=document.createElement('div');
+      item.style.cssText='padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--bor);font-size:13px;font-weight:600';
+      item.textContent=o;
+      item.addEventListener('mouseover',function(){this.style.background='var(--bor)';});
+      item.addEventListener('mouseout',function(){this.style.background='';});
+      item.addEventListener('mousedown',function(e){
+        e.preventDefault();
+        inp.value=o;
+        drop.style.display='none';
+        if(badge){badge.textContent='✓ '+o;badge.style.display='block';}
+        onSelect(o);
+      });
+      drop.appendChild(item);
+    });
+    drop.style.display='block';
+  }
+
+  inp.addEventListener('input',filtrar);
+  inp.addEventListener('focus',filtrar);
+  inp.addEventListener('blur',function(){setTimeout(function(){drop.style.display='none';},180);});
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){
+      var q=(inp.value||'').trim().toUpperCase();
+      var exacto=opciones.find(function(o){return o.toUpperCase()===q;});
+      if(exacto){inp.value=exacto;drop.style.display='none';if(badge){badge.textContent='✓ '+exacto;badge.style.display='block';}onSelect(exacto);}
+    }
+  });
+}
+
+function _confirmarFormMovimiento(sku,saldoDisp){
+  var cant=parseInt((document.getElementById('inp-qty')||{}).value||'0');
+  var alm=window._almSeleccionado||'';
+  var ubic=window._ubicSeleccionada||'';
+  var obs=((document.getElementById('inp-obs')||{}).value||'').trim();
+
+  if(!cant||cant<=0){toast('Ingresa una cantidad válida');return;}
+  if(cant>saldoDisp){toast('Cantidad supera el disponible ('+saldoDisp+' un)');return;}
+  if(!alm){toast('Selecciona el almacén destino');return;}
+  if(!ubic){toast('Selecciona la ubicación destino');return;}
+
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Validando saldo...</div></div>');
+  Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
+    var saldos=calcularSaldos(res[0],res[1]);
+    var k=S.lpnActual+'|'+sku;
+    var saldoReal=saldos[k]?saldos[k].saldo:0;
+    if(cant>saldoReal){
+      toast('Saldo cambió. Disponible ahora: '+saldoReal+' un');
+      showFormMovimiento(S.lpnActual,sku,saldoReal);
+      return;
+    }
+    showConfirmacionMovimiento(sku,cant,alm,ubic,obs,saldoReal);
+  });
 }
 
 function setEmpresa(emp){
@@ -899,7 +1048,6 @@ function confirmarMovimiento(sku,saldoDisp){
 /* ── Pantalla 5: Confirmación antes de guardar ───────────────── */
 function showConfirmacionMovimiento(sku,cant,alm,ubic,obs,saldoReal){
   var origData=CFG.empresas[S.empresa]||CFG.empresas['INV'];
-  var t=ahora();
   render(
     '<div class="badge badge-perc">CONFIRMAR PERCHADO</div>'+
     '<div class="resumen-box">'+
@@ -908,17 +1056,25 @@ function showConfirmacionMovimiento(sku,cant,alm,ubic,obs,saldoReal){
       '<div class="resumen-row"><span class="resumen-lbl">LPN</span><span class="resumen-val">'+S.lpnActual+'</span></div>'+
       '<div class="resumen-row"><span class="resumen-lbl">SKU</span><span class="resumen-val">'+sku+'</span></div>'+
       '<div class="resumen-row"><span class="resumen-lbl">Origen</span><span class="resumen-val">'+origData.almacenOrigen+' / '+origData.ubicOrigen+'</span></div>'+
-      '<div class="resumen-row"><span class="resumen-lbl">Destino</span><span class="resumen-val">'+alm+' / '+ubic+'</span></div>'+
+      '<div class="resumen-row"><span class="resumen-lbl">Destino (AlmacenDestino)</span><span class="resumen-val">'+alm+'</span></div>'+
+      '<div class="resumen-row"><span class="resumen-lbl">Ubicación (UbicacionDestino)</span><span class="resumen-val">'+ubic+'</span></div>'+
       '<div class="resumen-row"><span class="resumen-lbl">Empresa</span><span class="resumen-val">'+S.empresa+'</span></div>'+
       '<div class="resumen-row"><span class="resumen-lbl">Saldo disponible</span><span class="resumen-val">'+saldoReal+' un</span></div>'+
       (obs?'<div class="resumen-row"><span class="resumen-lbl">Observación</span><span class="resumen-val">'+obs+'</span></div>':'')+
       '<div class="resumen-row"><span class="resumen-lbl">PERCHAR</span><span class="resumen-val" style="color:var(--perc);font-size:22px">'+cant+' un</span></div>'+
     '</div>'+
-    '<div class="btn-row">'+
-      '<button class="btn btn-sec" onclick="goBack()">← Atrás</button>'+
-      '<button class="btn btn-perc" onclick="ejecutarMovimiento(\''+sku+'\','+cant+',\''+alm+'\',\''+ubic+'\',\''+obs+'\')">✓ GUARDAR MOVIMIENTO</button>'+
-    '</div>'
+    '<div id="btn-guardar-wrap" style="margin-top:4px"></div>'
   );
+  // Botones via DOM — sin serializar strings
+  var wrap=document.getElementById('btn-guardar-wrap');
+  if(wrap){
+    var row=document.createElement('div'); row.className='btn-row';
+    var ba=document.createElement('button'); ba.className='btn btn-sec'; ba.textContent='← Atrás';
+    ba.addEventListener('click',function(){goBack();});
+    var bg=document.createElement('button'); bg.className='btn btn-perc'; bg.textContent='✓ GUARDAR MOVIMIENTO';
+    bg.addEventListener('click',function(){ejecutarMovimiento(sku,cant,alm,ubic,obs);});
+    row.appendChild(ba); row.appendChild(bg); wrap.appendChild(row);
+  }
 }
 
 function ejecutarMovimiento(sku,cant,alm,ubic,obs){
@@ -1286,8 +1442,8 @@ function showResumenPerchado(){
 }
 
 function selPedidoResumen(){
-  var p=($r('sel-ped-res')||{}).value||'';
-  if(!p){toast('Selecciona un pedido');return;}
+  var p=getPedidoMenu();
+  if(!p){toast('Selecciona un pedido primero');return;}
   S.pedido=p;
   _cargarResumen(p);
 }
@@ -1400,10 +1556,6 @@ window.showPerchadoPorSKU=showPerchadoPorSKU;
 window.showPerchadoPorLPN=showPerchadoPorLPN;
 window.buscarSKU=buscarSKU;
 window.buscarLPN=buscarLPN;
-window.setEmpresa=setEmpresa;
-window.actualizarUbicaciones=actualizarUbicaciones;
-window.confirmarMovimiento=confirmarMovimiento;
-window.ejecutarMovimiento=ejecutarMovimiento;
 window.showResultadoMovimiento=showResultadoMovimiento;
 window.buscarSKU_mismoSKU=buscarSKU_mismoSKU;
 window.buscarLPN_mismoLPN=buscarLPN_mismoLPN;
@@ -1412,7 +1564,6 @@ window.ejecutarSeparacion=ejecutarSeparacion;
 window.showMenuPrincipal=showMenuPrincipal;
 window.showResumenPerchado=showResumenPerchado;
 window.selPedidoResumen=selPedidoResumen;
-window.selResumenPedido=selResumenPedido;
 window.selPedidoBuscador=selPedidoBuscador;
 window.getPedidoMenu=getPedidoMenu;
 window.tipoUbicacion=tipoUbicacion;
