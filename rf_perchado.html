@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RF Perchado — Inverneg</title>
+<style>
+/* ── Tokens — coherente con RF Recepción ─────────────────────── */
+:root{
+  --bg:#0D1117;--sur:#161B22;--sur2:#1C2330;--bor:#2A3340;
+  --txt:#E6EDF3;--mut:#7D8590;
+  --acc:#58A6FF;--ok:#3FB950;--warn:#E3B341;--dan:#F85149;--rec:#F0883E;
+  /* Nuevos para Perchado */
+  --perc:#A78BFA;       /* violeta — distingue Perchado de Recepción */
+  --sep:#34D399;        /* verde esmeralda — Separación */
+  --sep-warn:#FCD34D;   /* amarillo — advertencia separación pendiente */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--txt);
+  font-family:'Segoe UI',system-ui,sans-serif;
+  min-height:100vh;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+.hdr{
+  background:var(--sur);border-bottom:1px solid var(--bor);
+  padding:10px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:10;
+}
+.hdr-brand{font-size:13px;font-weight:700;color:var(--perc);letter-spacing:.06em}
+.hdr-sub{font-size:10px;color:var(--mut);margin-top:1px}
+.hdr-back{
+  font-size:12px;color:var(--mut);cursor:pointer;
+  display:flex;align-items:center;gap:4px;
+}
+.hdr-back:hover{color:var(--txt)}
+
+/* ── Pantalla principal ────────────────────────────────────── */
+#screen{padding:14px 16px;max-width:480px;margin:0 auto}
+.loading{text-align:center;padding:48px 16px;color:var(--mut);font-size:13px}
+.loading-icon{font-size:28px;margin-bottom:10px;animation:spin 1.2s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Tipografía y layout base ──────────────────────────────── */
+.lbl{font-size:11px;color:var(--mut);letter-spacing:.04em;margin-bottom:4px;margin-top:10px}
+.inp{
+  width:100%;background:var(--sur2);border:1px solid var(--bor);
+  color:var(--txt);font-size:16px;padding:10px 12px;border-radius:7px;
+  outline:none;font-family:inherit;
+}
+.inp:focus{border-color:var(--acc)}
+.inp-xl{font-size:22px;font-weight:700;text-align:center;letter-spacing:.04em;text-transform:uppercase}
+
+/* ── Botones ───────────────────────────────────────────────── */
+.btn{
+  border:none;border-radius:8px;padding:12px 18px;
+  font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+  width:100%;margin-top:8px;transition:opacity .15s;
+}
+.btn:active{opacity:.75}
+.btn-perc{background:var(--perc);color:#000}
+.btn-sep{background:var(--sep);color:#000}
+.btn-ok{background:var(--ok);color:#000}
+.btn-sec{background:var(--sur2);color:var(--txt);border:1px solid var(--bor)}
+.btn-warn{background:var(--warn);color:#000}
+.btn-row{display:flex;gap:8px;margin-top:10px}
+.btn-row .btn{margin-top:0}
+
+/* ── Cards de selección ────────────────────────────────────── */
+.mode-card{
+  background:var(--sur2);border:1px solid var(--bor);
+  border-radius:10px;padding:18px;
+  cursor:pointer;transition:border-color .15s,background .15s;
+  display:flex;align-items:center;gap:14px;
+  margin-bottom:8px;
+}
+.mode-card:hover{background:#232b38;border-color:var(--bor)}
+.mode-card.perc{border-left:3px solid var(--perc)}
+.mode-card.sep{border-left:3px solid var(--sep)}
+.mode-icon{font-size:26px;flex-shrink:0}
+.mode-title{font-size:15px;font-weight:700;margin-bottom:3px}
+.mode-sub{font-size:11px;color:var(--mut)}
+
+/* ── Cards de ítem (LPN / SKU) ─────────────────────────────── */
+.item-card{
+  background:var(--sur2);border:1px solid var(--bor);border-radius:8px;
+  padding:12px 14px;margin-bottom:6px;cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;
+  transition:border-color .15s;
+}
+.item-card:hover,.item-card:active{border-color:var(--perc)}
+.item-card.selected{border-color:var(--perc);background:#1d1e30}
+.item-main{font-size:14px;font-weight:700;color:var(--acc);margin-bottom:2px}
+.item-sub{font-size:11px;color:var(--mut)}
+.item-qty{text-align:right;flex-shrink:0}
+.item-qty-num{font-size:20px;font-weight:700;color:var(--txt)}
+.item-qty-lbl{font-size:10px;color:var(--mut)}
+
+/* ── Badge contextual ──────────────────────────────────────── */
+.badge{
+  display:inline-block;padding:4px 10px;border-radius:20px;
+  font-size:11px;font-weight:700;margin-bottom:10px;
+}
+.badge-perc{background:rgba(167,139,250,.15);color:var(--perc);border:1px solid rgba(167,139,250,.3)}
+.badge-sep{background:rgba(52,211,153,.12);color:var(--sep);border:1px solid rgba(52,211,153,.25)}
+.badge-pedido{background:rgba(88,166,255,.12);color:var(--acc);border:1px solid rgba(88,166,255,.25)}
+
+/* ── Advertencia separación pendiente ─────────────────────── */
+.sep-warn-box{
+  background:rgba(252,211,77,.08);
+  border:1px solid rgba(252,211,77,.3);
+  border-radius:8px;padding:10px 12px;margin:8px 0;
+}
+.sep-warn-title{font-size:12px;font-weight:700;color:var(--sep-warn);margin-bottom:6px}
+.sep-warn-row{display:flex;justify-content:space-between;font-size:11px;color:var(--txt);padding:2px 0}
+.sep-warn-total{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--sep-warn);padding-top:6px;margin-top:4px;border-top:1px solid rgba(252,211,77,.2)}
+
+/* ── Panel de saldo ────────────────────────────────────────── */
+.saldo-panel{
+  background:var(--sur);border:1px solid var(--bor);
+  border-radius:8px;padding:12px 14px;margin-bottom:10px;
+}
+.saldo-sku{font-size:15px;font-weight:700;color:var(--acc);margin-bottom:2px}
+.saldo-desc{font-size:11px;color:var(--mut);margin-bottom:10px}
+.saldo-row{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0}
+.saldo-row-lbl{font-size:11px;color:var(--mut)}
+.saldo-row-val{font-size:14px;font-weight:700}
+.saldo-disponible{font-size:24px;font-weight:700;color:var(--ok);margin-top:4px}
+.saldo-div{border-top:1px solid var(--bor);margin:8px 0}
+
+/* ── Input cantidad grande (Zebra) ─────────────────────────── */
+.qty-wrap{margin:10px 0}
+.qty-lbl{font-size:11px;color:var(--mut);margin-bottom:5px}
+.qty-input{
+  width:100%;background:var(--sur);border:2px solid var(--bor);
+  color:var(--txt);font-size:36px;font-weight:700;
+  text-align:center;padding:14px;border-radius:10px;
+  outline:none;font-family:inherit;
+}
+.qty-input:focus{border-color:var(--perc)}
+.qty-input.mode-sep:focus{border-color:var(--sep)}
+
+/* ── Destino / empresa ─────────────────────────────────────── */
+.dest-panel{
+  background:var(--sur2);border:1px solid var(--bor);
+  border-radius:8px;padding:12px 14px;margin-top:6px;
+}
+.dest-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0}
+.dest-lbl{font-size:11px;color:var(--mut)}
+.dest-val{font-size:12px;font-weight:700;color:var(--txt)}
+.dest-auto{font-size:10px;color:var(--mut);font-style:italic}
+
+/* ── Empresa chips ──────────────────────────────────────────── */
+.empresa-row{display:flex;gap:8px;margin-top:6px}
+.empresa-chip{
+  flex:1;padding:10px;border-radius:7px;text-align:center;
+  font-size:14px;font-weight:700;cursor:pointer;
+  border:2px solid var(--bor);background:var(--sur2);color:var(--mut);
+  transition:all .15s;
+}
+.empresa-chip.active{border-color:var(--perc);color:var(--perc);background:rgba(167,139,250,.1)}
+
+/* ── Resumen de movimiento ──────────────────────────────────── */
+.resumen-box{
+  background:var(--sur);border:1px solid var(--bor);
+  border-radius:10px;padding:14px;margin:10px 0;
+}
+.resumen-titulo{font-size:12px;color:var(--mut);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
+.resumen-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor);font-size:12px}
+.resumen-row:last-child{border-bottom:none;padding-top:8px;font-size:14px;font-weight:700}
+.resumen-lbl{color:var(--mut)}
+.resumen-val{font-weight:600}
+
+/* ── Estado vacío ───────────────────────────────────────────── */
+.empty-state{
+  text-align:center;padding:32px 16px;color:var(--mut);font-size:13px;
+  border:1px dashed var(--bor);border-radius:8px;margin-top:8px;
+}
+.empty-icon{font-size:28px;margin-bottom:8px}
+
+/* ── Toast ──────────────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));
+  left:50%;transform:translateX(-50%);
+  background:var(--sur2);color:var(--txt);border:1px solid var(--bor);
+  padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;
+  opacity:0;transition:opacity .25s;pointer-events:none;z-index:999;
+  white-space:nowrap;max-width:90vw;
+}
+#toast.show{opacity:1}
+
+/* ── Footer ─────────────────────────────────────────────────── */
+.ftr{
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--sur);border-top:1px solid var(--bor);
+  padding:6px 16px calc(6px + env(safe-area-inset-bottom,0px));
+  font-size:11px;color:var(--mut);display:flex;justify-content:space-between;
+}
+.ftr-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block;margin-right:4px}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div>
+    <div class="hdr-brand">▸ RF PERCHADO</div>
+    <div class="hdr-sub">Inverneg · CND</div>
+  </div>
+  <div class="hdr-back" id="btn-back" onclick="goBack()" style="display:none">← Atrás</div>
+</div>
+
+<div id="screen">
+  <div class="loading">
+    <div class="loading-icon">⏳</div>
+    <div>Iniciando sesión Microsoft...</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div class="ftr">
+  <span><span class="ftr-dot"></span><span id="ftr-status">CONECTANDO</span></span>
+  <span id="ftr-user">—</span>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ── CFG ──────────────────────────────────────────────────────── */
+var CFG={
+  clientId:   'ec976114-e146-4ce4-850c-5d978e12acfd',
+  tenantId:   '5e008bd3-17b6-4f83-8d23-019691a40609',
+  siteId:     'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
+  perchadoNombre:'Inverneg_PerchadoRF.xlsx',
+  recepcionNombre:'Inverneg_ConteoRF_Base_Live.xlsx',
+  listas:{
+    recepciones:'RF_PRecepciones_LRecepciones',
+    movimientos:'RF_PRecepciones_LMovimientos',
+  },
+  empresas:{
+    'INV':{almacenOrigen:'CND2-IMPO', ubicOrigen:'N1-IMPO', label:'INV — Inverneg'},
+    'ECM':{almacenOrigen:'ECO3-IMPO', ubicOrigen:'E3-IMPO', label:'ECM — Economisa'},
+  },
+};
+var GRAPH='https://graph.microsoft.com/v1.0';
+var SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
+var msalInst,msalAcc;
+
+/* ── Estado de sesión ────────────────────────────────────────── */
+var S={
+  pedido:'',
+  modo:'',           // PERCHADO | SEPARACION
+  subModo:'',        // por-sku | por-lpn
+  empresa:'INV',
+  skuActual:null,    // {sku, desc, factor}
+  lpnActual:'',
+  cantActual:0,
+  almacenDest:'',
+  ubicDest:'',
+  destinoSep:'',
+  historial:[],      // breadcrumb para goBack()
+};
+
+/* ── DB catálogos ────────────────────────────────────────────── */
+var DB={
+  pedidos:[],
+  ubicaciones:[],          // hoja Ubicaciones del Excel perchado
+  destinosSep:[],          // hoja DestinosSeparacion
+  separacionPendiente:[],  // hoja Separacion (solicitudes analistas)
+  codigosBarra:[],         // hoja C.Barra del Excel recepcion
+  perchadoDriveId:null,perchadoItemId:null,
+  recepDriveId:null,recepItemId:null,
+  listIds:{recepciones:null,movimientos:null},
+};
+
+/* ── Utils ───────────────────────────────────────────────────── */
+function normStr(s){return s?s.toString().trim().toUpperCase():'';}
+function pad(n){return String(n).padStart(2,'0');}
+function ahora(){
+  var d=new Date();
+  return{
+    fecha:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),
+    hora:pad(d.getHours())+':'+pad(d.getMinutes()),
+    ts:d.toISOString(),
+  };
+}
+function $r(id){return document.getElementById(id);}
+function render(html){$r('screen').innerHTML=html;}
+function toast(msg,ms){
+  var t=$r('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},ms||2000);
+}
+function setStatus(s,ok){
+  $r('ftr-status').textContent=s;
+  $r('ftr-status').previousSibling.style.background=ok?'var(--ok)':'var(--warn)';
+}
+
+/* ── Breadcrumb ──────────────────────────────────────────────── */
+function pushScreen(fn){S.historial.push(fn);}
+function goBack(){
+  S.historial.pop();
+  var prev=S.historial[S.historial.length-1];
+  if(prev) prev();
+  else showMenuPrincipal();
+  actualizarBack();
+}
+function actualizarBack(){
+  var btn=$r('btn-back');
+  if(btn) btn.style.display=S.historial.length>1?'flex':'none';
+}
+
+/* ── GRAPH helpers ───────────────────────────────────────────── */
+function getToken(){
+  return msalInst.acquireTokenSilent({scopes:SCOPES,account:msalAcc})
+    .catch(function(){return msalInst.acquireTokenRedirect({scopes:SCOPES});});
+}
+function gGet(url){
+  return getToken().then(function(r){
+    return fetch(url,{headers:{'Authorization':'Bearer '+r.accessToken}});
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
+    return r.json();
+  });
+}
+function gPost(url,body){
+  return getToken().then(function(r){
+    return fetch(url,{method:'POST',
+      headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,120));});
+    return r.json();
+  });
+}
+function urlWB(driveId,itemId,hoja){
+  return GRAPH+'/drives/'+driveId+'/items/'+itemId+
+    "/workbook/worksheets('"+hoja+"')/usedRange";
+}
+function urlLista(id){return GRAPH+'/sites/'+CFG.siteId+'/lists/'+id;}
+
+/* ── Descubrimiento de archivos y listas ─────────────────────── */
+function descubrirExcel(nombre){
+  var url=GRAPH+'/sites/'+CFG.siteId+'/drive/root/search(q=\''+encodeURIComponent(nombre)+'\')';
+  return gGet(url).then(function(d){
+    var f=d.value&&d.value.find(function(x){return x.name===nombre;});
+    if(!f) throw new Error('Archivo no encontrado: '+nombre);
+    return{driveId:f.parentReference&&f.parentReference.driveId,itemId:f.id};
+  });
+}
+function descubrirListas(){
+  return gGet(GRAPH+'/sites/'+CFG.siteId+'/lists?$select=id,displayName&$top=200')
+    .then(function(d){
+      (d.value||[]).forEach(function(l){
+        Object.keys(CFG.listas).forEach(function(k){
+          if(l.displayName===CFG.listas[k]) DB.listIds[k]=l.id;
+        });
+      });
+    });
+}
+
+/* ── Parsers Excel ───────────────────────────────────────────── */
+function parsearHoja(values,mapFn){
+  if(!values||values.length<2) return[];
+  var hdr=values[0].map(function(v){return(v||'').toString().trim().toLowerCase();});
+  return values.slice(1).filter(function(r){return r.some(function(c){return c!==null&&c!=='';})}).map(function(r){return mapFn(hdr,r);});
+}
+function idx(hdr,names){
+  for(var i=0;i<names.length;i++){var j=hdr.indexOf(names[i]);if(j>=0)return j;}return -1;
+}
+function parsearUbicaciones(d){
+  DB.ubicaciones=parsearHoja(d.values,function(h,r){
+    return{empresa:r[idx(h,['empresa'])]||'',almacen:r[idx(h,['almacen'])]||'',ubicacion:r[idx(h,['ubicacion'])]||'',tipo:r[idx(h,['tipo'])]||''};
+  });
+}
+function parsearDestinos(d){
+  DB.destinosSep=parsearHoja(d.values,function(h,r){
+    return{destino:r[idx(h,['destino'])]||'',almacen:r[idx(h,['almacen'])]||'',ubicacion:r[idx(h,['ubicacion'])]||''};
+  });
+}
+function parsearSeparacion(d){
+  DB.separacionPendiente=parsearHoja(d.values,function(h,r){
+    return{pedido:r[idx(h,['pedido'])]||'',sku:r[idx(h,['sku'])]||'',cantidad:Number(r[idx(h,['cantidad'])])||0,fecha:r[idx(h,['fecha'])]||'',destino:r[idx(h,['destino'])]||''};
+  });
+}
+function parsearCBarra(d){
+  if(!d||!d.values||d.values.length<2) return;
+  var hdr=d.values[0].map(function(v){return(v||'').toString().trim().toLowerCase();});
+  var iS=hdr.findIndex(function(h){return h==='sku'||h.indexOf('codigo')>-1||h==='cod';});
+  if(iS<0) iS=0;
+  var iD=hdr.findIndex(function(h){return h.indexOf('desc')>-1;});
+  d.values.slice(1).forEach(function(r){
+    if(!r[iS]) return;
+    var sku=r[iS].toString().trim();
+    if(!DB.codigosBarra.find(function(x){return x.sku===sku;}))
+      DB.codigosBarra.push({sku:sku,desc:iD>=0&&r[iD]?r[iD].toString().trim():''});
+  });
+}
+
+/* ── Carga de catálogos ──────────────────────────────────────── */
+function cargarCatalogos(){
+  return Promise.all([
+    descubrirExcel(CFG.perchadoNombre).then(function(f){
+      DB.perchadoDriveId=f.driveId;DB.perchadoItemId=f.itemId;
+      return Promise.all([
+        gGet(urlWB(f.driveId,f.itemId,'Ubicaciones')).then(parsearUbicaciones).catch(function(){}),
+        gGet(urlWB(f.driveId,f.itemId,'DestinosSeparacion')).then(parsearDestinos).catch(function(){}),
+        gGet(urlWB(f.driveId,f.itemId,'Separacion')).then(parsearSeparacion).catch(function(){}),
+      ]);
+    }),
+    descubrirExcel(CFG.recepcionNombre).then(function(f){
+      DB.recepDriveId=f.driveId;DB.recepItemId=f.itemId;
+      return gGet(urlWB(f.driveId,f.itemId,'C.Barra')).then(parsearCBarra).catch(function(){});
+    }),
+    descubrirListas(),
+  ]);
+}
+
+/* ── Consultas SP: recepciones y movimientos ─────────────────── */
+function cargarRecepcionesPedido(pedido){
+  if(!DB.listIds.recepciones) return Promise.resolve([]);
+  return gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=2000')
+    .then(function(d){
+      return(d.value||[]).map(function(i){return i.fields||{};})
+        .filter(function(f){return normStr(f.Pedido||'')===normStr(pedido);});
+    }).catch(function(){return[];});
+}
+function cargarMovimientosPedido(pedido){
+  if(!DB.listIds.movimientos) return Promise.resolve([]);
+  return gGet(urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=2000')
+    .then(function(d){
+      return(d.value||[]).map(function(i){return i.fields||{};})
+        .filter(function(f){return normStr(f.Pedido||'')===normStr(pedido);});
+    }).catch(function(){return[];});
+}
+
+/* ── Cálculo de saldo ────────────────────────────────────────── */
+function calcularSaldos(recepciones,movimientos){
+  // Retorna Map de "LPN|SKU" → {lpn,sku,desc,recibido,movido,saldo,fechaCreated}
+  var mapa={};
+
+  // Sumar recibido OK (correcciones sí participan como negativos, dañado excluido)
+  recepciones.forEach(function(r){
+    if(normStr(r.Estado||'')==='DAÑADO') return;
+    var k=(r.LPN||'(sin LPN)')+'|'+(r.CodProducto||'');
+    if(!mapa[k]) mapa[k]={lpn:r.LPN||'(sin LPN)',sku:r.CodProducto||'',desc:r.Nombre||'',recibido:0,movido:0,saldo:0,created:r.Created||''};
+    mapa[k].recibido+=Number(r.Cantidad)||0;
+  });
+
+  // Restar movimientos ejecutados (Perchado + Separación)
+  movimientos.forEach(function(m){
+    var k=(m.LPN||'(sin LPN)')+'|'+(m.SKU||'');
+    if(!mapa[k]) return; // movimiento sin recepción correspondiente — ignorar
+    mapa[k].movido+=Number(m.Cantidad)||0;
+  });
+
+  // Calcular saldo
+  Object.keys(mapa).forEach(function(k){
+    mapa[k].saldo=mapa[k].recibido-mapa[k].movido;
+  });
+
+  return mapa;
+}
+
+/* ── Separación pendiente para un SKU ───────────────────────── */
+function sepPendienteSKU(pedido,sku){
+  // Lo que está en la hoja Separacion (solicitud) menos lo ya ejecutado (TipoMov=SEPARACION)
+  var reqs=DB.separacionPendiente.filter(function(r){
+    return normStr(r.pedido)===normStr(pedido)&&normStr(r.sku)===normStr(sku);
+  });
+  if(!reqs.length) return null;
+  // Consolidar por destino
+  var porDest={};
+  reqs.forEach(function(r){
+    var k=r.destino||'Sin destino';
+    porDest[k]=(porDest[k]||0)+r.cantidad;
+  });
+  return porDest;
+}
+
+function renderSepWarn(pedido,sku){
+  var pd=sepPendienteSKU(pedido,sku);
+  if(!pd) return '';
+  var total=Object.values(pd).reduce(function(a,v){return a+v;},0);
+  if(total<=0) return '';
+  var rows=Object.keys(pd).map(function(d){
+    return '<div class="sep-warn-row"><span>'+d+'</span><span>'+pd[d]+' un</span></div>';
+  }).join('');
+  return '<div class="sep-warn-box">'+
+    '<div class="sep-warn-title">⚠ Separación pendiente</div>'+
+    rows+
+    '<div class="sep-warn-total"><span>Total pendiente</span><span>'+total+' un</span></div>'+
+    '<div style="font-size:10px;color:var(--mut);margin-top:4px">Solo informativo — no afecta el saldo disponible</div>'+
+  '</div>';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PANTALLAS
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Pantalla 1: Menú principal ──────────────────────────────── */
+function showMenuPrincipal(){
+  S.historial=[showMenuPrincipal];
+  actualizarBack();
+  var pedOpts=DB.pedidos.map(function(p){
+    return '<option value="'+p+'">'+p+'</option>';
+  }).join('');
+  render(
+    '<div class="lbl">pedido</div>'+
+    '<select class="inp" id="sel-pedido" style="font-size:15px">'+
+      '<option value="">— seleccionar pedido —</option>'+
+      pedOpts+
+    '</select>'+
+    '<div style="margin-top:16px">'+
+      '<div class="mode-card perc" onclick="seleccionarModo(\'PERCHADO\')">'+
+        '<div class="mode-icon">📦</div>'+
+        '<div>'+
+          '<div class="mode-title">Perchado</div>'+
+          '<div class="mode-sub">Mover mercadería a ubicación de almacén</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="mode-card sep" onclick="seleccionarModo(\'SEPARACION\')">'+
+        '<div class="mode-icon">✂</div>'+
+        '<div>'+
+          '<div class="mode-title">Separación</div>'+
+          '<div class="mode-sub">Ejecutar tareas de separación del pedido</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'
+  );
+}
+
+function seleccionarModo(modo){
+  var pedido=$r('sel-pedido').value;
+  if(!pedido){toast('Selecciona un pedido primero');return;}
+  S.pedido=pedido;
+  S.modo=modo;
+  if(modo==='PERCHADO') showSubModoPerchado();
+  else showSeparacion();
+}
+
+/* ── Pantalla 2a: Sub-modo de Perchado ───────────────────────── */
+function showSubModoPerchado(){
+  pushScreen(showSubModoPerchado);actualizarBack();
+  render(
+    '<div class="badge badge-pedido">'+S.pedido+'</div>'+
+    '<div class="badge badge-perc" style="margin-left:6px">PERCHADO</div>'+
+    '<div style="margin-top:14px">'+
+      '<div class="mode-card" onclick="showPerchadoPorSKU()" style="border-left:3px solid var(--acc)">'+
+        '<div class="mode-icon">🔍</div>'+
+        '<div>'+
+          '<div class="mode-title">Perchar por SKU</div>'+
+          '<div class="mode-sub">Busca un SKU y ve todos sus LPN disponibles</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="mode-card" onclick="showPerchadoPorLPN()" style="border-left:3px solid var(--perc)">'+
+        '<div class="mode-icon">📋</div>'+
+        '<div>'+
+          '<div class="mode-title">Perchar por LPN</div>'+
+          '<div class="mode-sub">Selecciona un pallet y ve todos sus SKU disponibles</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'
+  );
+}
+
+/* ── Pantalla 3a: Perchar por SKU ────────────────────────────── */
+function showPerchadoPorSKU(){
+  pushScreen(showPerchadoPorSKU);actualizarBack();
+  render(
+    '<div class="badge badge-perc">PERCHAR POR SKU</div>'+
+    '<div class="badge badge-pedido" style="margin-left:6px">'+S.pedido+'</div>'+
+    '<div class="lbl">código SKU</div>'+
+    '<input class="inp inp-xl" id="inp-sku" type="text" placeholder="Escanear o ingresar SKU" autocomplete="off" autocorrect="off">'+
+    '<button class="btn btn-perc" onclick="buscarSKU()">Buscar SKU</button>'
+  );
+  setTimeout(function(){var el=$r('inp-sku');if(el)el.focus();},80);
+}
+
+function buscarSKU(){
+  var sku=($r('inp-sku').value||'').trim().toUpperCase();
+  if(!sku){toast('Ingresa un SKU');return;}
+  S.skuActual={sku:sku};
+  var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===sku;});
+  if(cb) S.skuActual.desc=cb.desc;
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Calculando saldos...</div></div>');
+  Promise.all([
+    cargarRecepcionesPedido(S.pedido),
+    cargarMovimientosPedido(S.pedido),
+  ]).then(function(res){
+    var saldos=calcularSaldos(res[0],res[1]);
+    // Filtrar por SKU con saldo > 0, ordenar por LPN alfanumérico
+    var lpns=Object.keys(saldos)
+      .map(function(k){return saldos[k];})
+      .filter(function(s){return normStr(s.sku)===sku&&s.saldo>0;})
+      .sort(function(a,b){return a.lpn.localeCompare(b.lpn);});
+
+    window._saldosCache=saldos;
+    showListaLPNParaSKU(sku,lpns);
+  });
+}
+
+function showListaLPNParaSKU(sku,lpns){
+  pushScreen(function(){showListaLPNParaSKU(sku,lpns);});actualizarBack();
+  var total=lpns.reduce(function(a,s){return a+s.saldo;},0);
+  var warnHtml=renderSepWarn(S.pedido,sku);
+  var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
+  var desc=cb?cb.desc:'';
+
+  var h='<div class="badge badge-perc">PERCHAR POR SKU</div>'+
+    '<div class="saldo-panel">'+
+      '<div class="saldo-sku">'+sku+'</div>'+
+      (desc?'<div class="saldo-desc">'+desc+'</div>':'')+
+      warnHtml+
+      '<div class="saldo-row"><span class="saldo-row-lbl">Total disponible</span><span class="saldo-disponible">'+total+'</span></div>'+
+    '</div>';
+
+  if(!lpns.length){
+    h+='<div class="empty-state"><div class="empty-icon">✓</div>Sin stock pendiente para este SKU en este pedido</div>';
+  } else {
+    h+='<div class="lbl">selecciona el LPN donde perchar</div>';
+    lpns.forEach(function(s){
+      h+='<div class="item-card" onclick="showFormMovimiento(\''+s.lpn+'\',\''+sku+'\','+s.saldo+')">'+
+        '<div><div class="item-main">'+s.lpn+'</div><div class="item-sub">Pallet</div></div>'+
+        '<div class="item-qty"><div class="item-qty-num">'+s.saldo+'</div><div class="item-qty-lbl">disponibles</div></div>'+
+      '</div>';
+    });
+  }
+  render(h);
+}
+
+/* ── Pantalla 3b: Perchar por LPN ────────────────────────────── */
+function showPerchadoPorLPN(){
+  pushScreen(showPerchadoPorLPN);actualizarBack();
+  render(
+    '<div class="badge badge-perc">PERCHAR POR LPN</div>'+
+    '<div class="badge badge-pedido" style="margin-left:6px">'+S.pedido+'</div>'+
+    '<div class="lbl">código LPN del pallet</div>'+
+    '<input class="inp inp-xl" id="inp-lpn" type="text" placeholder="Escanear o ingresar LPN" autocomplete="off" autocorrect="off">'+
+    '<button class="btn btn-perc" onclick="buscarLPN()">Ver SKUs del LPN</button>'
+  );
+  setTimeout(function(){var el=$r('inp-lpn');if(el)el.focus();},80);
+}
+
+function buscarLPN(){
+  var lpn=($r('inp-lpn').value||'').trim().toUpperCase();
+  if(!lpn){toast('Ingresa un LPN');return;}
+  S.lpnActual=lpn;
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando SKUs del pallet...</div></div>');
+  Promise.all([
+    cargarRecepcionesPedido(S.pedido),
+    cargarMovimientosPedido(S.pedido),
+  ]).then(function(res){
+    var saldos=calcularSaldos(res[0],res[1]);
+    var skus=Object.keys(saldos)
+      .map(function(k){return saldos[k];})
+      .filter(function(s){return normStr(s.lpn)===normStr(lpn)&&s.saldo>0;})
+      .sort(function(a,b){return a.sku.localeCompare(b.sku);});
+    window._saldosCache=saldos;
+    showListaSKUParaLPN(lpn,skus);
+  });
+}
+
+function showListaSKUParaLPN(lpn,skus){
+  pushScreen(function(){showListaSKUParaLPN(lpn,skus);});actualizarBack();
+  var h='<div class="badge badge-perc">LPN: '+lpn+'</div>'+
+    '<div class="lbl" style="margin-top:10px">SKUs disponibles en este pallet</div>';
+
+  if(!skus.length){
+    h+='<div class="empty-state"><div class="empty-icon">✓</div>Todos los SKUs de este pallet ya fueron perchados</div>';
+  } else {
+    skus.forEach(function(s){
+      var warnPD=sepPendienteSKU(S.pedido,s.sku);
+      var warnTotal=warnPD?Object.values(warnPD).reduce(function(a,v){return a+v;},0):0;
+      h+='<div class="item-card" onclick="showFormMovimiento(\''+lpn+'\',\''+s.sku+'\','+s.saldo+')">'+
+        '<div style="flex:1">'+
+          '<div class="item-main">'+s.sku+'</div>'+
+          (s.desc?'<div class="item-sub">'+s.desc+'</div>':'')+
+          (warnTotal>0?'<div style="font-size:10px;color:var(--sep-warn);margin-top:2px">⚠ Sep. pendiente: '+warnTotal+' un</div>':'')+
+        '</div>'+
+        '<div class="item-qty"><div class="item-qty-num">'+s.saldo+'</div><div class="item-qty-lbl">disponibles</div></div>'+
+      '</div>';
+    });
+  }
+  render(h);
+}
+
+/* ── Pantalla 4: Formulario de movimiento (Perchado) ─────────── */
+function showFormMovimiento(lpn,sku,saldoDisp){
+  pushScreen(function(){showFormMovimiento(lpn,sku,saldoDisp);});actualizarBack();
+  S.lpnActual=lpn;
+  var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
+  var desc=cb?cb.desc:'';
+  var warnHtml=renderSepWarn(S.pedido,sku);
+
+  // Ubicaciones disponibles para empresa seleccionada
+  var ubics=DB.ubicaciones.filter(function(u){return normStr(u.empresa)===normStr(S.empresa);});
+  var almacenes=[...new Set(ubics.map(function(u){return u.almacen;}))];
+  var almOpts=almacenes.map(function(a){return '<option value="'+a+'">'+a+'</option>';}).join('');
+
+  var origData=CFG.empresas[S.empresa]||CFG.empresas['INV'];
+
+  render(
+    '<div class="badge badge-perc">PERCHADO</div>'+
+    '<div class="saldo-panel">'+
+      '<div class="saldo-sku">'+sku+'</div>'+
+      (desc?'<div class="saldo-desc">'+desc+'</div>':'')+
+      '<div class="saldo-row"><span class="saldo-row-lbl">LPN</span><span class="saldo-row-val">'+lpn+'</span></div>'+
+      '<div class="saldo-row"><span class="saldo-row-lbl">Disponible</span><span class="saldo-disponible" id="lbl-saldo">'+saldoDisp+'</span></div>'+
+      warnHtml+
+    '</div>'+
+
+    '<div class="qty-wrap">'+
+      '<div class="qty-lbl">cantidad a perchar</div>'+
+      '<input class="qty-input" id="inp-qty" type="number" min="1" max="'+saldoDisp+'" placeholder="0" inputmode="numeric">'+
+    '</div>'+
+
+    '<div class="lbl">empresa</div>'+
+    '<div class="empresa-row" id="empresa-row">'+
+      Object.keys(CFG.empresas).map(function(k){
+        return '<div class="empresa-chip'+(k===S.empresa?' active':'')+'" onclick="setEmpresa(\''+k+'\')" id="chip-'+k+'">'+k+'</div>';
+      }).join('')+
+    '</div>'+
+
+    '<div class="dest-panel" id="dest-panel">'+
+      '<div class="dest-row"><span class="dest-lbl">Origen</span><span class="dest-val">'+origData.almacenOrigen+' / '+origData.ubicOrigen+'</span><span class="dest-auto">automático</span></div>'+
+    '</div>'+
+
+    '<div class="lbl">almacén destino</div>'+
+    '<select class="inp" id="sel-almacen" onchange="actualizarUbicaciones()">'+
+      '<option value="">— seleccionar —</option>'+almOpts+
+    '</select>'+
+    '<div class="lbl">ubicación destino</div>'+
+    '<select class="inp" id="sel-ubic"><option value="">— primero selecciona almacén —</option></select>'+
+
+    '<div class="lbl" style="margin-top:8px">observación (opcional)</div>'+
+    '<input class="inp" id="inp-obs" type="text" placeholder="...">'+
+
+    '<div class="btn-row" style="margin-top:14px">'+
+      '<button class="btn btn-sec" onclick="goBack()">← Atrás</button>'+
+      '<button class="btn btn-perc" onclick="confirmarMovimiento(\''+sku+'\','+saldoDisp+')">✓ Confirmar perchado</button>'+
+    '</div>'
+  );
+  setTimeout(function(){var el=$r('inp-qty');if(el)el.focus();},80);
+}
+
+function setEmpresa(emp){
+  S.empresa=emp;
+  Object.keys(CFG.empresas).forEach(function(k){
+    var c=$r('chip-'+k);
+    if(c) c.className='empresa-chip'+(k===emp?' active':'');
+  });
+  // Actualizar origen
+  var origData=CFG.empresas[emp]||CFG.empresas['INV'];
+  var dp=$r('dest-panel');
+  if(dp) dp.innerHTML='<div class="dest-row"><span class="dest-lbl">Origen</span><span class="dest-val">'+origData.almacenOrigen+' / '+origData.ubicOrigen+'</span><span class="dest-auto">automático</span></div>';
+  // Actualizar almacenes
+  var ubics=DB.ubicaciones.filter(function(u){return normStr(u.empresa)===normStr(emp);});
+  var almacenes=[...new Set(ubics.map(function(u){return u.almacen;}))];
+  var sel=$r('sel-almacen');
+  if(sel){
+    sel.innerHTML='<option value="">— seleccionar —</option>'+
+      almacenes.map(function(a){return '<option value="'+a+'">'+a+'</option>';}).join('');
+  }
+  var selU=$r('sel-ubic');
+  if(selU) selU.innerHTML='<option value="">— primero selecciona almacén —</option>';
+}
+
+function actualizarUbicaciones(){
+  var alm=($r('sel-almacen').value||'').trim();
+  var ubics=DB.ubicaciones.filter(function(u){
+    return normStr(u.empresa)===normStr(S.empresa)&&normStr(u.almacen)===normStr(alm);
+  });
+  var sel=$r('sel-ubic');
+  if(!sel) return;
+  sel.innerHTML='<option value="">— seleccionar ubicación —</option>'+
+    ubics.map(function(u){return '<option value="'+u.ubicacion+'">'+u.ubicacion+'</option>';}).join('');
+}
+
+function confirmarMovimiento(sku,saldoDisp){
+  var cant=parseInt($r('inp-qty').value||'0');
+  var alm=($r('sel-almacen').value||'').trim();
+  var ubic=($r('sel-ubic').value||'').trim();
+  var obs=($r('inp-obs').value||'').trim();
+
+  if(!cant||cant<=0){toast('Ingresa una cantidad válida');return;}
+  if(cant>saldoDisp){toast('Cantidad supera el disponible ('+saldoDisp+' un)');return;}
+  if(!alm){toast('Selecciona el almacén destino');return;}
+  if(!ubic){toast('Selecciona la ubicación destino');return;}
+
+  // Validación en tiempo real justo antes del POST
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Validando saldo en tiempo real...</div></div>');
+  Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
+    var saldos=calcularSaldos(res[0],res[1]);
+    var k=S.lpnActual+'|'+sku;
+    var saldoReal=saldos[k]?saldos[k].saldo:0;
+
+    if(cant>saldoReal){
+      toast('Saldo cambió. Disponible ahora: '+saldoReal+' un');
+      showFormMovimiento(S.lpnActual,sku,saldoReal);
+      return;
+    }
+
+    // Mostrar confirmación antes de escribir
+    showConfirmacionMovimiento(sku,cant,alm,ubic,obs,saldoReal);
+  });
+}
+
+/* ── Pantalla 5: Confirmación antes de guardar ───────────────── */
+function showConfirmacionMovimiento(sku,cant,alm,ubic,obs,saldoReal){
+  var origData=CFG.empresas[S.empresa]||CFG.empresas['INV'];
+  var t=ahora();
+  render(
+    '<div class="badge badge-perc">CONFIRMAR PERCHADO</div>'+
+    '<div class="resumen-box">'+
+      '<div class="resumen-titulo">Resumen del movimiento</div>'+
+      '<div class="resumen-row"><span class="resumen-lbl">Pedido</span><span class="resumen-val">'+S.pedido+'</span></div>'+
+      '<div class="resumen-row"><span class="resumen-lbl">LPN</span><span class="resumen-val">'+S.lpnActual+'</span></div>'+
+      '<div class="resumen-row"><span class="resumen-lbl">SKU</span><span class="resumen-val">'+sku+'</span></div>'+
+      '<div class="resumen-row"><span class="resumen-lbl">Origen</span><span class="resumen-val">'+origData.almacenOrigen+' / '+origData.ubicOrigen+'</span></div>'+
+      '<div class="resumen-row"><span class="resumen-lbl">Destino</span><span class="resumen-val">'+alm+' / '+ubic+'</span></div>'+
+      '<div class="resumen-row"><span class="resumen-lbl">Empresa</span><span class="resumen-val">'+S.empresa+'</span></div>'+
+      '<div class="resumen-row"><span class="resumen-lbl">Saldo disponible</span><span class="resumen-val">'+saldoReal+' un</span></div>'+
+      (obs?'<div class="resumen-row"><span class="resumen-lbl">Observación</span><span class="resumen-val">'+obs+'</span></div>':'')+
+      '<div class="resumen-row"><span class="resumen-lbl">PERCHAR</span><span class="resumen-val" style="color:var(--perc);font-size:22px">'+cant+' un</span></div>'+
+    '</div>'+
+    '<div class="btn-row">'+
+      '<button class="btn btn-sec" onclick="goBack()">← Atrás</button>'+
+      '<button class="btn btn-perc" onclick="ejecutarMovimiento(\''+sku+'\','+cant+',\''+alm+'\',\''+ubic+'\',\''+obs+'\')">✓ GUARDAR MOVIMIENTO</button>'+
+    '</div>'
+  );
+}
+
+function ejecutarMovimiento(sku,cant,alm,ubic,obs){
+  if(!DB.listIds.movimientos){toast('Lista movimientos no disponible');return;}
+  var origData=CFG.empresas[S.empresa]||CFG.empresas['INV'];
+  var t=ahora();
+  var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
+  var fields={
+    Title:         S.pedido+'-PERC-'+t.ts.replace(/[:.]/g,''),
+    Pedido:        S.pedido,
+    LPN:           S.lpnActual,
+    SKU:           sku,
+    Descripcion:   cb?cb.desc:'',
+    Cantidad:      cant,
+    TipoMovimiento:'PERCHADO',
+    AlmacenOrigen: origData.almacenOrigen,
+    UbicacionOrigen:origData.ubicOrigen,
+    AlmacenDestino: alm,
+    UbicacionDestino:ubic,
+    Empresa:       S.empresa,
+    Operador:      msalAcc?msalAcc.username||msalAcc.name:'',
+    FechaMovimiento:t.fecha,
+    Observacion:   obs,
+  };
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Guardando movimiento...</div></div>');
+  gPost(urlLista(DB.listIds.movimientos)+'/items',{fields:fields}).then(function(){
+    showResultadoMovimiento(sku,cant,S.lpnActual);
+  }).catch(function(e){
+    toast('Error: '+e.message.slice(0,60));
+    goBack();
+  });
+}
+
+/* ── Pantalla 6: Resultado y opciones post-movimiento ────────── */
+function showResultadoMovimiento(sku,cant,lpn){
+  S.historial=[showMenuPrincipal];actualizarBack();
+  render(
+    '<div style="text-align:center;padding:24px 0">'+
+      '<div style="font-size:48px;margin-bottom:12px">✓</div>'+
+      '<div style="font-size:18px;font-weight:700;color:var(--ok);margin-bottom:6px">Movimiento registrado</div>'+
+      '<div style="font-size:13px;color:var(--mut)">'+cant+' un de '+sku+' perchadas en almacén</div>'+
+    '</div>'+
+    '<div class="btn-row" style="flex-direction:column">'+
+      (S.subModo!=='lpn'?
+        '<button class="btn btn-perc" onclick="buscarSKU_mismoSKU(\''+sku+'\')">Perchar más '+sku+'</button>':'')+ 
+      '<button class="btn btn-sec" onclick="showPerchadoPorSKU()">Otro SKU</button>'+
+      (S.subModo==='lpn'?
+        '<button class="btn btn-perc" onclick="buscarLPN_mismoLPN(\''+lpn+'\')">Siguiente SKU en '+lpn+'</button>':'')+ 
+      '<button class="btn btn-sec" onclick="showMenuPrincipal()">⌂ Menú principal</button>'+
+    '</div>'
+  );
+}
+
+function buscarSKU_mismoSKU(sku){
+  $r('inp-sku')&&($r('inp-sku').value=sku);
+  showPerchadoPorSKU();
+  setTimeout(function(){
+    if($r('inp-sku')) $r('inp-sku').value=sku;
+    buscarSKU();
+  },100);
+}
+function buscarLPN_mismoLPN(lpn){
+  S.lpnActual=lpn;
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Actualizando saldos...</div></div>');
+  Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
+    var saldos=calcularSaldos(res[0],res[1]);
+    var skus=Object.keys(saldos).map(function(k){return saldos[k];})
+      .filter(function(s){return normStr(s.lpn)===normStr(lpn)&&s.saldo>0;})
+      .sort(function(a,b){return a.sku.localeCompare(b.sku);});
+    showListaSKUParaLPN(lpn,skus);
+  });
+}
+
+/* ── Pantalla Separación ─────────────────────────────────────── */
+function showSeparacion(){
+  pushScreen(showSeparacion);actualizarBack();
+  S.empresa='INV'; // Separación siempre INV
+
+  // Cargar tareas del pedido desde la hoja Separacion
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando tareas de separación...</div></div>');
+
+  Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
+    var saldos=calcularSaldos(res[0],res[1]);
+
+    // Consolidar tareas por Pedido+SKU+Destino
+    var reqs=DB.separacionPendiente.filter(function(r){return normStr(r.pedido)===normStr(S.pedido);});
+    var consolidado={};
+    reqs.forEach(function(r){
+      var k=normStr(r.sku)+'|'+(r.destino||'');
+      if(!consolidado[k]) consolidado[k]={sku:r.sku,destino:r.destino,cantidad:0};
+      consolidado[k].cantidad+=r.cantidad;
+    });
+    var tareas=Object.values(consolidado).sort(function(a,b){return a.sku.localeCompare(b.sku);});
+
+    // Calcular saldo total por SKU (suma todos los LPN)
+    var saldoXsku={};
+    Object.keys(saldos).forEach(function(k){
+      var s=saldos[k];
+      if(!saldoXsku[normStr(s.sku)]) saldoXsku[normStr(s.sku)]=0;
+      saldoXsku[normStr(s.sku)]+=s.saldo;
+    });
+
+    if(!tareas.length){
+      render(
+        '<div class="badge badge-sep">SEPARACIÓN — '+S.pedido+'</div>'+
+        '<div class="empty-state" style="margin-top:14px">'+
+          '<div class="empty-icon">✓</div>'+
+          'No hay tareas de separación pendientes para este pedido'+
+        '</div>'+
+        '<button class="btn btn-sec" style="margin-top:12px" onclick="showMenuPrincipal()">⌂ Menú principal</button>'
+      );
+      return;
+    }
+
+    var h='<div class="badge badge-sep">SEPARACIÓN — '+S.pedido+'</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin:6px 0 10px">'+tareas.length+' tareas de separación • Empresa INV • Origen automático</div>';
+
+    tareas.forEach(function(t,i){
+      var dispTotal=saldoXsku[normStr(t.sku)]||0;
+      var factible=dispTotal>=t.cantidad;
+      var colorFact=factible?'var(--ok)':'var(--dan)';
+      var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(t.destino);});
+      h+='<div style="background:var(--sur2);border:1px solid '+(factible?'var(--bor)':'var(--dan)')+';border-radius:8px;padding:12px 14px;margin-bottom:8px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'+
+          '<div><div style="font-size:14px;font-weight:700;color:var(--acc)">'+t.sku+'</div>'+
+          '<div style="font-size:11px;color:var(--mut)">Destino: '+t.destino+(destInfo?' → '+destInfo.almacen+'/'+destInfo.ubicacion:'')+'</div></div>'+
+          '<div style="text-align:right">'+
+            '<div style="font-size:18px;font-weight:700">'+t.cantidad+' un</div>'+
+            '<div style="font-size:10px;color:'+colorFact+'">Disp: '+dispTotal+' un</div>'+
+          '</div>'+
+        '</div>'+
+        (factible?
+          '<button class="btn btn-sep" style="font-size:13px;padding:9px" onclick="ejecutarSeparacion('+i+',\''+t.sku+'\','+t.cantidad+',\''+t.destino+'\','+dispTotal+')">✓ Ejecutar separación</button>':
+          '<div style="font-size:11px;color:var(--dan);padding:6px 0">⚠ Stock insuficiente — disponible: '+dispTotal+' un</div>'
+        )+
+      '</div>';
+    });
+    window._tareasActuales=tareas;
+    render(h);
+  });
+}
+
+function ejecutarSeparacion(idx,sku,cantReq,destino,saldoDisp){
+  var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(destino);});
+  if(!destInfo){toast('Destino no encontrado en catálogo');return;}
+
+  var origData=CFG.empresas['INV'];
+  var t=ahora();
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Procesando separación...</div></div>');
+
+  // Re-calcular saldos para FIFO
+  Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
+    var saldos=calcularSaldos(res[0],res[1]);
+
+    // FIFO: LPN ordenados por fecha de recepción (campo Created de SP), fallback alfanumérico
+    var lpnsDelSKU=Object.keys(saldos)
+      .map(function(k){return saldos[k];})
+      .filter(function(s){return normStr(s.sku)===normStr(sku)&&s.saldo>0;})
+      .sort(function(a,b){
+        if(a.created&&b.created) return new Date(a.created)-new Date(b.created);
+        return a.lpn.localeCompare(b.lpn);
+      });
+
+    var pendiente=cantReq;
+    var posts=[];
+
+    for(var i=0;i<lpnsDelSKU.length&&pendiente>0;i++){
+      var s=lpnsDelSKU[i];
+      var tomar=Math.min(pendiente,s.saldo);
+      var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
+      posts.push({fields:{
+        Title:          S.pedido+'-SEP-'+t.ts.replace(/[:.]/g,'')+'-'+i,
+        Pedido:         S.pedido,
+        LPN:            s.lpn,
+        SKU:            sku,
+        Descripcion:    cb?cb.desc:'',
+        Cantidad:       tomar,
+        TipoMovimiento: 'SEPARACION',
+        AlmacenOrigen:  origData.almacenOrigen,
+        UbicacionOrigen:origData.ubicOrigen,
+        AlmacenDestino: destInfo.almacen,
+        UbicacionDestino:destInfo.ubicacion,
+        DestinoSeparacion:destino,
+        Empresa:        'INV',
+        Operador:       msalAcc?msalAcc.username||msalAcc.name:'',
+        FechaMovimiento:t.fecha,
+        Observacion:    '',
+      }});
+      pendiente-=tomar;
+    }
+
+    if(pendiente>0){
+      toast('Stock insuficiente al validar. Disponible: '+(cantReq-pendiente)+' un');
+      showSeparacion();
+      return;
+    }
+
+    // Ejecutar todos los posts secuencialmente
+    var chain=Promise.resolve();
+    posts.forEach(function(p){
+      chain=chain.then(function(){
+        return gPost(urlLista(DB.listIds.movimientos)+'/items',p);
+      });
+    });
+    chain.then(function(){
+      var lineas=posts.map(function(p){
+        return '• LPN '+p.fields.LPN+': '+p.fields.Cantidad+' un';
+      }).join('\n');
+      render(
+        '<div style="text-align:center;padding:24px 0">'+
+          '<div style="font-size:48px;margin-bottom:12px">✓</div>'+
+          '<div style="font-size:18px;font-weight:700;color:var(--sep);margin-bottom:8px">Separación ejecutada</div>'+
+          '<div style="font-size:13px;color:var(--txt);margin-bottom:4px">'+cantReq+' un de '+sku+' → '+destino+'</div>'+
+          '<div style="font-size:11px;color:var(--mut);white-space:pre-line">'+lineas+'</div>'+
+        '</div>'+
+        '<div class="btn-row" style="flex-direction:column">'+
+          '<button class="btn btn-sep" onclick="showSeparacion()">← Volver a tareas</button>'+
+          '<button class="btn btn-sec" onclick="showMenuPrincipal()">⌂ Menú principal</button>'+
+        '</div>'
+      );
+    }).catch(function(e){toast('Error: '+e.message.slice(0,60));showSeparacion();});
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ARRANQUE — MSAL
+   ══════════════════════════════════════════════════════════════ */
+window._loginRedirect=function(){
+  if(msalInst) msalInst.loginRedirect({scopes:SCOPES});
+};
+
+var s=document.createElement('script');
+s.src='https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
+s.onload=function(){
+  var cfg={
+    auth:{clientId:CFG.clientId,authority:'https://login.microsoftonline.com/'+CFG.tenantId,
+      redirectUri:location.href.split('?')[0].split('#')[0],navigateToLoginRequestUrl:false},
+    cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true},
+  };
+  msalInst=new msal.PublicClientApplication(cfg);
+  msalInst.handleRedirectPromise().then(function(res){
+    if(res&&res.account){msalAcc=res.account;boot();}
+    else{var acc=msalInst.getAllAccounts();if(acc.length>0){msalAcc=acc[0];boot();}else{loginPage();}}
+  }).catch(function(e){console.error('[MSAL]',e.message);loginPage();});
+};
+document.head.appendChild(s);
+
+function loginPage(){
+  render('<div style="text-align:center;padding:48px 16px">'+
+    '<div style="font-size:32px;margin-bottom:16px">📦</div>'+
+    '<div style="font-size:16px;font-weight:700;color:var(--perc);margin-bottom:6px">RF Perchado</div>'+
+    '<div style="font-size:12px;color:var(--mut);margin-bottom:24px">Inverneg · Centro de Distribución Nacional</div>'+
+    '<button class="btn btn-perc" style="max-width:220px;margin:0 auto" onclick="window._loginRedirect()">🔐 Iniciar sesión</button>'+
+  '</div>');
+}
+
+function boot(){
+  $r('ftr-user').textContent=msalAcc.username||msalAcc.name||'—';
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando catálogos...</div></div>');
+  cargarCatalogos().then(function(){
+    setStatus('LIVE',true);
+    // Obtener lista de pedidos de LRecepciones (pedidos únicos)
+    if(DB.listIds.recepciones){
+      gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=2000')
+        .then(function(d){
+          var ps=[...new Set((d.value||[]).map(function(i){return(i.fields||{}).Pedido||'';}).filter(Boolean))].sort();
+          DB.pedidos=ps;
+          showMenuPrincipal();
+        }).catch(function(){showMenuPrincipal();});
+    } else {
+      showMenuPrincipal();
+    }
+  }).catch(function(e){
+    console.error('[BOOT]',e.message);
+    setStatus('ERROR',false);
+    showMenuPrincipal();
+  });
+}
+
+
+// Devuelve el Tipo de una ubicación destino (PERCHADO, IMPO, DANA, OBSE, PEND)
+// Si no se encuentra, devuelve 'PERCHADO' como fallback
+function tipoUbicacion(almacen, ubicacion){
+  var u=DB.ubicaciones.find(function(u){
+    return normStr(u.almacen)===normStr(almacen)&&normStr(u.ubicacion)===normStr(ubicacion);
+  });
+  return u&&u.tipo?u.tipo.toString().trim().toUpperCase():'PERCHADO';
+}
+
+// Categoriza un movimiento en las 5 categorías del resumen
+function categorizarMovimiento(mov){
+  if(normStr(mov.TipoMovimiento||'')===normStr('SEPARACION')) return 'SEP';
+  return tipoUbicacion(mov.AlmacenDestino||'', mov.UbicacionDestino||'');
+}
+
+
+// ── Calcular resumen de perchado para un pedido ───────────────────
+function calcularResumenPerchado(recepciones, movimientos){
+  // Recibido OK (correcciones participan, dañados excluidos)
+  var recibidoOK=0;
+  recepciones.forEach(function(r){
+    if(normStr(r.Estado||'')!=='DAÑADO') recibidoOK+=Number(r.Cantidad)||0;
+  });
+
+  // Categorías del resumen
+  var cats={PERCHADO:0,IMPO:0,DANA:0,OBSE:0,PEND:0,SEP:0};
+
+  // Detalle por destino: {almacen+'/'+ubicacion → {almacen,ubicacion,tipo,cantidad}}
+  var detalle={};
+
+  movimientos.forEach(function(m){
+    var cant=Number(m.Cantidad)||0;
+    var cat=categorizarMovimiento(m);
+    if(cats.hasOwnProperty(cat)) cats[cat]+=cant;
+    else cats['PERCHADO']+=cant; // fallback
+
+    // Acumular detalle por destino
+    var alm=m.AlmacenDestino||'';
+    var ubic=m.UbicacionDestino||'';
+    var key=normStr(alm)+'|'+normStr(ubic);
+    if(!detalle[key]) detalle[key]={almacen:alm,ubicacion:ubic,tipo:cat,cantidad:0};
+    detalle[key].cantidad+=cant;
+  });
+
+  var totalMovido=cats.PERCHADO+cats.IMPO+cats.DANA+cats.OBSE+cats.PEND+cats.SEP;
+  var saldo=recibidoOK-totalMovido;
+  var pct=recibidoOK>0?Math.round(totalMovido/recibidoOK*100):0;
+
+  return{
+    recibidoOK:recibidoOK,
+    perchado:cats.PERCHADO,
+    impo:cats.IMPO,
+    dana:cats.DANA,
+    obse:cats.OBSE,
+    pend:cats.PEND,
+    sep:cats.SEP,
+    totalMovido:totalMovido,
+    saldo:saldo,
+    pct:pct,
+    finalizado:saldo<=0,
+    detalle:Object.values(detalle).sort(function(a,b){return b.cantidad-a.cantidad;}),
+  };
+}
+
+
+// ── Pantalla: Resumen de Perchado ────────────────────────────────
+function showResumenPerchado(){
+  pushScreen(showResumenPerchado);actualizarBack();
+
+  var pedido=S.pedido;
+  if(!pedido){
+    // Si no hay pedido activo, pedir selección
+    render(
+      '<div class="badge badge-perc">RESUMEN DE PERCHADO</div>'+
+      '<div class="lbl">pedido</div>'+
+      '<select class="inp" id="sel-ped-res" style="font-size:15px">'+
+        '<option value="">— seleccionar pedido —</option>'+
+        DB.pedidos.map(function(p){return '<option value="'+p+'">'+p+'</option>';}).join('')+
+      '</select>'+
+      '<button class="btn btn-perc" onclick="selPedidoResumen()">Ver resumen</button>'
+    );
+    return;
+  }
+  _cargarResumen(pedido);
+}
+
+function selPedidoResumen(){
+  var p=($r('sel-ped-res')||{}).value||'';
+  if(!p){toast('Selecciona un pedido');return;}
+  S.pedido=p;
+  _cargarResumen(p);
+}
+
+function _cargarResumen(pedido){
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Calculando resumen...</div></div>');
+  Promise.all([cargarRecepcionesPedido(pedido),cargarMovimientosPedido(pedido)]).then(function(res){
+    var r=calcularResumenPerchado(res[0],res[1]);
+    _renderResumen(pedido,r);
+  });
+}
+
+function _renderResumen(pedido,r){
+  var fin=r.finalizado;
+  var estadoColor=fin?'var(--ok)':'var(--warn)';
+  var estadoTxt=fin?'✅ Finalizado':'⏳ En proceso';
+
+  // ── Nivel 1: Resumen general ─────────────────────────────────
+  function fila(lbl,val,color,pct){
+    var bar=pct!==undefined?
+      '<div style="height:3px;background:var(--bor);border-radius:2px;margin-top:3px">'+
+        '<div style="height:100%;width:'+Math.min(pct,100)+'%;background:'+(color||'var(--acc)')+';border-radius:2px"></div>'+
+      '</div>':'';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">'+
+      '<span style="font-size:12px;color:var(--mut)">'+lbl+'</span>'+
+      '<span style="font-size:14px;font-weight:700;color:'+(color||'var(--txt)')+'">'+val.toLocaleString()+' un</span>'+
+    '</div>'+bar;
+  }
+
+  var h=
+    '<div class="badge badge-perc">RESUMEN DE PERCHADO</div>'+
+    '<div class="badge badge-pedido" style="margin-left:6px">'+pedido+'</div>'+
+
+    // Estado y avance
+    '<div style="background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:12px 14px;margin:10px 0;display:flex;justify-content:space-between;align-items:center">'+
+      '<div>'+
+        '<div style="font-size:11px;color:var(--mut)">Estado del perchado</div>'+
+        '<div style="font-size:16px;font-weight:700;color:'+estadoColor+';margin-top:2px">'+estadoTxt+'</div>'+
+      '</div>'+
+      '<div style="text-align:right">'+
+        '<div style="font-size:28px;font-weight:700;color:'+estadoColor+'">'+r.pct+'%</div>'+
+        '<div style="font-size:10px;color:var(--mut)">avance</div>'+
+      '</div>'+
+    '</div>'+
+
+    // Barra de progreso grande
+    '<div style="height:8px;background:var(--sur2);border-radius:4px;margin-bottom:14px;overflow:hidden">'+
+      '<div style="height:100%;width:'+Math.min(r.pct,100)+'%;background:'+(fin?'var(--ok)':'var(--perc)')+';border-radius:4px;transition:width .5s"></div>'+
+    '</div>'+
+
+    // Tabla resumen nivel 1
+    '<div class="saldo-panel">'+
+      fila('Recibido OK',r.recibidoOK,'var(--txt)')+
+      '<div style="height:6px"></div>'+
+      (r.perchado>0?fila('Perchado (normal)',r.perchado,'var(--ok)',r.recibidoOK?Math.round(r.perchado/r.recibidoOK*100):0):'') +
+      (r.impo>0?fila('Importación',r.impo,'var(--acc)',r.recibidoOK?Math.round(r.impo/r.recibidoOK*100):0):'') +
+      (r.sep>0?fila('Separación',r.sep,'var(--sep)',r.recibidoOK?Math.round(r.sep/r.recibidoOK*100):0):'') +
+      (r.dana>0?fila('Dañados',r.dana,'var(--dan)',r.recibidoOK?Math.round(r.dana/r.recibidoOK*100):0):'') +
+      (r.obse>0?fila('Observación',r.obse,'var(--warn)',r.recibidoOK?Math.round(r.obse/r.recibidoOK*100):0):'') +
+      (r.pend>0?fila('Pendiente',r.pend,'var(--warn)',r.recibidoOK?Math.round(r.pend/r.recibidoOK*100):0):'') +
+      '<div style="height:6px"></div>'+
+      '<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;font-weight:700">'+
+        '<span style="color:var(--mut)">Total movido</span>'+
+        '<span>'+r.totalMovido.toLocaleString()+' un</span>'+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:15px;font-weight:700;border-top:2px solid var(--bor)">'+
+        '<span style="color:var(--mut)">Saldo pendiente</span>'+
+        '<span style="color:'+(fin?'var(--ok)':'var(--dan)')+'">'+r.saldo.toLocaleString()+' un</span>'+
+      '</div>'+
+    '</div>'+
+
+    // ── Nivel 2: Detalle por destino ──────────────────────────
+    (r.detalle.length>0?
+      '<div style="margin-top:14px">'+
+        '<div style="font-size:11px;color:var(--mut);letter-spacing:.04em;margin-bottom:8px">DETALLE POR DESTINO</div>'+
+        r.detalle.map(function(d){
+          var tipoCols={'PERCHADO':'var(--ok)','IMPO':'var(--acc)','SEP':'var(--sep)','DANA':'var(--dan)','OBSE':'var(--warn)','PEND':'var(--warn)'};
+          var color=tipoCols[d.tipo]||'var(--txt)';
+          var pctD=r.recibidoOK>0?Math.round(d.cantidad/r.recibidoOK*100):0;
+          return '<div style="background:var(--sur2);border:1px solid var(--bor);border-left:3px solid '+color+';border-radius:8px;padding:10px 14px;margin-bottom:6px">'+
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+              '<div>'+
+                '<div style="font-size:13px;font-weight:700">'+d.almacen+'</div>'+
+                '<div style="font-size:11px;color:var(--mut)">'+d.ubicacion+'</div>'+
+                '<div style="font-size:10px;color:'+color+';margin-top:2px">'+d.tipo+'</div>'+
+              '</div>'+
+              '<div style="text-align:right">'+
+                '<div style="font-size:18px;font-weight:700">'+d.cantidad.toLocaleString()+'</div>'+
+                '<div style="font-size:10px;color:var(--mut)">'+pctD+'% del total</div>'+
+              '</div>'+
+            '</div>'+
+            '<div style="height:3px;background:var(--bor);border-radius:2px;margin-top:8px">'+
+              '<div style="height:100%;width:'+Math.min(pctD,100)+'%;background:'+color+';border-radius:2px"></div>'+
+            '</div>'+
+          '</div>';
+        }).join('')+
+      '</div>'
+    :'<div class="empty-state"><div class="empty-icon">📊</div>Sin movimientos registrados aún</div>')+
+
+    '<button class="btn btn-sec" style="margin-top:10px" onclick="showMenuPrincipal()">⌂ Menú principal</button>';
+
+  render(h);
+}
+
+// Exports para HTML onclick
+window.goBack=goBack;
+window.seleccionarModo=seleccionarModo;
+window.showSubModoPerchado=showSubModoPerchado;
+window.showPerchadoPorSKU=showPerchadoPorSKU;
+window.showPerchadoPorLPN=showPerchadoPorLPN;
+window.buscarSKU=buscarSKU;
+window.buscarLPN=buscarLPN;
+window.setEmpresa=setEmpresa;
+window.actualizarUbicaciones=actualizarUbicaciones;
+window.confirmarMovimiento=confirmarMovimiento;
+window.ejecutarMovimiento=ejecutarMovimiento;
+window.showResultadoMovimiento=showResultadoMovimiento;
+window.buscarSKU_mismoSKU=buscarSKU_mismoSKU;
+window.buscarLPN_mismoLPN=buscarLPN_mismoLPN;
+window.showSeparacion=showSeparacion;
+window.ejecutarSeparacion=ejecutarSeparacion;
+window.showMenuPrincipal=showMenuPrincipal;
+window.showResumenPerchado=showResumenPerchado;
+window.selPedidoResumen=selPedidoResumen;
+window.selResumenPedido=selResumenPedido;
+window.tipoUbicacion=tipoUbicacion;
+window.categorizarMovimiento=categorizarMovimiento;
+window.showFormMovimiento=showFormMovimiento;
+window.showConfirmacionMovimiento=showConfirmacionMovimiento;
+
+})();
+</script>
+</body>
+</html>
