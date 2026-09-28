@@ -200,6 +200,18 @@ body{
   font-size:11px;color:var(--mut);display:flex;justify-content:space-between;
 }
 .ftr-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block;margin-right:4px}
+
+/* Chips de selección de operador */
+.op-grid{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.op-chip{background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:14px 16px;cursor:pointer;font-size:15px;font-weight:600;display:flex;align-items:center;gap:10px;transition:border-color .15s,background .15s}
+.op-chip:hover,.op-chip:active{border-color:var(--perc);background:#1d1e30}
+.op-avatar{width:32px;height:32px;border-radius:50%;background:var(--perc);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;flex-shrink:0}
+.op-banner{background:rgba(167,139,250,.1);border-bottom:1px solid rgba(167,139,250,.2);padding:5px 16px;font-size:11px;color:var(--perc);font-weight:600;display:flex;align-items:center;gap:6px}
+.mov-row{display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--bor);font-size:12px}
+.mov-hora{width:44px;color:var(--mut);flex-shrink:0;font-size:11px}
+.mov-sku{flex:1;font-weight:700;color:var(--acc)}
+.mov-cant{width:60px;text-align:right;font-weight:700}
+.mov-dest{width:90px;text-align:right;font-size:10px;color:var(--mut)}
 </style>
 </head>
 <body>
@@ -214,6 +226,9 @@ body{
   <div onclick="showMenuPrincipal()" style="cursor:pointer;font-size:13px;color:var(--mut);padding:4px 8px;border:1px solid var(--bor);border-radius:6px">🏠 Inicio</div>
 </div>
 
+<div id="op-banner" style="display:none" class="op-banner">
+  <span>👤</span><span id="op-banner-txt">—</span>
+</div>
 <div id="screen">
   <div class="loading">
     <div class="loading-icon">⏳</div>
@@ -254,6 +269,7 @@ var msalInst,msalAcc;
 /* ── Estado de sesión ────────────────────────────────────────── */
 var S={
   pedido:'',
+  operador:'',       // operador seleccionado en pantalla de selección
   modo:'',           // PERCHADO | SEPARACION
   subModo:'',        // por-sku | por-lpn
   empresa:'INV',
@@ -269,6 +285,7 @@ var S={
 /* ── DB catálogos ────────────────────────────────────────────── */
 var DB={
   pedidos:[],
+  operadores:[],           // hoja Operadores del Excel perchado
   ubicaciones:[],          // hoja Ubicaciones del Excel perchado
   destinosSep:[],          // hoja DestinosSeparacion
   separacionPendiente:[],  // hoja Separacion (solicitudes analistas)
@@ -421,6 +438,18 @@ function parsearDestinos(d){
     return{destino:r[idx(h,['destino'])]||'',almacen:r[idx(h,['almacen'])]||'',ubicacion:r[idx(h,['ubicacion'])]||''};
   });
 }
+function parsearOperadores(d){
+  if(!d||!d.values||d.values.length<2){DB.operadores=[];return;}
+  // Hoja con una columna: Operadores
+  var hdr=d.values[0].map(function(v){return(v||'').toString().trim().toLowerCase();});
+  var iOp=idx(hdr,['operadores','operador','nombre','name']);
+  if(iOp<0) iOp=0; // fallback primera columna
+  DB.operadores=d.values.slice(1)
+    .map(function(r){return(r[iOp]||'').toString().trim();})
+    .filter(function(v){return v.length>0;})
+    .sort();
+  console.log('[OPS] Operadores cargados:',DB.operadores.length,'→',DB.operadores.join(', '));
+}
 function parsearSeparacion(d){
   DB.separacionPendiente=parsearHoja(d.values,function(h,r){
     return{pedido:r[idx(h,['pedido'])]||'',sku:r[idx(h,['sku'])]||'',cantidad:Number(r[idx(h,['cantidad'])])||0,fecha:r[idx(h,['fecha'])]||'',destino:r[idx(h,['destino'])]||''};
@@ -449,6 +478,7 @@ function cargarCatalogos(){
         gGet(urlWB(f.driveId,f.itemId,'Ubicaciones')).then(parsearUbicaciones).catch(function(){}),
         gGet(urlWB(f.driveId,f.itemId,'DestinosSeparacion')).then(parsearDestinos).catch(function(){}),
         gGet(urlWB(f.driveId,f.itemId,'Separacion')).then(parsearSeparacion).catch(function(){}),
+        gGet(urlWB(f.driveId,f.itemId,'Operadores')).then(parsearOperadores).catch(function(){}),
       ]);
     }),
     descubrirExcel(CFG.recepcionNombre).then(function(f){
@@ -1204,7 +1234,7 @@ function ejecutarMovimiento(sku,cant,alm,ubic,obs){
     UbicacionOrigen:origData.ubicOrigen,
     AlmacenDestino: alm,
     UbicacionDestino:ubic,
-    Operador:       msalAcc?msalAcc.username||msalAcc.name:'',
+    Operador:       S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'',
     FechaMovimiento:t.fecha,
     Observacion:    obs,
   };
@@ -1371,7 +1401,7 @@ function ejecutarSeparacion(idx,sku,cantReq,destino,saldoDisp){
         UbicacionDestino:destInfo.ubicacion,
         DestinoSeparacion:destino,
         // Empresa no existe en SP
-        Operador:       msalAcc?msalAcc.username||msalAcc.name:'',
+        Operador:       S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'',
         FechaMovimiento:t.fecha,
         Observacion:    '',
       }});
@@ -1454,10 +1484,10 @@ function boot(){
         .then(function(d){
           var ps=[...new Set((d.value||[]).map(function(i){return(i.fields||{}).Pedido||'';}).filter(Boolean))].sort();
           DB.pedidos=ps;
-          showMenuPrincipal();
-        }).catch(function(){showMenuPrincipal();});
+          showSeleccionOperador();
+        }).catch(function(){showSeleccionOperador();});
     } else {
-      showMenuPrincipal();
+      showSeleccionOperador();
     }
   }).catch(function(e){
     console.error('[BOOT]',e.message);
@@ -1660,6 +1690,96 @@ function _renderResumen(pedido,r){
   render(h);
 }
 
+
+// ── Pantalla: Vista Operativa del Pedido ─────────────────────────
+function showVistaOperativa(){
+  pushScreen('vista-op',showVistaOperativa);actualizarBack();
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando movimientos...</div></div>');
+  Promise.all([
+    cargarRecepcionesPedido(S.pedido),
+    cargarMovimientosPedido(S.pedido),
+  ]).then(function(res){
+    var movs=res[1].sort(function(a,b){
+      return (a.FechaMovimiento||'').localeCompare(b.FechaMovimiento||'');
+    });
+    var resumen=calcularResumenPerchado(res[0],res[1]);
+
+    var h='<div class="badge badge-perc">VISTA OPERATIVA</div>'+
+      '<div class="badge badge-pedido" style="margin-left:6px">'+S.pedido+'</div>';
+
+    // Minibarra de progreso
+    var col=resumen.finalizado?'var(--ok)':'var(--perc)';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 4px">'+
+      '<span style="font-size:11px;color:var(--mut)">Avance del pedido</span>'+
+      '<span style="font-size:14px;font-weight:700;color:'+col+'">'+resumen.pct+'%</span>'+
+    '</div>'+
+    '<div style="height:5px;background:var(--sur2);border-radius:3px;margin-bottom:12px">'+
+      '<div style="height:100%;width:'+Math.min(resumen.pct,100)+'%;background:'+col+';border-radius:3px"></div>'+
+    '</div>';
+
+    // Tabla de movimientos
+    h+='<div class="card-title" style="font-size:11px;color:var(--mut);letter-spacing:.05em;margin-bottom:6px">MOVIMIENTOS REGISTRADOS</div>';
+    if(!movs.length){
+      h+='<div class="empty-state"><div class="empty-icon">📋</div>Sin movimientos aún</div>';
+    } else {
+      h+='<div style="display:flex;gap:0;padding:4px 0;border-bottom:2px solid var(--bor);font-size:10px;color:var(--mut);font-weight:700">'+
+        '<span style="width:44px">HORA</span>'+
+        '<span style="flex:1">SKU</span>'+
+        '<span style="width:60px;text-align:right">CANT</span>'+
+        '<span style="width:90px;text-align:right">DESTINO</span>'+
+      '</div>';
+      // Mostrar hasta los últimos 50 movimientos, más recientes abajo
+      movs.slice(-50).forEach(function(m){
+        var hora=(m.FechaMovimiento||'').slice(11,16)||'—';
+        var tipoCols={'PERCHADO':'var(--ok)','SEPARACION':'var(--sep)','DANA':'var(--dan)','OBSE':'var(--warn)','PEND':'var(--warn)'};
+        var tipo=categorizarMovimiento(m);
+        var color=tipoCols[tipo]||'var(--txt)';
+        h+='<div class="mov-row">'+
+          '<span class="mov-hora">'+hora+'</span>'+
+          '<span class="mov-sku" style="color:'+color+'">'+
+            (m.SKU||'—')+
+            '<div style="font-size:9px;color:var(--mut);font-weight:400">'+m.TipoMovimiento+'</div>'+
+          '</span>'+
+          '<span class="mov-cant">'+Number(m.Cantidad||0).toLocaleString()+'</span>'+
+          '<span class="mov-dest">'+(m.AlmacenDestino||'—')+'</span>'+
+        '</div>';
+      });
+      if(movs.length>50){
+        h+='<div style="font-size:10px;color:var(--mut);padding:6px 0;text-align:center">... +'+(movs.length-50)+' movimientos anteriores</div>';
+      }
+    }
+
+    // Totales
+    h+='<div style="background:var(--sur);border:1px solid var(--bor);border-radius:8px;padding:12px 14px;margin-top:12px">'+
+      '<div style="font-size:11px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:8px">TOTALES DEL PEDIDO</div>';
+    function filaT(lbl,val,color){
+      if(!val) return '';
+      return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bor);font-size:12px">'+
+        '<span style="color:var(--mut)">'+lbl+'</span>'+
+        '<span style="font-weight:700;color:'+(color||'var(--txt)')+'">'+val.toLocaleString()+' un</span>'+
+      '</div>';
+    }
+    h+=filaT('Recibido OK',resumen.recibidoOK);
+    h+=filaT('Perchado',resumen.perchado,'var(--ok)');
+    if(resumen.impo) h+=filaT('Importación',resumen.impo,'var(--acc)');
+    h+=filaT('Separación',resumen.sep,'var(--sep)');
+    h+=filaT('Dañados',resumen.dana,'var(--dan)');
+    h+=filaT('Observación',resumen.obse,'var(--warn)');
+    if(resumen.pend) h+=filaT('Pendiente',resumen.pend,'var(--warn)');
+    h+='<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;font-weight:700;border-top:2px solid var(--bor);margin-top:4px">'+
+      '<span style="color:var(--mut)">Saldo pendiente</span>'+
+      '<span style="color:'+(resumen.finalizado?'var(--ok)':'var(--dan)')+'">'+
+        resumen.saldo.toLocaleString()+' un '+
+        (resumen.finalizado?'✅':'⏳')+
+      '</span>'+
+    '</div>';
+    h+='</div>';
+
+    h+='<button class="btn btn-sec" style="margin-top:10px" onclick="goBack()">← Volver</button>';
+    render(h);
+  });
+}
+
 // Exports para HTML onclick
 window.goBack=goBack;
 window.seleccionarModo=seleccionarModo;
@@ -1674,6 +1794,9 @@ window.buscarLPN_mismoLPN=buscarLPN_mismoLPN;
 window.showSeparacion=showSeparacion;
 window.ejecutarSeparacion=ejecutarSeparacion;
 window.showMenuPrincipal=showMenuPrincipal;
+window.showSeleccionOperador=showSeleccionOperador;
+window.showVistaOperativa=showVistaOperativa;
+window.selVistaOperativa=selVistaOperativa;
 window.showResumenPerchado=showResumenPerchado;
 window.selPedidoResumen=selPedidoResumen;
 window.selPedidoBuscador=selPedidoBuscador;
