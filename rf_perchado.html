@@ -802,38 +802,47 @@ function buscarLPN(){
 
 function showListaSKUParaLPN(lpn,skus){
   pushScreen('lista-sku-lpn',function(){showListaSKUParaLPN(lpn,skus);});actualizarBack();
+  console.log('[LPN] Pedido='+S.pedido+' LPN="'+lpn+'" SKUs con saldo>0:'+skus.length);
+  if(skus.length>0){
+    console.log('[LPN] Primer SKU:',JSON.stringify({sku:skus[0].sku,saldo:skus[0].saldo}));
+    console.log('[LPN] Todos los SKUs:',skus.map(function(s){return s.sku+'('+s.saldo+')';}).join(', '));
+  }
+
   var h='<div class="badge badge-perc">LPN: '+lpn+'</div>'+
     '<div class="lbl" style="margin-top:10px">SKUs disponibles en este pallet</div>';
 
   if(!skus.length){
     h+='<div class="empty-state"><div class="empty-icon">✓</div>Todos los SKUs de este pallet ya fueron perchados</div>';
-  } else {
-    // Tarjetas SKU via DOM — sin serializar strings en onclick
-    render(h+'<div id="lista-skus-lpn"></div>');
-    var cont2=document.getElementById('lista-skus-lpn');
-    if(!cont2) return;
-    skus.forEach(function(s){
-      var warnPD=sepPendienteSKU(S.pedido,s.sku);
-      var warnTotal=warnPD?Object.values(warnPD).reduce(function(a,v){return a+v;},0):0;
-      var card=document.createElement('div');
-      card.className='item-card';
-      card.innerHTML=
-        '<div style="flex:1">'+
-          '<div class="item-main">'+s.sku+'</div>'+
-          (s.desc?'<div class="item-sub">'+s.desc+'</div>':'')+
-          (warnTotal>0?'<div style="font-size:10px;color:var(--sep-warn);margin-top:2px">⚠ Sep. pendiente: '+warnTotal+' un</div>':'')+
-        '</div>'+
-        '<div class="item-qty">'+
-          '<div class="item-qty-num">'+s.saldo+'</div>'+
-          '<div class="item-qty-lbl">disponibles</div>'+
-        '</div>';
-      card.addEventListener('click',(function(lp,sk,sa){
-        return function(){ showFormMovimiento(lp,sk,sa); };
-      })(lpn,s.sku,s.saldo));
-      cont2.appendChild(card);
-    });
+    render(h);   // ← render solo en el caso vacío
+    return;
   }
-  render(h);
+
+  // Caso con SKUs: render del shell, luego poblar via DOM
+  render(h+'<div id="lista-skus-lpn"></div>');
+  var cont=document.getElementById('lista-skus-lpn');
+  if(!cont){ console.error('[LPN] contenedor lista-skus-lpn no encontrado'); return; }
+
+  skus.forEach(function(s){
+    var warnPD=sepPendienteSKU(S.pedido,s.sku);
+    var warnTotal=warnPD?Object.values(warnPD).reduce(function(a,v){return a+v;},0):0;
+    var card=document.createElement('div');
+    card.className='item-card';
+    card.innerHTML=
+      '<div style="flex:1">'+
+        '<div class="item-main">'+s.sku+'</div>'+
+        (s.desc?'<div class="item-sub">'+s.desc+'</div>':'')+
+        (warnTotal>0?'<div style="font-size:10px;color:var(--sep-warn);margin-top:2px">⚠ Sep. pendiente: '+warnTotal+' un</div>':'')+
+      '</div>'+
+      '<div class="item-qty">'+
+        '<div class="item-qty-num">'+s.saldo+'</div>'+
+        '<div class="item-qty-lbl">disponibles</div>'+
+      '</div>';
+    card.addEventListener('click',(function(lp,sk,sa){
+      return function(){ showFormMovimiento(lp,sk,sa); };
+    })(lpn,s.sku,s.saldo));
+    cont.appendChild(card);
+  });
+  // ← NO hay render(h) aquí — eso borraba las tarjetas recién creadas
 }
 
 /* ── Pantalla 4: Formulario de movimiento (Perchado) ─────────── */
