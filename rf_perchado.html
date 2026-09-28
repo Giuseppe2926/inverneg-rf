@@ -301,17 +301,24 @@ function setStatus(s,ok){
 }
 
 /* ── Breadcrumb ──────────────────────────────────────────────── */
-function pushScreen(fn){S.historial.push(fn);}
+function pushScreen(id,fn){
+  var pos=-1;
+  for(var i=0;i<S.historial.length;i++){if(S.historial[i].id===id){pos=i;break;}}
+  if(pos>=0) S.historial=S.historial.slice(0,pos);
+  S.historial.push({id:id,fn:fn});
+  actualizarBack();
+}
 function goBack(){
+  if(S.historial.length<=1){showMenuPrincipal();return;}
   S.historial.pop();
   var prev=S.historial[S.historial.length-1];
-  if(prev) prev();
+  if(prev&&prev.fn) prev.fn();
   else showMenuPrincipal();
   actualizarBack();
 }
 function actualizarBack(){
   var btn=$r('btn-atras');
-  if(btn) btn.style.display=S.historial.length>1?'flex':'none';
+  if(btn) btn.style.display=S.historial.length>1?'block':'none';
 }
 
 /* ── GRAPH helpers ───────────────────────────────────────────── */
@@ -373,9 +380,41 @@ function idx(hdr,names){
   for(var i=0;i<names.length;i++){var j=hdr.indexOf(names[i]);if(j>=0)return j;}return -1;
 }
 function parsearUbicaciones(d){
+  if(!d||!d.values||d.values.length<2){
+    console.warn('[UBIC-PARSE] Hoja vacía o sin datos');
+    DB.ubicaciones=[];return;
+  }
+  // Log encabezados raw para detectar nombres de columna
+  var hdrRaw=d.values[0];
+  console.log('[UBIC-PARSE] Encabezados raw:',hdrRaw.map(function(v,i){return i+'="'+v+'"'}).join(' | '));
+  var hdr=hdrRaw.map(function(v){return(v||'').toString().trim().toLowerCase();});
+  var iEmp=idx(hdr,['empresa']);
+  var iAlm=idx(hdr,['almacen','almacén']);
+  var iUbic=idx(hdr,['ubicacion','ubicación']);
+  var iTipo=idx(hdr,['tipo']);
+  console.log('[UBIC-PARSE] Índices → empresa:'+iEmp+' almacen:'+iAlm+' ubicacion:'+iUbic+' tipo:'+iTipo);
+  // Log primer registro raw para ver valores reales
+  if(d.values.length>1){
+    var r1=d.values[1];
+    console.log('[UBIC-PARSE] Primer registro raw:',r1.map(function(v,i){return i+'="'+v+'"'}).join(' | '));
+    console.log('[UBIC-PARSE] Primer registro parseado:',
+      '{Empresa:"'+r1[iEmp]+'"|normEmpresa:"'+normStr(r1[iEmp]||'')+'"|Almacen:"'+r1[iAlm]+'"|Ubicacion:"'+r1[iUbic]+'"|Tipo:"'+r1[iTipo]+'"}');
+  }
   DB.ubicaciones=parsearHoja(d.values,function(h,r){
-    return{empresa:r[idx(h,['empresa'])]||'',almacen:r[idx(h,['almacen'])]||'',ubicacion:r[idx(h,['ubicacion'])]||'',tipo:r[idx(h,['tipo'])]||''};
+    var emp=(r[iEmp]||'').toString().trim();
+    var alm=(r[iAlm]||'').toString().trim();
+    var ubic=(r[iUbic]||'').toString().trim();
+    var tipo=(r[iTipo]||'').toString().trim();
+    return{empresa:emp,almacen:alm,ubicacion:ubic,tipo:tipo};
   });
+  // Log resumen por empresa
+  var porEmp={};
+  DB.ubicaciones.forEach(function(u){
+    var k='"'+u.empresa+'"(norm:"'+normStr(u.empresa)+'")';
+    porEmp[k]=(porEmp[k]||0)+1;
+  });
+  console.log('[UBIC-PARSE] Registros por empresa:',JSON.stringify(porEmp));
+  console.log('[UBIC-PARSE] Total cargadas:',DB.ubicaciones.length);
 }
 function parsearDestinos(d){
   DB.destinosSep=parsearHoja(d.values,function(h,r){
@@ -504,7 +543,7 @@ function renderSepWarn(pedido,sku){
 
 /* ── Pantalla 1: Menú principal ──────────────────────────────── */
 function showMenuPrincipal(){
-  S.historial=[showMenuPrincipal];
+  S.historial=[{id:'menu',fn:showMenuPrincipal}];
   window._pedidoActualMenu='';
   actualizarBack();
   render(
@@ -600,7 +639,7 @@ function seleccionarModo(modo){
 
 /* ── Pantalla 2a: Sub-modo de Perchado ───────────────────────── */
 function showSubModoPerchado(){
-  pushScreen(showSubModoPerchado);actualizarBack();
+  pushScreen('submodo',showSubModoPerchado);actualizarBack();
   render(
     '<div class="badge badge-pedido">'+S.pedido+'</div>'+
     '<div class="badge badge-perc" style="margin-left:6px">PERCHADO</div>'+
@@ -625,7 +664,7 @@ function showSubModoPerchado(){
 
 /* ── Pantalla 3a: Perchar por SKU ────────────────────────────── */
 function showPerchadoPorSKU(){
-  pushScreen(showPerchadoPorSKU);actualizarBack();
+  pushScreen('por-sku',showPerchadoPorSKU);actualizarBack();
   render(
     '<div class="badge badge-perc">PERCHAR POR SKU</div>'+
     '<div class="badge badge-pedido" style="margin-left:6px">'+S.pedido+'</div>'+
@@ -660,7 +699,7 @@ function buscarSKU(){
 }
 
 function showListaLPNParaSKU(sku,lpns){
-  pushScreen(function(){showListaLPNParaSKU(sku,lpns);});actualizarBack();
+  pushScreen('lista-lpn-sku',function(){showListaLPNParaSKU(sku,lpns);});actualizarBack();
   var total=lpns.reduce(function(a,s){return a+s.saldo;},0);
   var warnHtml=renderSepWarn(S.pedido,sku);
   var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
@@ -712,7 +751,7 @@ function showListaLPNParaSKU(sku,lpns){
 
 /* ── Pantalla 3b: Perchar por LPN ────────────────────────────── */
 function showPerchadoPorLPN(){
-  pushScreen(showPerchadoPorLPN);actualizarBack();
+  pushScreen('por-lpn',showPerchadoPorLPN);actualizarBack();
   render(
     '<div class="badge badge-perc">PERCHAR POR LPN</div>'+
     '<div class="badge badge-pedido" style="margin-left:6px">'+S.pedido+'</div>'+
@@ -724,7 +763,7 @@ function showPerchadoPorLPN(){
 }
 
 function buscarLPN(){
-  var lpn=($r('inp-lpn').value||'').trim().toUpperCase();
+  var lpn=($r('inp-lpn').value||'').trim();
   if(!lpn){toast('Ingresa un LPN');return;}
   S.lpnActual=lpn;
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando SKUs del pallet...</div></div>');
@@ -733,17 +772,36 @@ function buscarLPN(){
     cargarMovimientosPedido(S.pedido),
   ]).then(function(res){
     var saldos=calcularSaldos(res[0],res[1]);
+    // Log para diagnóstico: ver todos los LPN disponibles en el pedido
+    var lpnsEnPedido=[...new Set(Object.keys(saldos).map(function(k){return saldos[k].lpn;}))];
+    console.log('[LPN-BUSQ] Buscando LPN="'+lpn+'" norm="'+normStr(lpn)+'"');
+    console.log('[LPN-BUSQ] LPNs en pedido ('+lpnsEnPedido.length+'):',
+      lpnsEnPedido.map(function(l){return '"'+l+'"(norm:"'+normStr(l)+'")';}).join(' | '));
+
     var skus=Object.keys(saldos)
       .map(function(k){return saldos[k];})
-      .filter(function(s){return normStr(s.lpn)===normStr(lpn)&&s.saldo>0;})
+      .filter(function(s){
+        var match=normStr(s.lpn)===normStr(lpn);
+        return match&&s.saldo>0;
+      })
       .sort(function(a,b){return a.sku.localeCompare(b.sku);});
+
+    console.log('[LPN-BUSQ] SKUs encontrados con saldo>0:',skus.length);
+    if(skus.length>0){
+      console.log('[LPN-BUSQ] Primer SKU:',JSON.stringify({sku:skus[0].sku,saldo:skus[0].saldo,lpn:skus[0].lpn}));
+    } else {
+      // Mostrar todos los saldos del pedido para ver qué hay
+      var todos=Object.keys(saldos).map(function(k){return saldos[k];});
+      console.log('[LPN-BUSQ] Saldos del pedido (primeros 5):',
+        todos.slice(0,5).map(function(s){return 'LPN="'+s.lpn+'" SKU='+s.sku+' saldo='+s.saldo;}).join(' | '));
+    }
     window._saldosCache=saldos;
     showListaSKUParaLPN(lpn,skus);
   });
 }
 
 function showListaSKUParaLPN(lpn,skus){
-  pushScreen(function(){showListaSKUParaLPN(lpn,skus);});actualizarBack();
+  pushScreen('lista-sku-lpn',function(){showListaSKUParaLPN(lpn,skus);});actualizarBack();
   var h='<div class="badge badge-perc">LPN: '+lpn+'</div>'+
     '<div class="lbl" style="margin-top:10px">SKUs disponibles en este pallet</div>';
 
@@ -780,7 +838,7 @@ function showListaSKUParaLPN(lpn,skus){
 
 /* ── Pantalla 4: Formulario de movimiento (Perchado) ─────────── */
 function showFormMovimiento(lpn,sku,saldoDisp){
-  pushScreen(function(){showFormMovimiento(lpn,sku,saldoDisp);});actualizarBack();
+  pushScreen('form-movimiento',function(){showFormMovimiento(lpn,sku,saldoDisp);});actualizarBack();
   S.lpnActual=lpn;
   var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
   var desc=cb?cb.desc:'';
@@ -1110,7 +1168,7 @@ function ejecutarMovimiento(sku,cant,alm,ubic,obs){
 
 /* ── Pantalla 6: Resultado y opciones post-movimiento ────────── */
 function showResultadoMovimiento(sku,cant,lpn){
-  S.historial=[showMenuPrincipal];actualizarBack();
+  S.historial=[{id:'menu',fn:showMenuPrincipal}];actualizarBack();
   render(
     '<div style="text-align:center;padding:24px 0">'+
       '<div style="font-size:48px;margin-bottom:12px">✓</div>'+
@@ -1150,7 +1208,7 @@ function buscarLPN_mismoLPN(lpn){
 
 /* ── Pantalla Separación ─────────────────────────────────────── */
 function showSeparacion(){
-  pushScreen(showSeparacion);actualizarBack();
+  pushScreen('separacion',showSeparacion);actualizarBack();
   S.empresa='INV'; // Separación siempre INV
 
   // Cargar tareas del pedido desde la hoja Separacion
@@ -1422,7 +1480,7 @@ function calcularResumenPerchado(recepciones, movimientos){
 
 // ── Pantalla: Resumen de Perchado ────────────────────────────────
 function showResumenPerchado(){
-  pushScreen(showResumenPerchado);actualizarBack();
+  pushScreen('resumen',showResumenPerchado);actualizarBack();
 
   var pedido=S.pedido;
   if(!pedido){
