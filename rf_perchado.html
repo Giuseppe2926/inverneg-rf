@@ -478,29 +478,65 @@ function cargarMovimientosPedido(pedido){
 }
 
 /* ── Cálculo de saldo ────────────────────────────────────────── */
-function calcularSaldos(recepciones,movimientos){
-  // Retorna Map de "LPN|SKU" → {lpn,sku,desc,recibido,movido,saldo,fechaCreated}
+function calcularSaldos(recepciones,movimientos,logSKU){
+  // Retorna Map de "LPN|SKU" → {lpn,sku,desc,recibido,movido,saldo,created}
+  // logSKU: si se pasa, loguea detalle para ese SKU específico
   var mapa={};
 
-  // Sumar recibido OK (correcciones sí participan como negativos, dañado excluido)
+  // Normalizar LPN a string siempre — evita que número 1 ≠ string "1"
+  function normLPN(v){ return v!==null&&v!==undefined&&v!==''?String(v).trim():'(sin LPN)'; }
+
+  // Sumar recibido OK (correcciones participan como negativos, dañado excluido)
   recepciones.forEach(function(r){
     if(normStr(r.Estado||'')==='DAÑADO') return;
-    var k=(r.LPN||'(sin LPN)')+'|'+(r.CodProducto||'');
-    if(!mapa[k]) mapa[k]={lpn:r.LPN||'(sin LPN)',sku:r.CodProducto||'',desc:r.Nombre||'',recibido:0,movido:0,saldo:0,created:r.Created||''};
+    var lpn=normLPN(r.LPN);
+    var sku=(r.CodProducto||'').toString().trim();
+    var k=lpn+'|'+sku;
+    if(!mapa[k]) mapa[k]={lpn:lpn,sku:sku,desc:r.Nombre||'',recibido:0,movido:0,saldo:0,created:r.Created||''};
     mapa[k].recibido+=Number(r.Cantidad)||0;
   });
 
+  // Log recepciones agrupadas para el SKU de diagnóstico
+  if(logSKU){
+    var recSKU=Object.keys(mapa).filter(function(k){return normStr(mapa[k].sku)===normStr(logSKU);});
+    console.log('[SKU-SALDO] === Recepciones por LPN para SKU='+logSKU+' ===');
+    recSKU.forEach(function(k){
+      console.log('[SKU-SALDO] LPN="'+mapa[k].lpn+'" recibido='+mapa[k].recibido);
+    });
+  }
+
   // Restar movimientos ejecutados (Perchado + Separación)
   movimientos.forEach(function(m){
-    var k=(m.LPN||'(sin LPN)')+'|'+(m.SKU||'');
-    if(!mapa[k]) return; // movimiento sin recepción correspondiente — ignorar
+    var lpn=normLPN(m.LPN);
+    var sku=(m.SKU||'').toString().trim();
+    var k=lpn+'|'+sku;
+    if(logSKU&&normStr(sku)===normStr(logSKU)){
+      console.log('[SKU-SALDO] Movimiento: LPN="'+lpn+'" tipo='+m.TipoMovimiento+' cant='+m.Cantidad+
+        ' clave_existe='+(!!mapa[k]));
+    }
+    if(!mapa[k]){
+      if(logSKU&&normStr(sku)===normStr(logSKU))
+        console.warn('[SKU-SALDO] DESCUENTO PERDIDO — clave "'+k+'" no existe en mapa de recepciones');
+      return;
+    }
     mapa[k].movido+=Number(m.Cantidad)||0;
   });
 
-  // Calcular saldo
+  // Calcular saldo y log final
   Object.keys(mapa).forEach(function(k){
     mapa[k].saldo=mapa[k].recibido-mapa[k].movido;
   });
+
+  if(logSKU){
+    var resSKU=Object.keys(mapa).filter(function(k){return normStr(mapa[k].sku)===normStr(logSKU);});
+    console.log('[SKU-SALDO] === Saldo final por LPN para SKU='+logSKU+' ===');
+    resSKU.forEach(function(k){
+      var e=mapa[k];
+      console.log('[SKU-SALDO] LPN="'+e.lpn+'" recibido='+e.recibido+' movido='+e.movido+' saldo='+e.saldo);
+    });
+    var totalSaldo=resSKU.reduce(function(a,k){return a+mapa[k].saldo;},0);
+    console.log('[SKU-SALDO] Total saldo '+logSKU+':',totalSaldo);
+  }
 
   return mapa;
 }
@@ -686,7 +722,7 @@ function buscarSKU(){
     cargarRecepcionesPedido(S.pedido),
     cargarMovimientosPedido(S.pedido),
   ]).then(function(res){
-    var saldos=calcularSaldos(res[0],res[1]);
+    var saldos=calcularSaldos(res[0],res[1],sku); // logSKU activo
     // Filtrar por SKU con saldo > 0, ordenar por LPN alfanumérico
     var lpns=Object.keys(saldos)
       .map(function(k){return saldos[k];})
@@ -771,7 +807,13 @@ function buscarLPN(){
     cargarRecepcionesPedido(S.pedido),
     cargarMovimientosPedido(S.pedido),
   ]).then(function(res){
-    var saldos=calcularSaldos(res[0],res[1]);
+    // Para loguear: detectar qué SKU tiene movimientos en este LPN
+    var saldosPrev=calcularSaldos(res[0],[]);// solo recepciones para ver qué hay
+    var skuDelLPN=Object.keys(saldosPrev).filter(function(k){
+      return normStr(saldosPrev[k].lpn)===normStr(lpn);
+    }).map(function(k){return saldosPrev[k].sku;});
+    var logSKULPN=skuDelLPN[0]||null; // loguear el primer SKU del LPN
+    var saldos=calcularSaldos(res[0],res[1],logSKULPN);
     // Log para diagnóstico: ver todos los LPN disponibles en el pedido
     var lpnsEnPedido=[...new Set(Object.keys(saldos).map(function(k){return saldos[k].lpn;}))];
     console.log('[LPN-BUSQ] Buscando LPN="'+lpn+'" norm="'+normStr(lpn)+'"');
