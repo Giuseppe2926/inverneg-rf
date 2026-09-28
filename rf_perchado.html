@@ -1140,28 +1140,31 @@ function ejecutarMovimiento(sku,cant,alm,ubic,obs){
   var origData=CFG.empresas[S.empresa]||CFG.empresas['INV'];
   var t=ahora();
   var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
+  // NOTA: campo Empresa NO incluido — no existe en RF_PRecepciones_LMovimientos
   var fields={
-    Title:         S.pedido+'-PERC-'+t.ts.replace(/[:.]/g,''),
-    Pedido:        S.pedido,
-    LPN:           S.lpnActual,
-    SKU:           sku,
-    Descripcion:   cb?cb.desc:'',
-    Cantidad:      cant,
-    TipoMovimiento:'PERCHADO',
-    AlmacenOrigen: origData.almacenOrigen,
+    Title:          S.pedido+'-PERC-'+t.ts.replace(/[:.]/g,''),
+    Pedido:         S.pedido,
+    LPN:            S.lpnActual,
+    SKU:            sku,
+    Descripcion:    cb?cb.desc:'',
+    Cantidad:       cant,
+    TipoMovimiento: 'PERCHADO',
+    AlmacenOrigen:  origData.almacenOrigen,
     UbicacionOrigen:origData.ubicOrigen,
     AlmacenDestino: alm,
     UbicacionDestino:ubic,
-    Empresa:       S.empresa,
-    Operador:      msalAcc?msalAcc.username||msalAcc.name:'',
+    Operador:       msalAcc?msalAcc.username||msalAcc.name:'',
     FechaMovimiento:t.fecha,
-    Observacion:   obs,
+    Observacion:    obs,
   };
+  console.log('[POST-MOV] Body enviado a SP:',JSON.stringify(fields,null,2));
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Guardando movimiento...</div></div>');
   gPost(urlLista(DB.listIds.movimientos)+'/items',{fields:fields}).then(function(){
+    console.log('[POST-MOV] Movimiento guardado OK');
     showResultadoMovimiento(sku,cant,S.lpnActual);
   }).catch(function(e){
-    toast('Error: '+e.message.slice(0,60));
+    console.error('[POST-MOV] Error completo:',e.message);
+    toast('Error al guardar: '+e.message.slice(0,80));
     goBack();
   });
 }
@@ -1316,7 +1319,7 @@ function ejecutarSeparacion(idx,sku,cantReq,destino,saldoDisp){
         AlmacenDestino: destInfo.almacen,
         UbicacionDestino:destInfo.ubicacion,
         DestinoSeparacion:destino,
-        Empresa:        'INV',
+        // Empresa no existe en SP
         Operador:       msalAcc?msalAcc.username||msalAcc.name:'',
         FechaMovimiento:t.fecha,
         Observacion:    '',
