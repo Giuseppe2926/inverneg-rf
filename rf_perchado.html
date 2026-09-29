@@ -1059,6 +1059,7 @@ function showListaSKUParaLPN(lpn,skus){
 function showFormMovimiento(lpn,sku,saldoDisp){
   pushScreen('form-movimiento',function(){showFormMovimiento(lpn,sku,saldoDisp);});actualizarBack();
   S.lpnActual=lpn;
+  window._almSeleccionado=''; window._ubicSeleccionada=''; // resetear por cada apertura
   var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
   var desc=cb?cb.desc:'';
   var warnHtml=renderSepWarn(S.pedido,sku);
@@ -1193,9 +1194,9 @@ function _initBuscadorAlmacen(sku,saldoDisp){
 
   _initBuscadorDrop('inp-alm-dest','drop-alm','badge-alm',almacenes,onAlmSelect);
 
-  // Precargar almacén por defecto solo cuando el campo está vacío
+  // Precargar almacén por defecto siempre (se resetea al abrir el formulario)
   var defAlm=CFG.almacenDestDefault||'';
-  if(defAlm&&!window._almSeleccionado){
+  if(defAlm){
     var inpAlm=document.getElementById('inp-alm-dest');
     var badgeAlm=document.getElementById('badge-alm');
     var existe=almacenes.find(function(a){return normStr(a)===normStr(defAlm);});
