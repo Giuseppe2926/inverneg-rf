@@ -754,24 +754,31 @@ function showMenuPrincipal(){
     '<div style="margin-top:16px">'+
       '<div class="mode-card perc" onclick="seleccionarModo(\'PERCHADO\')">'+
         '<div class="mode-icon">📦</div>'+
-        '<div>'+
-          '<div class="mode-title">Perchado</div>'+
-          '<div class="mode-sub">Mover mercadería a ubicación de almacén</div>'+
-        '</div>'+
+        '<div><div class="mode-title">Perchado</div>'+
+        '<div class="mode-sub">Mover mercadería a ubicación de almacén</div></div>'+
       '</div>'+
       '<div class="mode-card sep" onclick="seleccionarModo(\'SEPARACION\')">'+
         '<div class="mode-icon">✂</div>'+
-        '<div>'+
-          '<div class="mode-title">Separación</div>'+
-          '<div class="mode-sub">Ejecutar tareas de separación del pedido</div>'+
-        '</div>'+
+        '<div><div class="mode-title">Separación</div>'+
+        '<div class="mode-sub">Ejecutar tareas de separación del pedido</div></div>'+
+      '</div>'+
+      '<div class="mode-card" style="border-left:3px solid var(--warn)" onclick="selVistaOperativa()">'+
+        '<div class="mode-icon">👁</div>'+
+        '<div><div class="mode-title">Visualización</div>'+
+        '<div class="mode-sub">Historial y resumen de movimientos del pedido</div></div>'+
+      '</div>'+
+      '<div class="mode-card" style="border-left:3px solid var(--acc)" onclick="selPedidoResumen()">'+
+        '<div class="mode-icon">📊</div>'+
+        '<div><div class="mode-title">Resumen de Perchado</div>'+
+        '<div class="mode-sub">Ver estado y destinos del pedido</div></div>'+
       '</div>'+
     '</div>'
   );
-  // Inicializar buscador de pedidos via DOM — sin strings en eventos
+  // Inicializar buscador de pedidos via DOM
   setTimeout(function(){
     var inp=document.getElementById('inp-busca-pedido');
     var drop=document.getElementById('drop-pedidos');
+    var badge=document.getElementById('badge-pedido-sel');
     if(!inp||!drop) return;
 
     function filtrar(){
@@ -781,14 +788,14 @@ function showMenuPrincipal(){
       if(!matches.length||!q){drop.style.display='none';return;}
       matches.forEach(function(p){
         var item=document.createElement('div');
-        item.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);font-size:14px;font-weight:600';
+        item.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);font-size:14px;font-weight:600;color:var(--txt)';
         item.textContent=p;
+        item.addEventListener('mouseover',function(){this.style.background='var(--bor)';});
+        item.addEventListener('mouseout',function(){this.style.background='';});
         item.addEventListener('mousedown',function(e){
           e.preventDefault();
           selPedidoBuscador(p);
         });
-        item.addEventListener('mouseover',function(){this.style.background='var(--bor)';});
-        item.addEventListener('mouseout',function(){this.style.background='';});
         drop.appendChild(item);
       });
       drop.style.display='block';
