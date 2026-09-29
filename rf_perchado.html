@@ -540,12 +540,45 @@ function cargarRecepcionesPedido(pedido){
     }).catch(function(){return[];});
 }
 function cargarMovimientosPedido(pedido){
-  if(!DB.listIds.movimientos) return Promise.resolve([]);
-  return gGet(urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=2000')
-    .then(function(d){
-      return(d.value||[]).map(function(i){return i.fields||{};})
-        .filter(function(f){return normStr(f.Pedido||'')===normStr(pedido);});
-    }).catch(function(){return[];});
+  if(!DB.listIds.movimientos){
+    console.warn('[VISTA-OP] listIds.movimientos no disponible');
+    return Promise.resolve([]);
+  }
+  var url=urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=2000';
+  return gGet(url).then(function(d){
+    var total=(d.value||[]).length;
+    // Log todos los pedidos en la lista para detectar diferencias de formato
+    var pedidosEnSP=[...new Set((d.value||[]).map(function(i){
+      return(i.fields||{}).Pedido||'(vacío)';
+    }))];
+    console.log('[VISTA-OP] Total ítems LMovimientos:'+total+' | Pedidos:',pedidosEnSP.join(' | '));
+    console.log('[VISTA-OP] Buscando pedido="'+pedido+'" norm="'+normStr(pedido)+'"');
+    if(total>0){
+      var f0=d.value[0].fields||{};
+      console.log('[VISTA-OP] Ítem[0]: Pedido="'+f0.Pedido+'" SKU="'+f0.SKU+
+        '" Cant='+f0.Cantidad+' Fecha="'+f0.FechaMovimiento+'"');
+    }
+    var filtrados=(d.value||[])
+      .filter(function(i){
+        var p=(i.fields||{}).Pedido||'';
+        return normStr(p)===normStr(pedido);
+      })
+      .map(function(i){
+        var f=i.fields||{};
+        // Preservar timestamp real del ítem para ordenar
+        f.Created=f.Created||i.createdDateTime||i.Created||f.FechaMovimiento||'';
+        return f;
+      });
+    console.log('[VISTA-OP] Movimientos para "'+pedido+'":',filtrados.length);
+    if(filtrados.length>0)
+      console.log('[VISTA-OP] Primero:',JSON.stringify({SKU:filtrados[0].SKU,
+        Cant:filtrados[0].Cantidad,Dest:filtrados[0].AlmacenDestino,
+        Fecha:filtrados[0].FechaMovimiento}));
+    return filtrados;
+  }).catch(function(e){
+    console.error('[VISTA-OP] Error:',e.message);
+    return[];
+  });
 }
 
 /* ── Cálculo de saldo ────────────────────────────────────────── */
