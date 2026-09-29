@@ -453,8 +453,21 @@ function parsearOperadores(d){
 }
 function parsearSeparacion(d){
   DB.separacionPendiente=parsearHoja(d.values,function(h,r){
-    return{pedido:r[idx(h,['pedido'])]||'',sku:r[idx(h,['sku'])]||'',cantidad:Number(r[idx(h,['cantidad'])])||0,fecha:r[idx(h,['fecha'])]||'',destino:r[idx(h,['destino'])]||''};
+    var skuRaw=r[idx(h,['sku'])];
+    return{
+      pedido:(r[idx(h,['pedido'])]||'').toString().trim(),
+      sku:skuRaw!==null&&skuRaw!==undefined?skuRaw.toString().trim():'',  // forzar string
+      cantidad:Number(r[idx(h,['cantidad'])])||0,
+      fecha:(r[idx(h,['fecha'])]||'').toString().trim(),
+      destino:(r[idx(h,['destino'])]||'').toString().trim(),
+    };
   });
+  if(DB.separacionPendiente.length>0){
+    var p0=DB.separacionPendiente[0];
+    console.log('[SEP] Primer registro leído:',JSON.stringify(p0));
+    console.log('[SEP] Tipo de dato sku:',typeof p0.sku,'valor:',p0.sku);
+  }
+  console.log('[SEP] Total registros Separacion:',DB.separacionPendiente.length);
 }
 function parsearCBarra(d){
   if(!d||!d.values||d.values.length<2) return;
@@ -1468,10 +1481,15 @@ function showSeparacion(){
     var consolidado={};
     reqs.forEach(function(r){
       var k=normStr(r.sku)+'|'+(r.destino||'');
-      if(!consolidado[k]) consolidado[k]={sku:r.sku,destino:r.destino,cantidad:0};
+      if(!consolidado[k]) consolidado[k]={sku:String(r.sku),destino:r.destino,cantidad:0};
       consolidado[k].cantidad+=r.cantidad;
     });
-    var tareas=Object.values(consolidado).sort(function(a,b){return a.sku.localeCompare(b.sku);});
+    var tareas=Object.values(consolidado).sort(function(a,b){
+      // Comparación segura: ambos a string para evitar error si viene como número
+      return String(a.sku).localeCompare(String(b.sku));
+    });
+    console.log('[SEP] Total registros consolidados:',tareas.length);
+    if(tareas.length>0) console.log('[SEP] Primer registro consolidado:',JSON.stringify(tareas[0]));
 
     // Calcular saldo total por SKU (suma todos los LPN)
     var saldoXsku={};
