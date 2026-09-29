@@ -1468,30 +1468,14 @@ function buscarLPN_mismoLPN(lpn){
 /* ── Pantalla Separación ─────────────────────────────────────── */
 function showSeparacion(){
   pushScreen('separacion',showSeparacion);actualizarBack();
-  S.empresa='INV'; // Separación siempre INV
+  S.empresa='INV';
 
-  // Cargar tareas del pedido desde la hoja Separacion
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando tareas de separación...</div></div>');
 
   Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
     var saldos=calcularSaldos(res[0],res[1]);
 
-    // Consolidar tareas por Pedido+SKU+Destino
-    var reqs=DB.separacionPendiente.filter(function(r){return normStr(r.pedido)===normStr(S.pedido);});
-    var consolidado={};
-    reqs.forEach(function(r){
-      var k=normStr(r.sku)+'|'+(r.destino||'');
-      if(!consolidado[k]) consolidado[k]={sku:String(r.sku),destino:r.destino,cantidad:0};
-      consolidado[k].cantidad+=r.cantidad;
-    });
-    var tareas=Object.values(consolidado).sort(function(a,b){
-      // Comparación segura: ambos a string para evitar error si viene como número
-      return String(a.sku).localeCompare(String(b.sku));
-    });
-    console.log('[SEP] Total registros consolidados:',tareas.length);
-    if(tareas.length>0) console.log('[SEP] Primer registro consolidado:',JSON.stringify(tareas[0]));
-
-    // Calcular saldo total por SKU (suma todos los LPN)
+    // Saldo total por SKU (todos los LPN)
     var saldoXsku={};
     Object.keys(saldos).forEach(function(k){
       var s=saldos[k];
@@ -1499,43 +1483,222 @@ function showSeparacion(){
       saldoXsku[normStr(s.sku)]+=s.saldo;
     });
 
-    if(!tareas.length){
+    // Consolidar por Destino+SKU — solo registros del pedido activo con cantidad > 0
+    var reqs=DB.separacionPendiente.filter(function(r){
+      return normStr(r.pedido)===normStr(S.pedido)&&r.cantidad>0;
+    });
+    var porDestSku={};
+    reqs.forEach(function(r){
+      var dest=(r.destino||'Sin destino').toString().trim();
+      var sku=String(r.sku).trim();
+      if(!porDestSku[dest]) porDestSku[dest]={};
+      if(!porDestSku[dest][sku]) porDestSku[dest][sku]=0;
+      porDestSku[dest][sku]+=Number(r.cantidad)||0;
+    });
+
+    // Filtrar SKU con cantidad <= 0 y destinos vacíos
+    Object.keys(porDestSku).forEach(function(dest){
+      Object.keys(porDestSku[dest]).forEach(function(sku){
+        if(porDestSku[dest][sku]<=0) delete porDestSku[dest][sku];
+      });
+      if(!Object.keys(porDestSku[dest]).length) delete porDestSku[dest];
+    });
+
+    var destinos=Object.keys(porDestSku).sort();
+    console.log('[SEP] Destinos con tareas:',destinos.join(', '));
+
+    window._sepData={porDestSku:porDestSku,saldoXsku:saldoXsku};
+
+    if(!destinos.length){
       render(
         '<div class="badge badge-sep">SEPARACIÓN — '+S.pedido+'</div>'+
         '<div class="empty-state" style="margin-top:14px">'+
-          '<div class="empty-icon">✓</div>'+
-          'No hay tareas de separación pendientes para este pedido'+
+          '<div class="empty-icon">✓</div>No hay tareas de separación pendientes para este pedido'+
         '</div>'+
         '<button class="btn btn-sec" style="margin-top:12px" onclick="showMenuPrincipal()">⌂ Menú principal</button>'
       );
       return;
     }
+    _renderDestinosSep(destinos,porDestSku,saldoXsku);
+  });
+}
 
-    var h='<div class="badge badge-sep">SEPARACIÓN — '+S.pedido+'</div>'+
-      '<div style="font-size:11px;color:var(--mut);margin:6px 0 10px">'+tareas.length+' tareas de separación • Empresa INV • Origen automático</div>';
+function _renderDestinosSep(destinos,porDestSku,saldoXsku){
+  var totalSkus=destinos.reduce(function(a,d){return a+Object.keys(porDestSku[d]).length;},0);
+  render(
+    '<div class="badge badge-sep">SEPARACIÓN — '+S.pedido+'</div>'+
+    '<div style="font-size:11px;color:var(--mut);margin:6px 0 10px">'+
+      destinos.length+' destinos · '+totalSkus+' SKUs · Empresa INV · Origen automático'+
+    '</div>'+
+    '<div class="lbl" style="margin-bottom:6px">selecciona el destino</div>'+
+    '<div id="dest-sep-grid"></div>'
+  );
 
-    tareas.forEach(function(t,i){
-      var dispTotal=saldoXsku[normStr(t.sku)]||0;
-      var factible=dispTotal>=t.cantidad;
-      var colorFact=factible?'var(--ok)':'var(--dan)';
-      var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(t.destino);});
-      h+='<div style="background:var(--sur2);border:1px solid '+(factible?'var(--bor)':'var(--dan)')+';border-radius:8px;padding:12px 14px;margin-bottom:8px">'+
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'+
-          '<div><div style="font-size:14px;font-weight:700;color:var(--acc)">'+t.sku+'</div>'+
-          '<div style="font-size:11px;color:var(--mut)">Destino: '+t.destino+(destInfo?' → '+destInfo.almacen+'/'+destInfo.ubicacion:'')+'</div></div>'+
-          '<div style="text-align:right">'+
-            '<div style="font-size:18px;font-weight:700">'+t.cantidad+' un</div>'+
-            '<div style="font-size:10px;color:'+colorFact+'">Disp: '+dispTotal+' un</div>'+
-          '</div>'+
-        '</div>'+
-        (factible?
-          '<button class="btn btn-sep" style="font-size:13px;padding:9px" onclick="ejecutarSeparacion('+i+',\''+t.sku+'\','+t.cantidad+',\''+t.destino+'\','+dispTotal+')">✓ Ejecutar separación</button>':
-          '<div style="font-size:11px;color:var(--dan);padding:6px 0">⚠ Stock insuficiente — disponible: '+dispTotal+' un</div>'
-        )+
-      '</div>';
+  var grid=document.getElementById('dest-sep-grid');
+  if(!grid) return;
+
+  destinos.forEach(function(dest){
+    var skus=Object.keys(porDestSku[dest]);
+    var totalCant=skus.reduce(function(a,sku){return a+porDestSku[dest][sku];},0);
+    // Verificar si todos los SKU son factibles
+    var algunoInsuf=skus.some(function(sku){
+      return (saldoXsku[normStr(sku)]||0)<porDestSku[dest][sku];
     });
-    window._tareasActuales=tareas;
-    render(h);
+    var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(dest);});
+
+    var card=document.createElement('div');
+    card.className='mode-card';
+    card.style.cssText='border-left:3px solid '+(algunoInsuf?'var(--dan)':'var(--sep)');
+    card.innerHTML=
+      '<div class="mode-icon">📍</div>'+
+      '<div style="flex:1">'+
+        '<div class="mode-title">'+dest+'</div>'+
+        '<div class="mode-sub">'+
+          skus.length+' SKU'+
+          (destInfo?' · '+destInfo.almacen+'/'+destInfo.ubicacion:'')+
+        '</div>'+
+      '</div>'+
+      '<div style="text-align:right;flex-shrink:0">'+
+        '<div style="font-size:16px;font-weight:700">'+totalCant+' un</div>'+
+        (algunoInsuf?'<div style="font-size:9px;color:var(--dan)">⚠ stock insuf.</div>':'')+
+      '</div>';
+    card.addEventListener('click',(function(d){
+      return function(){ _renderSKUsPorDestino(d,porDestSku[d],saldoXsku); };
+    })(dest));
+    grid.appendChild(card);
+  });
+}
+
+function _renderSKUsPorDestino(dest,skuMap,saldoXsku){
+  pushScreen('sep-destino-'+dest,function(){_renderSKUsPorDestino(dest,skuMap,saldoXsku);});
+  actualizarBack();
+
+  var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(dest);});
+  var skus=Object.keys(skuMap).filter(function(s){return skuMap[s]>0;}).sort(function(a,b){
+    return String(a).localeCompare(String(b));
+  });
+
+  render(
+    '<div class="badge badge-sep">'+dest+'</div>'+
+    '<div class="badge badge-pedido" style="margin-left:6px">'+S.pedido+'</div>'+
+    (destInfo?'<div style="font-size:11px;color:var(--mut);margin:6px 0 8px">→ '+destInfo.almacen+' / '+destInfo.ubicacion+'</div>':'')+
+    '<div class="lbl" style="margin-bottom:6px">SKUs a separar para este destino</div>'+
+    '<div id="skus-sep-grid"></div>'
+  );
+
+  var grid=document.getElementById('skus-sep-grid');
+  if(!grid) return;
+
+  skus.forEach(function(sku){
+    var cant=skuMap[sku];
+    var disp=saldoXsku[normStr(sku)]||0;
+    var factible=disp>=cant;
+
+    var card=document.createElement('div');
+    card.style.cssText='background:var(--sur2);border:1px solid '+(factible?'var(--bor)':'var(--dan)')+
+      ';border-radius:8px;padding:12px 14px;margin-bottom:8px';
+    card.innerHTML=
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
+        '<div>'+
+          '<div style="font-size:14px;font-weight:700;color:var(--acc)">'+sku+'</div>'+
+          '<div style="font-size:10px;color:'+(factible?'var(--ok)':'var(--dan)')+'">'+
+            'Disponible: '+disp+' un</div>'+
+        '</div>'+
+        '<div style="font-size:20px;font-weight:700">'+cant+' un</div>'+
+      '</div>';
+
+    if(factible){
+      var btn=document.createElement('button');
+      btn.className='btn btn-sep';
+      btn.style.cssText='font-size:13px;padding:9px';
+      btn.textContent='✓ Ejecutar separación';
+      btn.addEventListener('click',(function(sk,ca,de,di){
+        return function(){ _ejecutarSepDesdeDestino(sk,ca,de,di); };
+      })(sku,cant,dest,disp));
+      card.appendChild(btn);
+    } else {
+      var warn=document.createElement('div');
+      warn.style.cssText='font-size:11px;color:var(--dan);padding:4px 0';
+      warn.textContent='⚠ Stock insuficiente — disponible: '+disp+' un';
+      card.appendChild(warn);
+    }
+    grid.appendChild(card);
+  });
+}
+
+function _ejecutarSepDesdeDestino(sku,cantReq,destino,saldoDisp){
+  if(!destino){toast('Destino no definido');return;}
+  var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(destino);});
+  if(!destInfo){toast('Destino "'+destino+'" no encontrado en DestinosSeparacion');return;}
+
+  var origData=CFG.empresas['INV'];
+  var t=ahora();
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Procesando separación...</div></div>');
+
+  Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
+    var saldos=calcularSaldos(res[0],res[1]);
+    var lpnsDelSKU=Object.keys(saldos)
+      .map(function(k){return saldos[k];})
+      .filter(function(s){return normStr(s.sku)===normStr(sku)&&s.saldo>0;})
+      .sort(function(a,b){
+        if(a.created&&b.created) return new Date(a.created)-new Date(b.created);
+        return String(a.lpn).localeCompare(String(b.lpn));
+      });
+
+    var pendiente=cantReq;
+    var posts=[];
+    for(var i=0;i<lpnsDelSKU.length&&pendiente>0;i++){
+      var s=lpnsDelSKU[i];
+      var tomar=Math.min(pendiente,s.saldo);
+      var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
+      posts.push({fields:{
+        Title:          S.pedido+'-SEP-'+t.ts.replace(/[:.]/g,'')+'-'+i,
+        Pedido:         S.pedido,
+        LPN:            s.lpn,
+        SKU:            sku,
+        Descripcion:    cb?cb.desc:'',
+        Cantidad:       tomar,
+        TipoMovimiento: 'SEPARACION',
+        AlmacenOrigen:  origData.almacenOrigen,
+        UbicacionOrigen:origData.ubicOrigen,
+        AlmacenDestino: destInfo.almacen,
+        UbicacionDestino:destInfo.ubicacion,
+        DestinoSeparacion:destino,
+        Operador:       S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'',
+        FechaMovimiento:t.ts,
+      }});
+      pendiente-=tomar;
+    }
+
+    if(pendiente>0){
+      toast('Stock insuficiente al validar. Disponible: '+(cantReq-pendiente)+' un');
+      goBack();
+      return;
+    }
+
+    var chain=Promise.resolve();
+    posts.forEach(function(p){
+      chain=chain.then(function(){
+        return gPost(urlLista(DB.listIds.movimientos)+'/items',p);
+      });
+    });
+    chain.then(function(){
+      var lineas=posts.map(function(p){
+        return '• LPN '+p.fields.LPN+': '+p.fields.Cantidad+' un';
+      }).join('\n');
+      render(
+        '<div style="text-align:center;padding:24px 0">'+
+          '<div style="font-size:48px;margin-bottom:12px">✓</div>'+
+          '<div style="font-size:18px;font-weight:700;color:var(--sep);margin-bottom:8px">Separación ejecutada</div>'+
+          '<div style="font-size:13px;color:var(--txt);margin-bottom:4px">'+cantReq+' un de '+sku+' → '+destino+'</div>'+
+          '<div style="font-size:11px;color:var(--mut);white-space:pre-line">'+lineas+'</div>'+
+        '</div>'+
+        '<div class="btn-row" style="flex-direction:column">'+
+          '<button class="btn btn-sep" onclick="showSeparacion()">← Volver a destinos</button>'+
+          '<button class="btn btn-sec" onclick="showMenuPrincipal()">⌂ Menú principal</button>'+
+        '</div>'
+      );
+    }).catch(function(e){toast('Error: '+e.message.slice(0,60));goBack();});
   });
 }
 
@@ -2066,6 +2229,9 @@ window.showResultadoMovimiento=showResultadoMovimiento;
 window.buscarSKU_mismoSKU=buscarSKU_mismoSKU;
 window.buscarLPN_mismoLPN=buscarLPN_mismoLPN;
 window.showSeparacion=showSeparacion;
+window._renderDestinosSep=_renderDestinosSep;
+window._renderSKUsPorDestino=_renderSKUsPorDestino;
+window._ejecutarSepDesdeDestino=_ejecutarSepDesdeDestino;
 window.ejecutarSeparacion=ejecutarSeparacion;
 window.showMenuPrincipal=showMenuPrincipal;
 window.showSeleccionOperador=showSeleccionOperador;
