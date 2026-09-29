@@ -261,6 +261,7 @@ var CFG={
     'INV':{almacenOrigen:'CND2-IMPO', ubicOrigen:'N1-IMPO', label:'INV — Inverneg'},
     'ECM':{almacenOrigen:'ECO3-IMPO', ubicOrigen:'E3-IMPO', label:'ECM — Economisa'},
   },
+  almacenDestDefault:'CND2-BODE',  // precargado en formulario; operador puede cambiar
 };
 var GRAPH='https://graph.microsoft.com/v1.0';
 var SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
@@ -1168,24 +1169,43 @@ function _initBuscadorAlmacen(sku,saldoDisp){
   var almacenes=[...new Set(ubics.map(function(u){return u.almacen;}))].sort();
   console.log('[UBIC-FORM] Empresa:',S.empresa,'Almacenes:',almacenes.length,'→',almacenes.join('|'));
 
-  _initBuscadorDrop('inp-alm-dest','drop-alm','badge-alm',almacenes,function(alm){
+  function onAlmSelect(alm){
     window._almSeleccionado=alm;
-    // Poblar ubicaciones para este almacén
-    var ubicsAlm=ubics.filter(function(u){return normStr(u.almacen)===normStr(alm);}).map(function(u){return u.ubicacion;}).sort();
+    var ubicsAlm=ubics.filter(function(u){return normStr(u.almacen)===normStr(alm);})
+      .map(function(u){return u.ubicacion;}).sort();
     window._ubicSeleccionada='';
-    var iu=document.getElementById('inp-ubic-dest'); if(iu){iu.value='';iu.placeholder='Buscar ubicación en '+alm+'...';}
+    var iu=document.getElementById('inp-ubic-dest');
+    if(iu){iu.value='';iu.placeholder='Buscar ubicación en '+alm+'...';}
     var bu=document.getElementById('badge-ubic'); if(bu) bu.style.display='none';
     _initBuscadorDrop('inp-ubic-dest','drop-ubic','badge-ubic',ubicsAlm,function(ubic){
       window._ubicSeleccionada=ubic;
-      // Mostrar Tipo de la ubicación seleccionada
-      var u=DB.ubicaciones.find(function(x){return normStr(x.almacen)===normStr(alm)&&normStr(x.ubicacion)===normStr(ubic);});
+      var u=DB.ubicaciones.find(function(x){
+        return normStr(x.almacen)===normStr(alm)&&normStr(x.ubicacion)===normStr(ubic);
+      });
       if(u&&u.tipo){
+        var tipoCol={'PERCHADO':'var(--ok)','IMPO':'var(--acc)','DANA':'var(--dan)',
+          'OBSE':'var(--warn)','PEND':'var(--warn)'};
         var bu2=document.getElementById('badge-ubic');
-        var tipoCol={'PERCHADO':'var(--ok)','IMPO':'var(--acc)','DANA':'var(--dan)','OBSE':'var(--warn)','PEND':'var(--warn)'};
         if(bu2) bu2.style.color=tipoCol[u.tipo]||'var(--acc)';
       }
     });
-  });
+  }
+
+  _initBuscadorDrop('inp-alm-dest','drop-alm','badge-alm',almacenes,onAlmSelect);
+
+  // Precargar almacén por defecto solo cuando el campo está vacío
+  var defAlm=CFG.almacenDestDefault||'';
+  if(defAlm&&!window._almSeleccionado){
+    var inpAlm=document.getElementById('inp-alm-dest');
+    var badgeAlm=document.getElementById('badge-alm');
+    var existe=almacenes.find(function(a){return normStr(a)===normStr(defAlm);});
+    if(existe&&inpAlm){
+      inpAlm.value=existe;
+      if(badgeAlm){badgeAlm.textContent='✓ '+existe;badgeAlm.style.display='block';}
+      onAlmSelect(existe);
+      console.log('[UBIC-FORM] Almacén por defecto precargado:',existe);
+    }
+  }
 }
 
 function _initBuscadorDrop(inpId,dropId,badgeId,opciones,onSelect){
