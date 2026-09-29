@@ -452,20 +452,77 @@ function parsearOperadores(d){
   console.log('[OPS] Operadores cargados:',DB.operadores.length,'→',DB.operadores.join(', '));
 }
 function parsearSeparacion(d){
-  DB.separacionPendiente=parsearHoja(d.values,function(h,r){
-    var skuRaw=r[idx(h,['sku'])];
-    return{
-      pedido:(r[idx(h,['pedido'])]||'').toString().trim(),
-      sku:skuRaw!==null&&skuRaw!==undefined?skuRaw.toString().trim():'',  // forzar string
-      cantidad:Number(r[idx(h,['cantidad'])])||0,
-      fecha:(r[idx(h,['fecha'])]||'').toString().trim(),
-      destino:(r[idx(h,['destino'])]||'').toString().trim(),
-    };
-  });
+  if(!d||!d.values||d.values.length<2){
+    console.warn('[SEP] Hoja Separacion vacía o sin filas');
+    DB.separacionPendiente=[];
+    return;
+  }
+  // LOG: encabezados raw — crítico para saber la estructura de la hoja
+  var hdrRaw=d.values[0];
+  console.log('[SEP] Encabezados raw ('+hdrRaw.length+' columnas):',
+    hdrRaw.map(function(v,i){return i+'="'+v+'"';}).join(' | '));
+  console.log('[SEP] Primera fila de datos:',
+    d.values[1].map(function(v,i){return i+'="'+v+'"';}).join(' | '));
+
+  var hdr=hdrRaw.map(function(v){return(v||'').toString().trim().toLowerCase();});
+
+  // Detectar si es estructura VERTICAL (columna "destino") u HORIZONTAL (destinos como encabezados)
+  var tieneDestino=hdr.indexOf('destino')>=0||hdr.indexOf('destination')>=0;
+  var iSku=idx(hdr,['sku','código sku','codigo sku','cod sku','codigosku']);
+  var iPed=idx(hdr,['pedido']);
+  var iCant=idx(hdr,['cantidad']);
+  var iFecha=idx(hdr,['fecha']);
+
+  console.log('[SEP] Estructura detectada:',tieneDestino?'VERTICAL (columna destino)':'HORIZONTAL (destinos como columnas)');
+  console.log('[SEP] Índices: pedido='+iPed+' sku='+iSku+' cantidad='+iCant+' fecha='+iFecha+' destino='+(tieneDestino?hdr.indexOf('destino'):-1));
+
+  DB.separacionPendiente=[];
+
+  if(tieneDestino){
+    // Estructura VERTICAL: Pedido | SKU | Cantidad | Fecha | Destino
+    var iDest=hdr.indexOf('destino');
+    d.values.slice(1).forEach(function(r){
+      if(!r.some(function(c){return c!==null&&c!=='';} )) return; // fila vacía
+      var skuRaw=iPed>=0?r[iSku]:null;
+      DB.separacionPendiente.push({
+        pedido:iPed>=0?(r[iPed]||'').toString().trim():'',
+        sku:skuRaw!==null&&skuRaw!==undefined?skuRaw.toString().trim():'',
+        cantidad:iCant>=0?Number(r[iCant])||0:0,
+        fecha:iFecha>=0?(r[iFecha]||'').toString().trim():'',
+        destino:iDest>=0?(r[iDest]||'').toString().trim():'',
+      });
+    });
+  } else {
+    // Estructura HORIZONTAL: Pedido | SKU | Fecha? | CRD | Cuenca | Ambato | Quito | Matriz | ...
+    // Las columnas de destino son todas las que no son pedido/sku/fecha/cantidad
+    var colsReservadas=['pedido','sku','fecha','cantidad','descripcion','descripción'];
+    var destCols=hdr.map(function(h2,i){
+      return colsReservadas.indexOf(h2)<0&&h2?{nombre:hdrRaw[i].toString().trim(),idx:i}:null;
+    }).filter(Boolean);
+    console.log('[SEP] Columnas de destino detectadas:',destCols.map(function(c){return '"'+c.nombre+'"';}).join(', '));
+
+    d.values.slice(1).forEach(function(r){
+      if(!r.some(function(c){return c!==null&&c!=='';} )) return;
+      var pedido=iPed>=0?(r[iPed]||'').toString().trim():'';
+      var skuRaw=iSku>=0?r[iSku]:null;
+      var sku=skuRaw!==null&&skuRaw!==undefined?skuRaw.toString().trim():'';
+      var fecha=iFecha>=0?(r[iFecha]||'').toString().trim():'';
+      if(!sku) return;
+      // Generar un registro por cada columna-destino con cantidad > 0
+      destCols.forEach(function(col){
+        var cant=Number(r[col.idx])||0;
+        if(cant>0){
+          DB.separacionPendiente.push({
+            pedido:pedido, sku:sku, cantidad:cant, fecha:fecha, destino:col.nombre
+          });
+        }
+      });
+    });
+    console.log('[SEP] Registros expandidos (uno por destino con cant>0):',DB.separacionPendiente.length);
+  }
+
   if(DB.separacionPendiente.length>0){
-    var p0=DB.separacionPendiente[0];
-    console.log('[SEP] Primer registro leído:',JSON.stringify(p0));
-    console.log('[SEP] Tipo de dato sku:',typeof p0.sku,'valor:',p0.sku);
+    console.log('[SEP] Primer registro parseado:',JSON.stringify(DB.separacionPendiente[0]));
   }
   console.log('[SEP] Total registros Separacion:',DB.separacionPendiente.length);
 }
@@ -1483,10 +1540,23 @@ function showSeparacion(){
       saldoXsku[normStr(s.sku)]+=s.saldo;
     });
 
+    // LOG diagnóstico
+    console.log('[SEP] Pedido seleccionado:',S.pedido,'norm:',normStr(S.pedido));
+    console.log('[SEP] Total registros en DB.separacionPendiente:',DB.separacionPendiente.length);
+    if(DB.separacionPendiente.length>0){
+      var p0s=DB.separacionPendiente[0];
+      console.log('[SEP] Primer registro en DB:',JSON.stringify(p0s));
+      console.log('[SEP] Pedidos distintos en DB:',
+        [...new Set(DB.separacionPendiente.map(function(r){return r.pedido;}))].join(' | '));
+    }
+
     // Consolidar por Destino+SKU — solo registros del pedido activo con cantidad > 0
     var reqs=DB.separacionPendiente.filter(function(r){
-      return normStr(r.pedido)===normStr(S.pedido)&&r.cantidad>0;
+      var match=normStr(r.pedido)===normStr(S.pedido)&&r.cantidad>0;
+      return match;
     });
+    console.log('[SEP] Registros para pedido "'+S.pedido+'":',reqs.length);
+    if(reqs.length>0) console.log('[SEP] Primer registro del pedido:',JSON.stringify(reqs[0]));
     var porDestSku={};
     reqs.forEach(function(r){
       var dest=(r.destino||'Sin destino').toString().trim();
