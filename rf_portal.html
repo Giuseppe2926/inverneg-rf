@@ -64,6 +64,7 @@ body{
 .app-card.dash::before{background:var(--acc)}
 .app-card.inf::before{background:var(--ok)}
 .app-card.perc::before{background:var(--perc)}
+.app-card.des::before{background:var(--warn)}
 
 .app-icon{font-size:28px;flex-shrink:0;width:44px;text-align:center}
 .app-name{font-size:15px;font-weight:700;margin-bottom:3px}
@@ -179,13 +180,12 @@ var APPS=[
     cls:'perc',
   },
   {
-    id:'dash',
-    icon:'📊',
-    name:'RF Dashboard',
-    desc:'Portal de indicadores operativos — próximamente',
-    href:'rf_dashboard.html',
-    cls:'dash',
-    disabled:true,
+    id:'des',
+    icon:'🚚',
+    name:'RF Despacho',
+    desc:'Registro y control de despachos desde bodega',
+    href:'rf_despacho.html',
+    cls:'des',
   },
 ];
 
