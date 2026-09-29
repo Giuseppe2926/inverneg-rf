@@ -1876,33 +1876,35 @@ function showVistaOperativa(){
         '<span style="width:60px;text-align:right">CANT</span>'+
         '<span style="width:90px;text-align:right">DESTINO</span>'+
       '</div>';
-      // Mostrar hasta los últimos 50 movimientos, más recientes abajo
-      movs.slice(-50).forEach(function(m){
-        // FechaMovimiento puede ser ISO "2026-09-28T14:32:00Z" o solo fecha "2026-09-28"
-        var _fm=m.FechaMovimiento||m.Created||'';
+      // Mostrar hasta los últimos 50 movimientos — variable renombrada a 'mov'
+      var slice=movs.slice(-50);
+      console.log('[VISTA-OP-RENDER] Movimientos a renderizar:',slice.length);
+      slice.forEach(function(mov,ridx){
+        var _fm=mov.FechaMovimiento||mov.Created||'';
         var hora='—';
         if(_fm.length>=16){
-          // Convertir UTC a local para mostrar hora correcta
           try{
             var _dt=new Date(_fm);
-            if(!isNaN(_dt)){
-              hora=pad(_dt.getHours())+':'+pad(_dt.getMinutes());
-            }
+            if(!isNaN(_dt)) hora=pad(_dt.getHours())+':'+pad(_dt.getMinutes());
           }catch(e){ hora=_fm.slice(11,16)||'—'; }
         }
-        var tipoCols={'PERCHADO':'var(--ok)','SEPARACION':'var(--sep)','DANA':'var(--dan)','OBSE':'var(--warn)','PEND':'var(--warn)'};
-        var tipo=categorizarMovimiento(m);
+        if(ridx===0) console.log('[VISTA-OP-RENDER] Primer mov → SKU='+mov.SKU+
+          ' Cant='+mov.Cantidad+' Dest='+mov.AlmacenDestino+' hora='+hora);
+        var tipoCols={'PERCHADO':'var(--ok)','SEPARACION':'var(--sep)',
+          'DANA':'var(--dan)','OBSE':'var(--warn)','PEND':'var(--warn)'};
+        var tipo=categorizarMovimiento(mov);
         var color=tipoCols[tipo]||'var(--txt)';
         h+='<div class="mov-row">'+
           '<span class="mov-hora">'+hora+'</span>'+
           '<span class="mov-sku" style="color:'+color+'">'+
-            (m.SKU||'—')+
-            '<div style="font-size:9px;color:var(--mut);font-weight:400">'+m.TipoMovimiento+'</div>'+
+            (mov.SKU||'—')+
+            '<div style="font-size:9px;color:var(--mut);font-weight:400">'+mov.TipoMovimiento+'</div>'+
           '</span>'+
-          '<span class="mov-cant">'+Number(m.Cantidad||0).toLocaleString()+'</span>'+
-          '<span class="mov-dest">'+(m.AlmacenDestino||'—')+'</span>'+
+          '<span class="mov-cant">'+Number(mov.Cantidad||0).toLocaleString()+'</span>'+
+          '<span class="mov-dest">'+(mov.AlmacenDestino||'—')+'</span>'+
         '</div>';
       });
+      console.log('[VISTA-OP-RENDER] h generado, llamando render...');
       if(movs.length>50){
         h+='<div style="font-size:10px;color:var(--mut);padding:6px 0;text-align:center">... +'+(movs.length-50)+' movimientos anteriores</div>';
       }
@@ -1955,6 +1957,12 @@ window.ejecutarSeparacion=ejecutarSeparacion;
 window.showMenuPrincipal=showMenuPrincipal;
 window.showSeleccionOperador=showSeleccionOperador;
 window.showVistaOperativa=showVistaOperativa;
+function selVistaOperativa(){
+  var pedido=getPedidoMenu();
+  if(!pedido){toast('Selecciona un pedido primero');return;}
+  S.pedido=pedido;
+  showVistaOperativa();
+}
 window.selVistaOperativa=selVistaOperativa;
 window.showResumenPerchado=showResumenPerchado;
 window.selPedidoResumen=selPedidoResumen;
