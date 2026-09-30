@@ -262,6 +262,7 @@ var CFG={
     'ECM':{almacenOrigen:'ECO3-IMPO', ubicOrigen:'E3-IMPO', label:'ECM — Economisa'},
   },
   almacenDestDefault:'CND2-BODE',  // precargado en formulario; operador puede cambiar
+  destinosValidosSep:['Quito','CRD','Cuenca','Ambato','Matriz'],
 };
 var GRAPH='https://graph.microsoft.com/v1.0';
 var SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
@@ -496,9 +497,15 @@ function parsearSeparacion(d){
     // Estructura HORIZONTAL: Pedido | SKU | Fecha? | CRD | Cuenca | Ambato | Quito | Matriz | ...
     // Las columnas de destino son todas las que no son pedido/sku/fecha/cantidad
     var colsReservadas=['pedido','sku','fecha','cantidad','descripcion','descripción'];
+        // Solo columnas que estén en la lista de destinos válidos
+    var destValiNorm=(CFG.destinosValidosSep||[]).map(function(v){return v.trim().toLowerCase();});
     var destCols=hdr.map(function(h2,i){
-      return colsReservadas.indexOf(h2)<0&&h2?{nombre:hdrRaw[i].toString().trim(),idx:i}:null;
+      if(colsReservadas.indexOf(h2)>=0||!h2) return null;
+      var valido=destValiNorm.length===0||destValiNorm.indexOf(h2.trim().toLowerCase())>=0;
+      return valido?{nombre:hdrRaw[i].toString().trim(),idx:i}:null;
     }).filter(Boolean);
+    console.log('[SEP] Destinos válidos config:',CFG.destinosValidosSep?CFG.destinosValidosSep.join(', '):'todos');
+    console.log('[SEP] Columnas de destino usadas:',destCols.map(function(c){return '"'+c.nombre+'"';}).join(', '));
     console.log('[SEP] Columnas de destino detectadas:',destCols.map(function(c){return '"'+c.nombre+'"';}).join(', '));
 
     d.values.slice(1).forEach(function(r){
@@ -1678,14 +1685,20 @@ function _renderSKUsPorDestino(dest,skuMap,saldoXsku){
       '</div>';
 
     if(factible){
-      var btn=document.createElement('button');
-      btn.className='btn btn-sep';
-      btn.style.cssText='font-size:13px;padding:9px';
-      btn.textContent='✓ Ejecutar separación';
-      btn.addEventListener('click',(function(sk,ca,de,di){
+      var bRow=document.createElement('div'); bRow.className='btn-row';
+      var btnExec=document.createElement('button');
+      btnExec.className='btn btn-sep'; btnExec.style.cssText='font-size:13px;padding:9px';
+      btnExec.textContent='✓ Ejecutar';
+      btnExec.addEventListener('click',(function(sk,ca,de,di){
         return function(){ _ejecutarSepDesdeDestino(sk,ca,de,di); };
       })(sku,cant,dest,disp));
-      card.appendChild(btn);
+      var btnCamb=document.createElement('button');
+      btnCamb.className='btn btn-sec'; btnCamb.style.cssText='font-size:13px;padding:9px';
+      btnCamb.textContent='✏ Cambiar';
+      btnCamb.addEventListener('click',(function(sk,ca,de,di){
+        return function(){ _cambiarCantidadSep(sk,ca,de,di); };
+      })(sku,cant,dest,disp));
+      bRow.appendChild(btnExec); bRow.appendChild(btnCamb); card.appendChild(bRow);
     } else {
       var warn=document.createElement('div');
       warn.style.cssText='font-size:11px;color:var(--dan);padding:4px 0';
@@ -1696,10 +1709,53 @@ function _renderSKUsPorDestino(dest,skuMap,saldoXsku){
   });
 }
 
+
+// ── Cambiar cantidad antes de ejecutar separación ─────────────────
+function _cambiarCantidadSep(sku,cantOriginal,dest,disp){
+  pushScreen('sep-cant',function(){_cambiarCantidadSep(sku,cantOriginal,dest,disp);});
+  actualizarBack();
+  var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(dest);});
+  render(
+    '<div class="badge badge-sep">'+dest+'</div>'+
+    '<div class="saldo-panel" style="margin-top:10px">'+
+      '<div class="saldo-sku">'+sku+'</div>'+
+      '<div class="saldo-row"><span class="saldo-row-lbl">Solicitado</span>'+
+        '<span class="saldo-row-val">'+cantOriginal+' un</span></div>'+
+      '<div class="saldo-row"><span class="saldo-row-lbl">Stock disponible</span>'+
+        '<span class="saldo-disponible">'+disp+'</span></div>'+
+      (destInfo?'<div class="saldo-row"><span class="saldo-row-lbl">Destino</span>'+
+        '<span class="saldo-row-val">'+destInfo.almacen+' / '+destInfo.ubicacion+'</span></div>':'')+
+    '</div>'+
+    '<div class="qty-wrap">'+
+      '<div class="qty-lbl">cantidad a separar</div>'+
+      '<input class="qty-input mode-sep" id="inp-sep-cant" type="number" min="1" max="'+disp+
+        '" value="'+cantOriginal+'" inputmode="numeric">'+
+    '</div>'+
+    '<div id="wrap-sep-cant-btn" style="margin-top:12px"></div>'
+  );
+  var wrap=document.getElementById('wrap-sep-cant-btn');
+  if(wrap){
+    var row=document.createElement('div'); row.className='btn-row';
+    var ba=document.createElement('button'); ba.className='btn btn-sec'; ba.textContent='← Atrás';
+    ba.addEventListener('click',function(){goBack();});
+    var bg=document.createElement('button'); bg.className='btn btn-sep'; bg.textContent='✓ Ejecutar separación';
+    bg.addEventListener('click',function(){
+      var nv=parseInt((document.getElementById('inp-sep-cant')||{}).value||'0');
+      if(!nv||nv<=0){toast('Ingresa una cantidad válida');return;}
+      if(nv>disp){toast('Supera stock disponible ('+disp+' un)');return;}
+      _ejecutarSepDesdeDestino(sku,nv,dest,disp);
+    });
+    row.appendChild(ba); row.appendChild(bg); wrap.appendChild(row);
+  }
+  setTimeout(function(){var el=document.getElementById('inp-sep-cant');if(el){el.focus();el.select();}},80);
+}
 function _ejecutarSepDesdeDestino(sku,cantReq,destino,saldoDisp){
   if(!destino){toast('Destino no definido');return;}
   var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(destino);});
+  console.log('[SEP-POST] Destino="'+destino+'" destInfo=',destInfo?JSON.stringify(destInfo):'NO ENCONTRADO');
+  console.log('[SEP-POST] DestinosSep disponibles:',DB.destinosSep.map(function(d){return d.destino;}).join(', '));
   if(!destInfo){toast('Destino "'+destino+'" no encontrado en DestinosSeparacion');return;}
+  console.log('[SEP-POST] Registrando: AlmacenDest="'+destInfo.almacen+'" UbicDest="'+destInfo.ubicacion+'"');
 
   var origData=CFG.empresas['INV'];
   var t=ahora();
@@ -2299,6 +2355,7 @@ window.showResultadoMovimiento=showResultadoMovimiento;
 window.buscarSKU_mismoSKU=buscarSKU_mismoSKU;
 window.buscarLPN_mismoLPN=buscarLPN_mismoLPN;
 window.showSeparacion=showSeparacion;
+window._cambiarCantidadSep=_cambiarCantidadSep;
 window._renderDestinosSep=_renderDestinosSep;
 window._renderSKUsPorDestino=_renderSKUsPorDestino;
 window._ejecutarSepDesdeDestino=_ejecutarSepDesdeDestino;
