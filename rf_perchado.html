@@ -213,6 +213,7 @@ body{
 .mov-cant{width:60px;text-align:right;font-weight:700}
 .mov-dest{width:90px;text-align:right;font-size:10px;color:var(--mut)}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="hdr">
@@ -895,6 +896,11 @@ function showMenuPrincipal(){
         '<div class="mode-icon">📊</div>'+
         '<div><div class="mode-title">Resumen de Perchado</div>'+
         '<div class="mode-sub">Ver estado y destinos del pedido</div></div>'+
+      '</div>'+
+      '<div class="mode-card" style="border-left:3px solid var(--ok)" onclick="selGenerarExcel()">'+
+        '<div class="mode-icon">📥</div>'+
+        '<div><div class="mode-title">Generar Excel D365</div>'+
+        '<div class="mode-sub">Exportar movimientos para carga en D365</div></div>'+
       '</div>'+
     '</div>'
   );
@@ -2614,6 +2620,199 @@ function _renderVisualizacion(pedido){
   });
 }
 
+
+// ── Generar Excel D365 ───────────────────────────────────────────
+function selGenerarExcel(){
+  var pedido=getPedidoMenu();
+  if(!pedido){toast('Selecciona un pedido primero');return;}
+  S.pedido=pedido;
+  showGenerarExcel();
+}
+
+function showGenerarExcel(){
+  pushScreen('generar-excel',showGenerarExcel); actualizarBack();
+  render(
+    '<div class="badge" style="background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.3)">📥 GENERAR EXCEL D365</div>'+
+    '<div class="badge badge-pedido" style="margin-left:6px">'+S.pedido+'</div>'+
+    '<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">'+
+      '<div class="mode-card" style="border-left:3px solid var(--ok)" onclick="generarExcelPerchado()">'+
+        '<div class="mode-icon">📦</div>'+
+        '<div><div class="mode-title">Perchado</div>'+
+        '<div class="mode-sub">Movimientos TipoMovimiento = PERCHADO</div></div>'+
+      '</div>'+
+      '<div class="mode-card" style="border-left:3px solid var(--sep)" onclick="showSeleccionDestinosSep()">'+
+        '<div class="mode-icon">✂</div>'+
+        '<div><div class="mode-title">Separación</div>'+
+        '<div class="mode-sub">Seleccionar destinos y exportar movimientos de separación</div></div>'+
+      '</div>'+
+    '</div>'+
+    '<button class="btn btn-sec" style="margin-top:12px" onclick="goBack()">← Volver</button>'
+  );
+}
+
+function showSeleccionDestinosSep(){
+  pushScreen('sel-destinos-sep-excel',showSeleccionDestinosSep); actualizarBack();
+  var destinos=CFG.destinosValidosSep||['Quito','CRD','Cuenca','Ambato','Matriz'];
+  window._destinosSelExcel={};
+  destinos.forEach(function(d){ window._destinosSelExcel[d]=false; });
+
+  render(
+    '<div class="badge" style="background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.3)">📥 EXCEL SEPARACIÓN</div>'+
+    '<div class="badge badge-pedido" style="margin-left:6px">'+S.pedido+'</div>'+
+    '<div class="lbl" style="margin-top:10px">selecciona los destinos a exportar</div>'+
+    '<div id="dest-excel-grid" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>'+
+    '<div id="btn-gen-sep-wrap" style="margin-top:14px"></div>'
+  );
+
+  var grid=document.getElementById('dest-excel-grid');
+  destinos.forEach(function(dest){
+    var item=document.createElement('div');
+    item.style.cssText='display:flex;align-items:center;gap:12px;background:var(--sur2);'+
+      'border:1px solid var(--bor);border-radius:8px;padding:12px 14px;cursor:pointer';
+    item.innerHTML=
+      '<div id="chk-'+dest+'" style="width:20px;height:20px;border-radius:4px;border:2px solid var(--bor);'+
+        'background:transparent;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px"></div>'+
+      '<span style="font-size:15px;font-weight:600">'+dest+'</span>';
+    item.addEventListener('click',function(){
+      window._destinosSelExcel[dest]=!window._destinosSelExcel[dest];
+      var chk=document.getElementById('chk-'+dest);
+      if(chk){
+        chk.style.background=window._destinosSelExcel[dest]?'var(--sep)':'transparent';
+        chk.style.borderColor=window._destinosSelExcel[dest]?'var(--sep)':'var(--bor)';
+        chk.textContent=window._destinosSelExcel[dest]?'✓':'';
+      }
+      // Actualizar estado del botón generar
+      var selCount=Object.values(window._destinosSelExcel).filter(Boolean).length;
+      var btnGen=document.getElementById('btn-gen-sep');
+      if(btnGen) btnGen.disabled=selCount===0;
+    });
+    grid.appendChild(item);
+  });
+
+  var btnWrap=document.getElementById('btn-gen-sep-wrap');
+  if(btnWrap){
+    var row=document.createElement('div'); row.className='btn-row';
+    var ba=document.createElement('button'); ba.className='btn btn-sec';
+    ba.textContent='← Atrás'; ba.onclick=function(){goBack();};
+    var bg=document.createElement('button'); bg.className='btn btn-ok btn-big';
+    bg.id='btn-gen-sep'; bg.disabled=true;
+    bg.textContent='📥 Generar Excel';
+    bg.onclick=function(){
+      var selDests=Object.keys(window._destinosSelExcel).filter(function(d){
+        return window._destinosSelExcel[d];
+      });
+      if(!selDests.length){toast('Selecciona al menos un destino');return;}
+      generarExcelSeparacion(selDests);
+    };
+    row.appendChild(ba); row.appendChild(bg); btnWrap.appendChild(row);
+  }
+}
+
+// ── Lógica de generación Excel ────────────────────────────────────
+function _consolidarMovimientos(movs){
+  // Clave: SKU|AlmOrigen|AlmDestino|UbicOrigen|UbicDestino
+  var mapa={};
+  movs.forEach(function(m){
+    var k=[
+      (m.SKU||'').trim(),
+      (m.AlmacenOrigen||'').trim(),
+      (m.AlmacenDestino||'').trim(),
+      (m.UbicacionOrigen||'').trim(),
+      (m.UbicacionDestino||'').trim(),
+    ].join('|');
+    if(!mapa[k]) mapa[k]={
+      sku:       (m.SKU||'').trim(),
+      almOrigen: (m.AlmacenOrigen||'').trim(),
+      almDestino:(m.AlmacenDestino||'').trim(),
+      ubicOrigen:(m.UbicacionOrigen||'').trim(),
+      ubicDestino:(m.UbicacionDestino||'').trim(),
+      cantidad:  0,
+    };
+    mapa[k].cantidad+=Number(m.Cantidad)||0;
+  });
+  return Object.values(mapa).filter(function(r){return r.cantidad>0;});
+}
+
+function _generarXLSX(filas,nombreArchivo){
+  if(!window.XLSX){toast('SheetJS no disponible — reintenta');return;}
+  var headers=['CODIGO DE ARTICULO','ALMACEN DE ORIGEN','ALMACEN DE DESTINO',
+               'UBICACIÓN DE ORIGEN','UBICACIÓN DE DESTINO','CANTIDAD'];
+  var data=[headers].concat(filas.map(function(r){
+    return[r.sku, r.almOrigen, r.almDestino, r.ubicOrigen, r.ubicDestino, -r.cantidad];
+  }));
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  // Ancho de columnas
+  ws['!cols']=[{wch:22},{wch:16},{wch:16},{wch:18},{wch:18},{wch:12}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Movimientos');
+  XLSX.writeFile(wb,nombreArchivo);
+  console.log('[EXCEL-D365] Generado:',nombreArchivo,'filas:',filas.length);
+}
+
+function generarExcelPerchado(){
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando movimientos...</div></div>');
+  cargarMovimientosPedido(S.pedido).then(function(movs){
+    var perchados=movs.filter(function(m){
+      return normStr(m.TipoMovimiento||'')===normStr('PERCHADO');
+    });
+    console.log('[EXCEL-D365] PERCHADO movimientos raw:',perchados.length);
+    if(!perchados.length){
+      toast('Sin movimientos de PERCHADO para '+S.pedido);
+      showGenerarExcel();
+      return;
+    }
+    var filas=_consolidarMovimientos(perchados);
+    console.log('[EXCEL-D365] PERCHADO filas consolidadas:',filas.length);
+    _generarXLSX(filas,'D365_PERCHADO_'+S.pedido+'_'+ahora().fecha.replace(/-/g,'')+'.xlsx');
+    render(
+      '<div style="text-align:center;padding:24px 0">'+
+        '<div style="font-size:48px;margin-bottom:12px">✅</div>'+
+        '<div style="font-size:17px;font-weight:700;color:var(--ok);margin-bottom:8px">Excel generado</div>'+
+        '<div style="font-size:12px;color:var(--mut);margin-bottom:4px">'+filas.length+' líneas consolidadas</div>'+
+        '<div style="font-size:11px;color:var(--mut)">PERCHADO · '+S.pedido+'</div>'+
+      '</div>'+
+      '<div class="btn-row" style="flex-direction:column;margin-top:8px">'+
+        '<button class="btn btn-ok" onclick="generarExcelPerchado()">🔄 Regenerar</button>'+
+        '<button class="btn btn-sec" onclick="showGenerarExcel()">← Volver</button>'+
+      '</div>'
+    );
+  }).catch(function(e){toast('Error: '+e.message.slice(0,60));showGenerarExcel();});
+}
+
+function generarExcelSeparacion(destinos){
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando movimientos...</div></div>');
+  cargarMovimientosPedido(S.pedido).then(function(movs){
+    var seps=movs.filter(function(m){
+      if(normStr(m.TipoMovimiento||'')!==normStr('SEPARACION')) return false;
+      var destMov=normStr(m.DestinoSeparacion||m.AlmacenDestino||'');
+      return destinos.some(function(d){return normStr(d)===destMov;});
+    });
+    console.log('[EXCEL-D365] SEP movimientos raw:',seps.length,'para destinos:',destinos.join(','));
+    if(!seps.length){
+      toast('Sin movimientos de separación para los destinos seleccionados');
+      showSeleccionDestinosSep();
+      return;
+    }
+    var filas=_consolidarMovimientos(seps);
+    console.log('[EXCEL-D365] SEP filas consolidadas:',filas.length);
+    var sufijo=destinos.length===1?destinos[0]:'MULTI';
+    _generarXLSX(filas,'D365_SEP_'+S.pedido+'_'+sufijo+'_'+ahora().fecha.replace(/-/g,'')+'.xlsx');
+    render(
+      '<div style="text-align:center;padding:24px 0">'+
+        '<div style="font-size:48px;margin-bottom:12px">✅</div>'+
+        '<div style="font-size:17px;font-weight:700;color:var(--ok);margin-bottom:8px">Excel generado</div>'+
+        '<div style="font-size:12px;color:var(--mut);margin-bottom:4px">'+filas.length+' líneas consolidadas</div>'+
+        '<div style="font-size:11px;color:var(--mut)">Destinos: '+destinos.join(', ')+'</div>'+
+      '</div>'+
+      '<div class="btn-row" style="flex-direction:column;margin-top:8px">'+
+        '<button class="btn btn-ok" onclick="generarExcelSeparacion('+JSON.stringify(destinos)+')">🔄 Regenerar</button>'+
+        '<button class="btn btn-sep" onclick="showSeleccionDestinosSep()">← Cambiar destinos</button>'+
+        '<button class="btn btn-sec" onclick="showGenerarExcel()">⌂ Menú Excel</button>'+
+      '</div>'
+    );
+  }).catch(function(e){toast('Error: '+e.message.slice(0,60));showSeleccionDestinosSep();});
+}
+
 // Exports para HTML onclick
 window.goBack=goBack;
 window.seleccionarModo=seleccionarModo;
@@ -2634,6 +2833,11 @@ window._seleccionarLPNSep=_seleccionarLPNSep;
 window._ejecutarSepConLPN=_ejecutarSepConLPN;
 window.ejecutarSeparacion=ejecutarSeparacion;
 window.showMenuPrincipal=showMenuPrincipal;
+window.generarExcelSeparacion=generarExcelSeparacion;
+window.generarExcelPerchado=generarExcelPerchado;
+window.showSeleccionDestinosSep=showSeleccionDestinosSep;
+window.showGenerarExcel=showGenerarExcel;
+window.selGenerarExcel=selGenerarExcel;
 window.resolverSKU=resolverSKU;
 window.showSeleccionOperador=showSeleccionOperador;
 window.showVistaOperativa=showVistaOperativa;
