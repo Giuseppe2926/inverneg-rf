@@ -690,6 +690,8 @@ function calcularSaldos(recepciones,movimientos,logSKU){
   // Retorna Map de "LPN|SKU" → {lpn,sku,desc,recibido,movido,saldo,created}
   // logSKU: si se pasa, loguea detalle para ese SKU específico
   var mapa={};
+  // Clave siempre UPPERCASE para evitar mismatch por capitalización del LPN ingresado
+  function claveK(lpn,sku){ return normLPN(lpn).toUpperCase()+'|'+String(sku).trim().toUpperCase(); }
 
   // Normalizar LPN a string siempre — evita que número 1 ≠ string "1"
 
@@ -698,7 +700,7 @@ function calcularSaldos(recepciones,movimientos,logSKU){
     if(normStr(r.Estado||'')==='DAÑADO') return;
     var lpn=normLPN(r.LPN);
     var sku=(r.CodProducto||'').toString().trim();
-    var k=lpn+'|'+sku;
+    var k=claveK(lpn,sku);
     if(!mapa[k]) mapa[k]={lpn:lpn,sku:sku,desc:r.Nombre||'',recibido:0,movido:0,saldo:0,created:r.Created||''};
     mapa[k].recibido+=Number(r.Cantidad)||0;
   });
@@ -716,7 +718,7 @@ function calcularSaldos(recepciones,movimientos,logSKU){
   movimientos.forEach(function(m){
     var lpn=normLPN(m.LPN);
     var sku=(m.SKU||'').toString().trim();
-    var k=lpn+'|'+sku;
+    var k=claveK(lpn,sku);
     if(logSKU&&normStr(sku)===normStr(logSKU)){
       console.log('[SKU-SALDO] Movimiento: LPN="'+lpn+'" tipo='+m.TipoMovimiento+' cant='+m.Cantidad+
         ' clave_existe='+(!!mapa[k]));
@@ -750,17 +752,36 @@ function calcularSaldos(recepciones,movimientos,logSKU){
 
 /* ── Separación pendiente para un SKU ───────────────────────── */
 function sepPendienteSKU(pedido,sku){
-  // Lo que está en la hoja Separacion (solicitud) menos lo ya ejecutado (TipoMov=SEPARACION)
+  // Solicitudes de la hoja Separacion
   var reqs=DB.separacionPendiente.filter(function(r){
     return normStr(r.pedido)===normStr(pedido)&&normStr(r.sku)===normStr(sku);
   });
   if(!reqs.length) return null;
-  // Consolidar por destino
+  // Consolidar solicitudes por destino
   var porDest={};
   reqs.forEach(function(r){
     var k=r.destino||'Sin destino';
     porDest[k]=(porDest[k]||0)+r.cantidad;
   });
+  // Descontar movimientos SEPARACION ya ejecutados en SP (cargados en DB._movsCache)
+  var movsEjec=DB._movsCache||[];
+  movsEjec.forEach(function(m){
+    if(normStr(m.TipoMovimiento)!=='SEPARACION') return;
+    if(normStr(m.Pedido||'')!==normStr(pedido)) return;
+    if(normStr(m.SKU||'')!==normStr(sku)) return;
+    var dest=m.DestinoSeparacion||m.AlmacenDestino||'Sin destino';
+    // Intentar coincidir con alguna clave del porDest
+    var matchKey=Object.keys(porDest).find(function(k2){
+      return normStr(k2)===normStr(dest);
+    })||dest;
+    if(porDest[matchKey]!==undefined){
+      porDest[matchKey]-=Number(m.Cantidad)||0;
+      if(porDest[matchKey]<0) porDest[matchKey]=0;
+    }
+  });
+  // Eliminar destinos con pendiente <= 0
+  Object.keys(porDest).forEach(function(k){if(porDest[k]<=0) delete porDest[k];});
+  if(!Object.keys(porDest).length) return null;
   return porDest;
 }
 
@@ -1016,7 +1037,8 @@ function buscarSKU(){
     cargarRecepcionesPedido(S.pedido),
     cargarMovimientosPedido(S.pedido),
   ]).then(function(res){
-    var saldos=calcularSaldos(res[0],res[1],sku); // logSKU activo
+    DB._movsCache=res[1]; // cachear para sepPendienteSKU
+      var saldos=calcularSaldos(res[0],res[1],sku); // logSKU activo
     // Filtrar por SKU con saldo > 0, ordenar por LPN alfanumérico
     var lpns=Object.keys(saldos)
       .map(function(k){return saldos[k];})
@@ -1107,6 +1129,7 @@ function buscarLPN(){
       return normStr(saldosPrev[k].lpn)===normStr(lpn);
     }).map(function(k){return saldosPrev[k].sku;});
     var logSKULPN=skuDelLPN[0]||null; // loguear el primer SKU del LPN
+    DB._movsCache=res[1]; // cachear para sepPendienteSKU
     var saldos=calcularSaldos(res[0],res[1],logSKULPN);
     // Log para diagnóstico: ver todos los LPN disponibles en el pedido
     var lpnsEnPedido=[...new Set(Object.keys(saldos).map(function(k){return saldos[k].lpn;}))];
@@ -1401,8 +1424,8 @@ function _confirmarFormMovimiento(sku,saldoDisp){
   Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
     var saldos=calcularSaldos(res[0],res[1]);
     // normLPN garantiza string para que la clave coincida con la del mapa de saldos
-    var lpnNorm=normLPN(S.lpnActual);
-    var skuNorm=sku.toString().trim();
+    var lpnNorm=normLPN(S.lpnActual).toUpperCase();
+    var skuNorm=sku.toString().trim().toUpperCase();
     var k=lpnNorm+'|'+skuNorm;
     var saldoReal=saldos[k]?saldos[k].saldo:0;
 
