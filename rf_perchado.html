@@ -1406,16 +1406,31 @@ function _confirmarFormMovimiento(sku,saldoDisp){
     var k=lpnNorm+'|'+skuNorm;
     var saldoReal=saldos[k]?saldos[k].saldo:0;
 
-    console.log('[PERCHAR] Claves en saldos:', Object.keys(saldos).filter(function(c){
-      return c.indexOf(skuNorm)>=0;
-    }));
-    console.log('[PERCHAR] Clave buscada:', k, '| saldoReal:', saldoReal);
+    // Log completo del mapa de saldos para detectar diferencias de clave
+    console.log('[DEBUG-SALDOS] Clave buscada JSON:', JSON.stringify(k));
+    console.log('[DEBUG-SALDOS] S.lpnActual:', JSON.stringify(S.lpnActual),
+      'normLPN:', JSON.stringify(lpnNorm));
+    console.log('[DEBUG-SALDOS] sku param:', JSON.stringify(sku),
+      'skuNorm:', JSON.stringify(skuNorm));
+    var todasClaves=Object.keys(saldos);
+    console.log('[DEBUG-SALDOS] Total claves en mapa:', todasClaves.length);
+    console.log('[DEBUG-SALDOS] Todas las claves:', JSON.stringify(todasClaves));
+    // Buscar la clave más parecida (por SKU)
+    var clavesConSKU=todasClaves.filter(function(c){
+      return c.indexOf(skuNorm)>=0||c.toUpperCase().indexOf(skuNorm.toUpperCase())>=0;
+    });
+    console.log('[DEBUG-SALDOS] Claves que contienen el SKU "'+skuNorm+'":', JSON.stringify(clavesConSKU));
+    if(clavesConSKU.length>0){
+      clavesConSKU.forEach(function(c){
+        console.log('[DEBUG-SALDOS] Clave "'+c+'" → saldo:', saldos[c].saldo,
+          '| chars clave:', [...c].map(function(ch){return ch.charCodeAt(0);}));
+        console.log('[DEBUG-SALDOS] Clave buscada chars:', [...k].map(function(ch){return ch.charCodeAt(0);}));
+      });
+    }
     console.log('[PERCHAR] saldoReal calculado:', saldoReal);
 
     if(cant>saldoReal){
-      // Diagnóstico: listar todas las claves del saldo para detectar discrepancia
-      console.warn('[PERCHAR] Saldo insuficiente o clave no encontrada.');
-      console.warn('[PERCHAR] Todas las claves del mapa:', Object.keys(saldos).slice(0,20));
+      console.warn('[PERCHAR] Saldo insuficiente. cant='+cant+' saldoReal='+saldoReal+' clave='+JSON.stringify(k));
       toast('Saldo cambió. Disponible ahora: '+saldoReal+' un');
       showFormMovimiento(S.lpnActual,sku,saldoReal);
       return;
