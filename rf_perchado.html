@@ -1243,32 +1243,31 @@ function showFormMovimiento(lpn,sku,saldoDisp){
     empRow.appendChild(chip);
   });
 
-  // Botón confirmar — DOM puro (sin serializar sku en onclick string)
+    // Guardar saldoDisp en variable accesible para onclick
+    // Botón via data-attr — evita problemas de quoting en Zebra
+  window._saldoDispForm=saldoDisp;
+  window._skuForm=sku;
   var btnWrap=document.getElementById('btn-confirmar-wrap');
   if(btnWrap){
-    var btnRow=document.createElement('div');
-    btnRow.className='btn-row';
-    var btnAtras=document.createElement('button');
-    btnAtras.className='btn btn-sec';
-    btnAtras.textContent='← Atrás';
-    btnAtras.addEventListener('click',function(){goBack();});
-    var btnConf=document.createElement('button');
-    btnConf.className='btn btn-perc';
-    btnConf.textContent='✓ Confirmar perchado';
-    btnConf.addEventListener('click',function(){_confirmarFormMovimiento(sku,saldoDisp);});
-    btnRow.appendChild(btnAtras);
-    btnRow.appendChild(btnConf);
-    btnWrap.appendChild(btnRow);
+    var row=document.createElement('div'); row.className='btn-row';
+    var ba=document.createElement('button'); ba.className='btn btn-sec';
+    ba.textContent='← Atrás';
+    ba.onclick=function(){goBack();};
+    var bc=document.createElement('button'); bc.className='btn btn-perc';
+    bc.textContent='✓ Confirmar perchado';
+    bc.onclick=function(){_confirmarFormMovimiento(window._skuForm,window._saldoDispForm);};
+    row.appendChild(ba); row.appendChild(bc); btnWrap.appendChild(row);
+    console.log('[FORM-MOV] Botón confirmar creado. SKU='+sku+' saldo='+saldoDisp);
+  } else {
+    console.error('[FORM-MOV] btn-confirmar-wrap no encontrado');
   }
-
-  // Inicializar buscadores de almacén y ubicación
+  // Inicializar buscadores (delay mínimo para garantizar DOM renderizado)
   setTimeout(function(){
     _initBuscadorAlmacen(sku,saldoDisp);
     var qtyEl=document.getElementById('inp-qty');
     if(qtyEl) qtyEl.focus();
-  },0);
+  },50);
 }
-
 function _setEmpresaForm(emp,sku,saldoDisp){
   S.empresa=emp;
   Object.keys(CFG.empresas).forEach(function(k){
@@ -2470,6 +2469,7 @@ window.getPedidoMenu=getPedidoMenu;
 window.tipoUbicacion=tipoUbicacion;
 window.categorizarMovimiento=categorizarMovimiento;
 window.showFormMovimiento=showFormMovimiento;
+window._confirmarFormMovimiento=_confirmarFormMovimiento;
 window.showConfirmacionMovimiento=showConfirmacionMovimiento;
 
 })();
