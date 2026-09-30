@@ -1891,11 +1891,20 @@ function _seleccionarLPNSep(sku,cantReq,destino,saldoDisp){
   Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
     DB._movsCache=res[1];
     var saldos=calcularSaldos(res[0],res[1]);
+    // Log diagnóstico
+    var todasEntradas=Object.keys(saldos).map(function(k){
+      return {k:k,sku:saldos[k].sku,lpn:saldos[k].lpn,saldo:saldos[k].saldo};
+    });
+    console.log('[SEP-LPN] SKU buscado:',JSON.stringify(sku),'norm:',normStr(sku));
+    console.log('[SEP-LPN] Total entradas en saldos:',todasEntradas.length);
+    console.log('[SEP-LPN] Todas las entradas:',JSON.stringify(todasEntradas.slice(0,10)));
     // LPN con saldo > 0 para este SKU, orden FIFO por fecha de creación
     var lpns=Object.keys(saldos)
       .map(function(k){return saldos[k];})
       .filter(function(s){
-        return normStr(s.sku).toUpperCase()===normStr(sku).toUpperCase()&&s.saldo>0;
+        var match=normStr(s.sku)===normStr(sku)&&s.saldo>0;
+        if(!match&&s.saldo>0) console.log('[SEP-LPN] SKU descartado:',JSON.stringify(s.sku),'norm:',normStr(s.sku));
+        return match;
       })
       .sort(function(a,b){
         if(a.created&&b.created) return new Date(a.created)-new Date(b.created);
