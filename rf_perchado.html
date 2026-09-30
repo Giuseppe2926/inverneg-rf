@@ -536,15 +536,38 @@ function parsearSeparacion(d){
 function parsearCBarra(d){
   if(!d||!d.values||d.values.length<2) return;
   var hdr=d.values[0].map(function(v){return(v||'').toString().trim().toLowerCase();});
-  var iS=hdr.findIndex(function(h){return h==='sku'||h.indexOf('codigo')>-1||h==='cod';});
+  // Columna A = SKU, B = Desc, D = CB Unidad, F = CB Caja (por índice fijo + búsqueda por nombre)
+  var iS=hdr.findIndex(function(h){return h==='sku'||h==='código sku'||h==='codigo sku'||h.indexOf('cod')===0;});
   if(iS<0) iS=0;
-  var iD=hdr.findIndex(function(h){return h.indexOf('desc')>-1;});
+  var iDesc=hdr.findIndex(function(h){return h.indexOf('desc')>-1;});
+  // CB Unidad: columna D (índice 3) o por nombre
+  var iCBU=hdr.findIndex(function(h){return h.indexOf('barras unidad')>-1||h.indexOf('cod. de barras u')>-1;});
+  if(iCBU<0) iCBU=3; // columna D por defecto
+  // CB Caja: columna F (índice 5) o por nombre
+  var iCBC=hdr.findIndex(function(h){return h.indexOf('barras caja')>-1||h.indexOf('cod. de barras c')>-1;});
+  if(iCBC<0) iCBC=5; // columna F por defecto
+  console.log('[CBARRA] índices: SKU='+iS+' Desc='+iDesc+' CB_Unidad='+iCBU+' CB_Caja='+iCBC);
+  if(d.values.length>1){
+    var r1=d.values[1];
+    console.log('[CBARRA] Fila[1]: SKU="'+r1[iS]+'" CB_U="'+r1[iCBU]+'" CB_C="'+r1[iCBC]+'"');
+  }
   d.values.slice(1).forEach(function(r){
-    if(!r[iS]) return;
-    var sku=r[iS].toString().trim();
-    if(!DB.codigosBarra.find(function(x){return x.sku===sku;}))
-      DB.codigosBarra.push({sku:sku,desc:iD>=0&&r[iD]?r[iD].toString().trim():''});
+    var sku=(r[iS]||'').toString().trim();
+    if(!sku) return;
+    var desc=iDesc>=0&&r[iDesc]?r[iDesc].toString().trim():'';
+    var cbU=(r[iCBU]||'').toString().trim();
+    var cbC=(r[iCBC]||'').toString().trim();
+    // Guardar una entrada por SKU (dedup)
+    var existe=DB.codigosBarra.find(function(x){return x.sku===sku;});
+    if(!existe){
+      DB.codigosBarra.push({sku:sku, desc:desc, cbUnidad:cbU, cbCaja:cbC});
+    } else {
+      // Agregar CBs adicionales si la misma fila tiene otro código de barra
+      if(cbU&&!existe.cbUnidad) existe.cbUnidad=cbU;
+      if(cbC&&!existe.cbCaja) existe.cbCaja=cbC;
+    }
   });
+  console.log('[CBARRA] Cargados:',DB.codigosBarra.length,'SKUs con equivalencias de códigos de barras');
 }
 
 /* ── Carga de catálogos ──────────────────────────────────────── */
@@ -956,12 +979,36 @@ function showPerchadoPorSKU(){
   setTimeout(function(){var el=$r('inp-sku');if(el)el.focus();},80);
 }
 
+
+// ── Resolver código leído → SKU real ─────────────────────────────
+// Acepta: SKU directo, código de barras unidad (col D), código de barras caja (col F)
+function resolverSKU(codigoLeido){
+  var q=codigoLeido.toString().trim().toUpperCase();
+  if(!q) return null;
+  // 1. Coincidencia directa de SKU
+  var porSKU=DB.codigosBarra.find(function(x){return normStr(x.sku)===q;});
+  if(porSKU) return {sku:porSKU.sku, desc:porSKU.desc, via:'SKU'};
+  // 2. Código de barras unidad (col D)
+  var porCBU=DB.codigosBarra.find(function(x){return x.cbUnidad&&normStr(x.cbUnidad)===q;});
+  if(porCBU) return {sku:porCBU.sku, desc:porCBU.desc, via:'CB_Unidad'};
+  // 3. Código de barras caja (col F)
+  var porCBC=DB.codigosBarra.find(function(x){return x.cbCaja&&normStr(x.cbCaja)===q;});
+  if(porCBC) return {sku:porCBC.sku, desc:porCBC.desc, via:'CB_Caja'};
+  // 4. No encontrado — devolver null (el llamador decide si continúa igual)
+  return null;
+}
 function buscarSKU(){
-  var sku=($r('inp-sku').value||'').trim().toUpperCase();
-  if(!sku){toast('Ingresa un SKU');return;}
-  S.skuActual={sku:sku};
-  var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===sku;});
-  if(cb) S.skuActual.desc=cb.desc;
+  var codigoLeido=($r('inp-sku').value||'').trim();
+  if(!codigoLeido){toast('Ingresa un SKU o código de barras');return;}
+  // Resolver equivalencia: SKU directo, CB unidad o CB caja
+  var resuelto=resolverSKU(codigoLeido);
+  var sku=resuelto?resuelto.sku:codigoLeido.toUpperCase();
+  var desc=resuelto?resuelto.desc:'';
+  if(resuelto&&resuelto.via!=='SKU'){
+    console.log('[EQUIV] Código "'+codigoLeido+'" → SKU "'+sku+'" via '+resuelto.via);
+    toast('Código resuelto → '+sku, 1500);
+  }
+  S.skuActual={sku:sku, desc:desc};
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Calculando saldos...</div></div>');
   Promise.all([
     cargarRecepcionesPedido(S.pedido),
@@ -2361,6 +2408,7 @@ window._renderSKUsPorDestino=_renderSKUsPorDestino;
 window._ejecutarSepDesdeDestino=_ejecutarSepDesdeDestino;
 window.ejecutarSeparacion=ejecutarSeparacion;
 window.showMenuPrincipal=showMenuPrincipal;
+window.resolverSKU=resolverSKU;
 window.showSeleccionOperador=showSeleccionOperador;
 window.showVistaOperativa=showVistaOperativa;
 function selVistaOperativa(){
