@@ -1822,7 +1822,7 @@ function _renderSKUsPorDestino(dest,skuMap,saldoXsku){
       btnExec.className='btn btn-sep'; btnExec.style.cssText='font-size:13px;padding:9px';
       btnExec.textContent='✓ Ejecutar';
       btnExec.addEventListener('click',(function(sk,ca,de,di){
-        return function(){ _ejecutarSepDesdeDestino(sk,ca,de,di); };
+        return function(){ _seleccionarLPNSep(sk,ca,de,di); };
       })(sku,cant,dest,disp));
       var btnCamb=document.createElement('button');
       btnCamb.className='btn btn-sec'; btnCamb.style.cssText='font-size:13px;padding:9px';
@@ -1875,11 +1875,134 @@ function _cambiarCantidadSep(sku,cantOriginal,dest,disp){
       var nv=parseInt((document.getElementById('inp-sep-cant')||{}).value||'0');
       if(!nv||nv<=0){toast('Ingresa una cantidad válida');return;}
       if(nv>disp){toast('Supera stock disponible ('+disp+' un)');return;}
-      _ejecutarSepDesdeDestino(sku,nv,dest,disp);
+      _seleccionarLPNSep(sku,nv,dest,disp);
     });
     row.appendChild(ba); row.appendChild(bg); wrap.appendChild(row);
   }
   setTimeout(function(){var el=document.getElementById('inp-sep-cant');if(el){el.focus();el.select();}},80);
+}
+
+// ── Selección de LPN origen para Separación ──────────────────────
+function _seleccionarLPNSep(sku,cantReq,destino,saldoDisp){
+  pushScreen('sep-lpn-'+sku,function(){_seleccionarLPNSep(sku,cantReq,destino,saldoDisp);});
+  actualizarBack();
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Calculando saldos por LPN...</div></div>');
+
+  Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
+    DB._movsCache=res[1];
+    var saldos=calcularSaldos(res[0],res[1]);
+    // LPN con saldo > 0 para este SKU, orden FIFO por fecha de creación
+    var lpns=Object.keys(saldos)
+      .map(function(k){return saldos[k];})
+      .filter(function(s){
+        return normStr(s.sku).toUpperCase()===normStr(sku).toUpperCase()&&s.saldo>0;
+      })
+      .sort(function(a,b){
+        if(a.created&&b.created) return new Date(a.created)-new Date(b.created);
+        return String(a.lpn).localeCompare(String(b.lpn));
+      });
+
+    var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(destino);});
+
+    render(
+      '<div class="badge badge-sep">'+destino+'</div>'+
+      '<div class="badge badge-pedido" style="margin-left:6px">'+S.pedido+'</div>'+
+      '<div class="saldo-panel" style="margin-top:10px">'+
+        '<div class="saldo-sku">'+sku+'</div>'+
+        '<div class="saldo-row"><span class="saldo-row-lbl">Cantidad a separar</span>'+
+          '<span class="saldo-row-val">'+cantReq+' un</span></div>'+
+        (destInfo?'<div class="saldo-row"><span class="saldo-row-lbl">Destino</span>'+
+          '<span class="saldo-row-val">'+destInfo.almacen+' / '+destInfo.ubicacion+'</span></div>':'')+
+      '</div>'+
+      '<div class="lbl" style="margin-top:10px">selecciona el LPN origen</div>'+
+      '<div id="lpn-sep-grid"></div>'
+    );
+
+    var grid=document.getElementById('lpn-sep-grid');
+    if(!grid) return;
+
+    if(!lpns.length){
+      grid.innerHTML='<div class="empty-state"><div class="empty-icon">⚠</div>Sin saldo disponible para este SKU</div>';
+      return;
+    }
+
+    lpns.forEach(function(s){
+      var suficiente=s.saldo>=cantReq;
+      var card=document.createElement('div');
+      card.className='item-card';
+      card.style.cssText='border-left:3px solid '+(suficiente?'var(--sep)':'var(--warn)');
+      card.innerHTML=
+        '<div style="flex:1">'+
+          '<div class="item-main">'+s.lpn+'</div>'+
+          '<div class="item-sub" style="color:'+(suficiente?'var(--ok)':'var(--warn)')+'">'+
+            s.saldo+' un disponibles'+
+            (!suficiente?' — insuficiente para '+cantReq+' un':'')+
+          '</div>'+
+        '</div>'+
+        '<div class="item-qty">'+
+          '<div class="item-qty-num">'+s.saldo+'</div>'+
+          '<div class="item-qty-lbl">disp.</div>'+
+        '</div>';
+      card.addEventListener('click',(function(lpn,saldoLPN){
+        return function(){
+          if(cantReq>saldoLPN){
+            toast('Saldo insuficiente en este LPN: '+saldoLPN+' un disponibles');
+            return;
+          }
+          _ejecutarSepConLPN(sku,cantReq,destino,lpn);
+        };
+      })(s.lpn,s.saldo));
+      grid.appendChild(card);
+    });
+  }).catch(function(e){
+    render('<div class="empty-state"><div class="empty-icon">⚠</div>Error cargando saldos: '+e.message+'</div>');
+  });
+}
+
+// ── Ejecutar separación sobre un LPN específico elegido ──────────
+function _ejecutarSepConLPN(sku,cantReq,destino,lpnOrigen){
+  var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(destino);});
+  if(!destInfo){toast('Destino "'+destino+'" no encontrado en DestinosSeparacion');return;}
+  var origData=CFG.empresas['INV'];
+  var t=ahora();
+  var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
+  var fields={
+    Title:           S.pedido+'-SEP-'+t.ts.replace(/[:.]/g,''),
+    Pedido:          S.pedido,
+    LPN:             lpnOrigen,
+    SKU:             sku,
+    Descripcion:     cb?cb.desc:'',
+    Cantidad:        cantReq,
+    TipoMovimiento:  'SEPARACION',
+    AlmacenOrigen:   origData.almacenOrigen,
+    UbicacionOrigen: origData.ubicOrigen,
+    AlmacenDestino:  destInfo.almacen,
+    UbicacionDestino:destInfo.ubicacion,
+    DestinoSeparacion:destino,
+    Operador:        S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'',
+    FechaMovimiento: t.ts,
+  };
+  console.log('[SEP-LPN] LPN='+lpnOrigen+' SKU='+sku+' Cant='+cantReq+' Dest='+destino);
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Registrando separación...</div></div>');
+  gPost(urlLista(DB.listIds.movimientos)+'/items',{fields:fields}).then(function(){
+    render(
+      '<div style="text-align:center;padding:24px 0">'+
+        '<div style="font-size:48px;margin-bottom:12px">✓</div>'+
+        '<div style="font-size:18px;font-weight:700;color:var(--sep);margin-bottom:8px">Separación ejecutada</div>'+
+        '<div style="font-size:13px;color:var(--txt);margin-bottom:4px">'+cantReq+' un de '+sku+' → '+destino+'</div>'+
+        '<div style="font-size:11px;color:var(--mut)">LPN origen: '+lpnOrigen+'</div>'+
+        '<div style="font-size:11px;color:var(--mut)">'+destInfo.almacen+' / '+destInfo.ubicacion+'</div>'+
+      '</div>'+
+      '<div class="btn-row" style="flex-direction:column">'+
+        '<button class="btn btn-sep" onclick="showSeparacion()">← Volver a destinos</button>'+
+        '<button class="btn btn-sec" onclick="showMenuPrincipal()">⌂ Menú principal</button>'+
+      '</div>'
+    );
+  }).catch(function(e){
+    console.error('[SEP-LPN] Error:',e.message);
+    toast('Error: '+e.message.slice(0,60));
+    goBack();
+  });
 }
 function _ejecutarSepDesdeDestino(sku,cantReq,destino,saldoDisp){
   if(!destino){toast('Destino no definido');return;}
@@ -2491,6 +2614,8 @@ window._cambiarCantidadSep=_cambiarCantidadSep;
 window._renderDestinosSep=_renderDestinosSep;
 window._renderSKUsPorDestino=_renderSKUsPorDestino;
 window._ejecutarSepDesdeDestino=_ejecutarSepDesdeDestino;
+window._seleccionarLPNSep=_seleccionarLPNSep;
+window._ejecutarSepConLPN=_ejecutarSepConLPN;
 window.ejecutarSeparacion=ejecutarSeparacion;
 window.showMenuPrincipal=showMenuPrincipal;
 window.resolverSKU=resolverSKU;
