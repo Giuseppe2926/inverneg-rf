@@ -1385,6 +1385,12 @@ function _confirmarFormMovimiento(sku,saldoDisp){
   var ubic=window._ubicSeleccionada||'';
   var obs=((document.getElementById('inp-obs')||{}).value||'').trim();
 
+  console.log('[PERCHAR] SKU:', sku);
+  console.log('[PERCHAR] LPN (S.lpnActual):', S.lpnActual, 'tipo:', typeof S.lpnActual);
+  console.log('[PERCHAR] Cantidad:', cant);
+  console.log('[PERCHAR] Almacen:', alm);
+  console.log('[PERCHAR] Ubicacion:', ubic);
+
   if(!cant||cant<=0){toast('Ingresa una cantidad válida');return;}
   if(cant>saldoDisp){toast('Cantidad supera el disponible ('+saldoDisp+' un)');return;}
   if(!alm){toast('Selecciona el almacén destino');return;}
@@ -1393,14 +1399,30 @@ function _confirmarFormMovimiento(sku,saldoDisp){
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Validando saldo...</div></div>');
   Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
     var saldos=calcularSaldos(res[0],res[1]);
-    var k=S.lpnActual+'|'+sku;
+    // normLPN garantiza string para que la clave coincida con la del mapa de saldos
+    var lpnNorm=normLPN(S.lpnActual);
+    var skuNorm=sku.toString().trim();
+    var k=lpnNorm+'|'+skuNorm;
     var saldoReal=saldos[k]?saldos[k].saldo:0;
+
+    console.log('[PERCHAR] Claves en saldos:', Object.keys(saldos).filter(function(c){
+      return c.indexOf(skuNorm)>=0;
+    }));
+    console.log('[PERCHAR] Clave buscada:', k, '| saldoReal:', saldoReal);
+
     if(cant>saldoReal){
+      // Diagnóstico: listar todas las claves del saldo para detectar discrepancia
+      console.warn('[PERCHAR] Saldo insuficiente o clave no encontrada.');
+      console.warn('[PERCHAR] Todas las claves del mapa:', Object.keys(saldos).slice(0,20));
       toast('Saldo cambió. Disponible ahora: '+saldoReal+' un');
       showFormMovimiento(S.lpnActual,sku,saldoReal);
       return;
     }
+    console.log('[PERCHAR] Saldo OK → ejecutando movimiento');
     showConfirmacionMovimiento(sku,cant,alm,ubic,obs,saldoReal);
+  }).catch(function(e){
+    console.error('[PERCHAR] Error validando saldo:', e.message);
+    toast('Error al validar saldo: '+e.message.slice(0,50));
   });
 }
 
@@ -1438,22 +1460,42 @@ function actualizarUbicaciones(){
 }
 
 function confirmarMovimiento(sku,saldoDisp){
-  var cant=parseInt($r('inp-qty').value||'0');
-  var alm=($r('sel-almacen').value||'').trim();
-  var ubic=($r('sel-ubic').value||'').trim();
-  var obs=($r('inp-obs').value||'').trim();
+  var cant=parseInt(($r('inp-qty')||{value:'0'}).value||'0');
+  // Los buscadores de almacén/ubicación usan window._almSeleccionado y window._ubicSeleccionada
+  // El input visible es inp-alm-dest / inp-ubic-dest (solo para búsqueda, no el valor confirmado)
+  var alm=(window._almSeleccionado||'').trim();
+  var ubic=(window._ubicSeleccionada||'').trim();
+  var obs=(($r('inp-obs')||{value:''}).value||'').trim();
+
+  console.log('[PERCHAR] SKU:', sku);
+  console.log('[PERCHAR] LPN:', S.lpnActual);
+  console.log('[PERCHAR] Cantidad:', cant);
+  console.log('[PERCHAR] Almacen (_almSeleccionado):', alm);
+  console.log('[PERCHAR] Ubicacion (_ubicSeleccionada):', ubic);
+  console.log('[PERCHAR] inp-alm-dest value:', ($r('inp-alm-dest')||{value:'(no encontrado)'}).value);
+  console.log('[PERCHAR] inp-ubic-dest value:', ($r('inp-ubic-dest')||{value:'(no encontrado)'}).value);
 
   if(!cant||cant<=0){toast('Ingresa una cantidad válida');return;}
   if(cant>saldoDisp){toast('Cantidad supera el disponible ('+saldoDisp+' un)');return;}
+  if(!alm){
+    // Fallback: leer del input visible si _almSeleccionado está vacío
+    alm=(($r('inp-alm-dest')||{value:''}).value||'').trim();
+    console.log('[PERCHAR] Fallback alm desde input:', alm);
+  }
+  if(!ubic){
+    ubic=(($r('inp-ubic-dest')||{value:''}).value||'').trim();
+    console.log('[PERCHAR] Fallback ubic desde input:', ubic);
+  }
   if(!alm){toast('Selecciona el almacén destino');return;}
   if(!ubic){toast('Selecciona la ubicación destino');return;}
 
-  // Validación en tiempo real justo antes del POST
+  console.log('[PERCHAR] Validando saldo en SP antes de guardar...');
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Validando saldo en tiempo real...</div></div>');
   Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
     var saldos=calcularSaldos(res[0],res[1]);
-    var k=S.lpnActual+'|'+sku;
+    var k=normLPN(S.lpnActual)+'|'+sku;
     var saldoReal=saldos[k]?saldos[k].saldo:0;
+    console.log('[PERCHAR] Saldo SP real:', saldoReal, 'clave:', k);
 
     if(cant>saldoReal){
       toast('Saldo cambió. Disponible ahora: '+saldoReal+' un');
@@ -1461,8 +1503,11 @@ function confirmarMovimiento(sku,saldoDisp){
       return;
     }
 
-    // Mostrar confirmación antes de escribir
+    console.log('[PERCHAR] Saldo OK — mostrando confirmación');
     showConfirmacionMovimiento(sku,cant,alm,ubic,obs,saldoReal);
+  }).catch(function(e){
+    console.error('[PERCHAR] Error validando saldo:', e.message);
+    toast('Error al validar: '+e.message.slice(0,50));
   });
 }
 
