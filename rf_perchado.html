@@ -683,13 +683,15 @@ function cargarMovimientosPedido(pedido){
 }
 
 /* ── Cálculo de saldo ────────────────────────────────────────── */
+// normLPN: convierte LPN a string normalizado — definida globalmente para uso en validaciones
+function normLPN(v){ return v!==null&&v!==undefined&&v!==''?String(v).trim():'(sin LPN)'; }
+
 function calcularSaldos(recepciones,movimientos,logSKU){
   // Retorna Map de "LPN|SKU" → {lpn,sku,desc,recibido,movido,saldo,created}
   // logSKU: si se pasa, loguea detalle para ese SKU específico
   var mapa={};
 
   // Normalizar LPN a string siempre — evita que número 1 ≠ string "1"
-  function normLPN(v){ return v!==null&&v!==undefined&&v!==''?String(v).trim():'(sin LPN)'; }
 
   // Sumar recibido OK (correcciones participan como negativos, dañado excluido)
   recepciones.forEach(function(r){
@@ -1408,6 +1410,7 @@ function _confirmarFormMovimiento(sku,saldoDisp){
       return c.indexOf(skuNorm)>=0;
     }));
     console.log('[PERCHAR] Clave buscada:', k, '| saldoReal:', saldoReal);
+    console.log('[PERCHAR] saldoReal calculado:', saldoReal);
 
     if(cant>saldoReal){
       // Diagnóstico: listar todas las claves del saldo para detectar discrepancia
