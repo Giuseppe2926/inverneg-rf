@@ -1023,30 +1023,37 @@ function resolverSKU(codigoLeido){
 function buscarSKU(){
   var codigoLeido=($r('inp-sku').value||'').trim();
   if(!codigoLeido){toast('Ingresa un SKU o código de barras');return;}
-  // Resolver equivalencia: SKU directo, CB unidad o CB caja
   var resuelto=resolverSKU(codigoLeido);
-  var sku=resuelto?resuelto.sku:codigoLeido.toUpperCase();
+  // skuNorm siempre UPPERCASE — claveK en calcularSaldos también es UPPERCASE
+  var skuNorm=(resuelto?resuelto.sku:codigoLeido).toString().trim().toUpperCase();
   var desc=resuelto?resuelto.desc:'';
+  console.log('[SKU-BUSQ] ingresado:',JSON.stringify(codigoLeido),
+    '→ skuNorm:',JSON.stringify(skuNorm));
   if(resuelto&&resuelto.via!=='SKU'){
-    console.log('[EQUIV] Código "'+codigoLeido+'" → SKU "'+sku+'" via '+resuelto.via);
-    toast('Código resuelto → '+sku, 1500);
+    console.log('[EQUIV] Código "'+codigoLeido+'" → SKU "'+skuNorm+'" via '+resuelto.via);
+    toast('Código resuelto → '+skuNorm, 1500);
   }
-  S.skuActual={sku:sku, desc:desc};
+  S.skuActual={sku:skuNorm, desc:desc};
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Calculando saldos...</div></div>');
   Promise.all([
     cargarRecepcionesPedido(S.pedido),
     cargarMovimientosPedido(S.pedido),
   ]).then(function(res){
-    DB._movsCache=res[1]; // cachear para sepPendienteSKU
-      var saldos=calcularSaldos(res[0],res[1],sku); // logSKU activo
-    // Filtrar por SKU con saldo > 0, ordenar por LPN alfanumérico
+    DB._movsCache=res[1];
+    var saldos=calcularSaldos(res[0],res[1],skuNorm);
+    // Filtrar: s.sku viene del SP original, claveK lo convirtió a UPPER en el mapa
+    // Comparar siempre en UPPERCASE en ambos lados
     var lpns=Object.keys(saldos)
       .map(function(k){return saldos[k];})
-      .filter(function(s){return normStr(s.sku)===sku&&s.saldo>0;})
-      .sort(function(a,b){return a.lpn.localeCompare(b.lpn);});
-
+      .filter(function(s){
+        return s.sku.toString().trim().toUpperCase()===skuNorm&&s.saldo>0;
+      })
+      .sort(function(a,b){return String(a.lpn).localeCompare(String(b.lpn));});
+    console.log('[SKU-BUSQ] LPNs con saldo>0:',lpns.map(function(s){
+      return s.lpn+'('+s.saldo+')';
+    }).join(', ')||'ninguno');
     window._saldosCache=saldos;
-    showListaLPNParaSKU(sku,lpns);
+    showListaLPNParaSKU(skuNorm,lpns);
   });
 }
 
