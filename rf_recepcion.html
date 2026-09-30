@@ -1139,10 +1139,8 @@ function showHome(){
   render(
     '<div class="lbl">¿con qué rol ingresas?</div>'+
     '<div class="grid2">'+
-      '<div class="card-t'+(S.rol==='supervisor'?' sel':'')+'" onclick="S.rol=\'supervisor\';S.operario=\'\';showHome()">'+
-        '<div class="card-t-icon">👔</div><div class="card-t-lbl">SUPERVISOR</div></div>'+
-      '<div class="card-t'+(S.rol==='operario'?' sel':'')+'" onclick="S.rol=\'operario\';S.operario=\'\';showHome()">'+
-        '<div class="card-t-icon">👷</div><div class="card-t-lbl">OPERARIO</div></div>'+
+      '<div class="card-t'+(estAct==='OK'?' sel':'')+'" id="ed-ok" onclick="selEstadoCorr(\'OK\')">OK</div>'+
+      '<div class="card-t'+(estAct==='DAÑADO'?' sel':'')+'" id="ed-dan" onclick="selEstadoCorr(\'DAÑADO\')">DAÑADO</div>'+
     '</div>'+
     '<div class="lbl" style="margin-top:10px">'+(S.rol==='supervisor'?'supervisor':'operario')+'</div>'+
     '<select class="inp" id="sel-quien" onchange="S.operario=this.value;updateFtr()">'+
@@ -2142,33 +2140,244 @@ function iniciarCorreccion(idx,sku,cantOrig){
   window._corrSKU=sku; window._corrOriginal=cantOrig; window._corrIdx=idx;
   var reg=window._filtrados[idx]||{};
   var desc=reg.Nombre||reg.desc||sku;
-  var h='<div class="badge badge-rec">CORREGIR</div>';
-  h+='<div style="background:var(--sur2);border-radius:8px;padding:12px;margin-bottom:10px">';
-  h+='<div style="font-size:12px;font-weight:700;color:var(--acc)">'+sku+'</div>';
-  h+='<div style="font-size:12px;color:var(--txt)">'+desc+'</div>';
-  h+='<div style="font-size:11px;color:var(--mut);margin-top:4px">Original: <strong>'+cantOrig+'</strong></div></div>';
-  h+='<div class="lbl">cantidad correcta</div>';
-  h+='<input class="inp" id="inp-corr-real" type="number" placeholder="Ej: 90" ';
-  h+='style="font-size:24px;font-weight:700;text-align:center" autocomplete="off">';
-  h+='<div id="corr-preview" style="font-size:12px;color:var(--mut);margin-top:6px;text-align:center">Se registra la diferencia</div>';
-  h+='<div class="lbl" style="margin-top:8px">observacion (requerida)</div>';
-  h+='<textarea class="inp inp-sm" id="inp-corr-obs" rows="2" style="resize:none" placeholder="Motivo..."></textarea>';
-  h+='<div class="btn-row" style="margin-top:10px">';
-  h+='<button class="btn btn-sec" onclick="showCorreccion()">ATR</button>';
-  h+='<button class="btn btn-warn btn-big" onclick="confCorreccion()">APLICAR CORRECCION</button></div>';
-  render(h);
+  var lpn=reg.LPN||reg.lpn||'—';
+  var cont=reg.Contenedor||reg.contenedor||'—';
+  var est=reg.Estado||reg.estado||'OK';
+  // Menú de acciones disponibles
+  render(
+    '<div class="badge badge-rec">CORREGIR REGISTRO</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin-bottom:12px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--acc)">'+sku+'</div>'+
+      '<div style="font-size:12px;color:var(--txt);margin-top:2px">'+desc+'</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px">'+
+        '<span>Cantidad: <strong>'+cantOrig+'</strong></span>'+
+        '<span>Estado: <strong>'+est+'</strong></span>'+
+        '<span>LPN: <strong>'+lpn+'</strong></span>'+
+        '<span>Cont: <strong>'+cont+'</strong></span>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+      '<div class="card-item" onclick="corrCantidad()">'+
+        '<div class="card-t-icon" style="font-size:20px">🔢</div>'+
+        '<div><div style="font-weight:700;font-size:13px">Corregir cantidad</div>'+
+        '<div style="font-size:11px;color:var(--mut)">Ajustar unidades registradas</div></div>'+
+      '</div>'+
+      '<div class="card-item" onclick="corrLPN()">'+
+        '<div class="card-t-icon" style="font-size:20px">🏷</div>'+
+        '<div><div style="font-weight:700;font-size:13px">Corregir LPN</div>'+
+        '<div style="font-size:11px;color:var(--mut)">Cambiar el pallet asignado</div></div>'+
+      '</div>'+
+      '<div class="card-item" onclick="corrDatos()">'+
+        '<div class="card-t-icon" style="font-size:20px">✏️</div>'+
+        '<div><div style="font-weight:700;font-size:13px">Corregir datos</div>'+
+        '<div style="font-size:11px;color:var(--mut)">Estado, novedades, observación</div></div>'+
+      '</div>'+
+      '<div class="card-item" style="border-color:var(--dan)" onclick="corrEliminar()">'+
+        '<div class="card-t-icon" style="font-size:20px">🗑</div>'+
+        '<div><div style="font-weight:700;font-size:13px;color:var(--dan)">Eliminar registro</div>'+
+        '<div style="font-size:11px;color:var(--mut)">Registrar anulación completa</div></div>'+
+      '</div>'+
+    '</div>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showCorreccion()">← Atrás</button>'
+  );
+}
+
+// ── Acción 1: Corregir cantidad ───────────────────────────────────
+function corrCantidad(){
+  var sku=window._corrSKU; var cantOrig=window._corrOriginal;
+  render(
+    '<div class="badge badge-rec">CORREGIR CANTIDAD</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:10px 12px;margin-bottom:10px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--acc)">'+sku+'</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-top:2px">Registrado: <strong>'+cantOrig+' un</strong></div>'+
+    '</div>'+
+    '<div class="lbl">cantidad correcta (unidades totales)</div>'+
+    '<input class="inp" id="inp-corr-real" type="number" placeholder="Ej: 90" '+
+      'style="font-size:24px;font-weight:700;text-align:center" autocomplete="off">'+
+    '<div id="corr-preview" style="font-size:12px;color:var(--mut);margin-top:6px;text-align:center">Ingresa la cantidad real</div>'+
+    '<div class="lbl" style="margin-top:8px">observación (requerida)</div>'+
+    '<textarea class="inp inp-sm" id="inp-corr-obs" rows="2" style="resize:none" placeholder="Motivo de la corrección..."></textarea>'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="iniciarCorreccion(window._corrIdx,window._corrSKU,window._corrOriginal)">← Atrás</button>'+
+      '<button class="btn btn-warn btn-big" onclick="confCorreccion()">✓ Aplicar</button>'+
+    '</div>'
+  );
   setTimeout(function(){
     var el=document.getElementById('inp-corr-real');
     if(el){el.focus();el.addEventListener('input',function(){
       var real=parseFloat(el.value);
       var prev=document.getElementById('corr-preview');
       if(!isNaN(real)&&prev){
-        var d=real-window._corrOriginal;
-        prev.textContent='Ajuste: '+(d>=0?'+':'')+d+' ('+window._corrOriginal+' a '+real+')';
+        var d=real-cantOrig;
+        prev.textContent='Ajuste: '+(d>=0?'+':'')+d+' ('+cantOrig+' → '+real+' un)';
         prev.style.color=d<0?'var(--ok)':d>0?'var(--dan)':'var(--mut)';
       }
     });}
   },100);
+}
+
+// ── Acción 2: Corregir LPN ────────────────────────────────────────
+function corrLPN(){
+  var reg=window._filtrados[window._corrIdx]||{};
+  var lpnActual=reg.LPN||reg.lpn||'';
+  render(
+    '<div class="badge badge-rec">CORREGIR LPN</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:10px 12px;margin-bottom:10px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--acc)">'+window._corrSKU+'</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-top:2px">LPN actual: <strong>'+(lpnActual||'(sin LPN)')+'</strong></div>'+
+    '</div>'+
+    '<div class="lbl">nuevo LPN</div>'+
+    '<input class="inp" id="inp-corr-lpn" type="text" placeholder="Ej: LPN0002" '+
+      'value="'+lpnActual+'" autocomplete="off" style="font-size:20px;font-weight:700;text-align:center;text-transform:uppercase">'+
+    '<div class="lbl" style="margin-top:8px">observación (requerida)</div>'+
+    '<textarea class="inp inp-sm" id="inp-corr-obs-lpn" rows="2" style="resize:none" placeholder="Motivo del cambio de LPN..."></textarea>'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="iniciarCorreccion(window._corrIdx,window._corrSKU,window._corrOriginal)">← Atrás</button>'+
+      '<button class="btn btn-warn btn-big" onclick="confCorrLPN()">✓ Aplicar</button>'+
+    '</div>'
+  );
+  setTimeout(function(){var el=document.getElementById('inp-corr-lpn');if(el)el.focus();},100);
+}
+function confCorrLPN(){
+  var nuevoLPN=(document.getElementById('inp-corr-lpn').value||'').trim().toUpperCase();
+  if(!nuevoLPN){toast('Ingresa el LPN correcto');return;}
+  var obs=(document.getElementById('inp-corr-obs-lpn').value||'').trim();
+  if(!obs){toast('Ingresa una observación');return;}
+  var reg=window._filtrados[window._corrIdx]||{};
+  var lpnAnterior=reg.LPN||reg.lpn||'(sin LPN)';
+  if(normStr(nuevoLPN)===normStr(lpnAnterior)){toast('El LPN es igual al actual');return;}
+  // Registrar ajuste negativo del LPN anterior y positivo en el nuevo LPN
+  var regCorr={
+    sku:window._corrSKU, desc:reg.Nombre||reg.desc||window._corrSKU,
+    factor:1, numCajas:1,
+    cantidad:-window._corrOriginal,   // anular del LPN original
+    estado:'CORRECCION',
+    novedad:'Cambio LPN: de '+lpnAnterior+' a '+nuevoLPN+' - '+obs,
+    pedido:S.pedido, lpn:lpnAnterior,
+  };
+  var regNuevo={
+    sku:window._corrSKU, desc:reg.Nombre||reg.desc||window._corrSKU,
+    factor:1, numCajas:1,
+    cantidad:window._corrOriginal,    // recrear en el LPN nuevo
+    estado:'OK',
+    novedad:'Reasignado desde LPN '+lpnAnterior+' - '+obs,
+    pedido:S.pedido, lpn:nuevoLPN,
+  };
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Aplicando corrección...</div></div>');
+  Promise.all([escribirSKU(regCorr),escribirSKU(regNuevo)]).then(function(){
+    S.skusRegistrados.push(regCorr); S.skusRegistrados.push(regNuevo);
+    toast('LPN corregido: '+lpnAnterior+' → '+nuevoLPN);
+    showCorreccion();
+  }).catch(function(e){toast('Error: '+e.message.slice(0,50));showCorreccion();});
+}
+
+// ── Acción 3: Corregir datos (estado, novedades) ──────────────────
+function corrDatos(){
+  var reg=window._filtrados[window._corrIdx]||{};
+  var estAct=reg.Estado||reg.estado||'OK';
+  window._estadoCorrDatos=estAct;
+  var novActual=(reg.Novedades||reg.novedad)||'';
+  render(
+    '<div class="badge badge-rec">CORREGIR DATOS</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:10px 12px;margin-bottom:10px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--acc)">'+window._corrSKU+'</div>'+
+      '<div style="font-size:11px;color:var(--mut)">Cantidad: <strong>'+window._corrOriginal+' un</strong></div>'+
+    '</div>'+
+    '<div class="lbl">estado correcto</div>'+
+    '<div class="grid2" id="grid-est-corr"></div>'+
+    '<div class="lbl" style="margin-top:8px">novedades / descripción</div>'+
+    '<textarea class="inp inp-sm" id="inp-corr-nov" rows="2" style="resize:none" '+
+      'placeholder="Descripción de la novedad..."></textarea>'+
+    '<div class="lbl" style="margin-top:8px">observación (requerida)</div>'+
+    '<textarea class="inp inp-sm" id="inp-corr-obs-d" rows="2" style="resize:none" placeholder="Motivo..."></textarea>'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="iniciarCorreccion(window._corrIdx,window._corrSKU,window._corrOriginal)">← Atrás</button>'+
+      '<button class="btn btn-warn btn-big" onclick="confCorrDatos()">✓ Aplicar</button>'+
+    '</div>'
+  );
+  // Precargar textarea con novedad actual
+  var novEl=document.getElementById('inp-corr-nov');
+  if(novEl) novEl.value=novActual;
+  // Chips de estado via DOM
+  var grid=document.getElementById('grid-est-corr');
+  if(grid){
+    ['OK','DAÑADO'].forEach(function(est){
+      var chip=document.createElement('div');
+      chip.className='card-t'+(estAct===est?' sel':'');
+      chip.id=est==='OK'?'ed-ok':'ed-dan';
+      chip.textContent=est;
+      chip.addEventListener('click',function(){selEstadoCorr(est);});
+      grid.appendChild(chip);
+    });
+  }
+}
+function selEstadoCorr(e){
+  window._estadoCorrDatos=e;
+  document.getElementById('ed-ok').className='card-t'+(e==='OK'?' sel':'');
+  document.getElementById('ed-dan').className='card-t'+(e==='DAÑADO'?' sel':'');
+}
+function confCorrDatos(){
+  var obs=(document.getElementById('inp-corr-obs-d').value||'').trim();
+  if(!obs){toast('Ingresa una observación');return;}
+  var nov=(document.getElementById('inp-corr-nov').value||'').trim();
+  var est=window._estadoCorrDatos||'OK';
+  var reg=window._filtrados[window._corrIdx]||{};
+  // Anular el registro original y crear uno nuevo con datos corregidos
+  var regAnul={
+    sku:window._corrSKU, desc:reg.Nombre||reg.desc||window._corrSKU,
+    factor:1, numCajas:1, cantidad:-window._corrOriginal,
+    estado:'CORRECCION', novedad:'Anulado para corrección de datos - '+obs,
+    pedido:S.pedido, lpn:reg.LPN||reg.lpn||'',
+  };
+  var regNuevo={
+    sku:window._corrSKU, desc:reg.Nombre||reg.desc||window._corrSKU,
+    factor:1, numCajas:1, cantidad:window._corrOriginal,
+    estado:est, novedad:nov,
+    pedido:S.pedido, lpn:reg.LPN||reg.lpn||'',
+  };
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Aplicando corrección...</div></div>');
+  Promise.all([escribirSKU(regAnul),escribirSKU(regNuevo)]).then(function(){
+    S.skusRegistrados.push(regAnul); S.skusRegistrados.push(regNuevo);
+    toast('Datos corregidos: '+est+(nov?' · '+nov.slice(0,30):''));
+    showCorreccion();
+  }).catch(function(e){toast('Error: '+e.message.slice(0,50));showCorreccion();});
+}
+
+// ── Acción 4: Eliminar registro ───────────────────────────────────
+function corrEliminar(){
+  var reg=window._filtrados[window._corrIdx]||{};
+  render(
+    '<div class="badge badge-rec" style="background:rgba(248,81,73,.15);color:var(--dan)">ELIMINAR REGISTRO</div>'+
+    '<div class="alert" style="margin:10px 0">Esta acción registra un ajuste negativo que anula el registro seleccionado en SharePoint.</div>'+
+    '<div style="background:var(--sur2);border-radius:8px;padding:12px;margin-bottom:12px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--acc)">'+window._corrSKU+'</div>'+
+      '<div style="font-size:11px;color:var(--mut)">Cantidad a anular: <strong>'+window._corrOriginal+' un</strong></div>'+
+      '<div style="font-size:11px;color:var(--mut)">LPN: <strong>'+(reg.LPN||reg.lpn||'—')+'</strong></div>'+
+    '</div>'+
+    '<div class="lbl">motivo de eliminación (requerido)</div>'+
+    '<textarea class="inp inp-sm" id="inp-corr-obs-el" rows="2" style="resize:none" placeholder="Por qué se elimina este registro..."></textarea>'+
+    '<div class="btn-row" style="margin-top:10px">'+
+      '<button class="btn btn-sec" onclick="iniciarCorreccion(window._corrIdx,window._corrSKU,window._corrOriginal)">← Atrás</button>'+
+      '<button class="btn btn-warn btn-big" onclick="confCorrEliminar()">🗑 Confirmar eliminación</button>'+
+    '</div>'
+  );
+}
+function confCorrEliminar(){
+  var obs=(document.getElementById('inp-corr-obs-el').value||'').trim();
+  if(!obs){toast('Ingresa el motivo');return;}
+  var reg=window._filtrados[window._corrIdx]||{};
+  var regAnul={
+    sku:window._corrSKU, desc:reg.Nombre||reg.desc||window._corrSKU,
+    factor:1, numCajas:1, cantidad:-window._corrOriginal,
+    estado:'CORRECCION', novedad:'ELIMINADO: '+obs,
+    pedido:S.pedido, lpn:reg.LPN||reg.lpn||'',
+  };
+  render('<div class="loading"><div class="loading-icon">⏳</div><div>Eliminando registro...</div></div>');
+  escribirSKU(regAnul).then(function(){
+    S.skusRegistrados.push(regAnul);
+    toast('Registro eliminado: '+window._corrSKU+' -'+window._corrOriginal+' un');
+    showCorreccion();
+  }).catch(function(e){toast('Error: '+e.message.slice(0,50));showCorreccion();});
 }
 function confCorreccion(){
   var real=parseFloat(document.getElementById('inp-corr-real').value);
@@ -2746,6 +2955,14 @@ window.refrescarContenedoresExcel=refrescarContenedoresExcel;
 window.showCorreccion=showCorreccion;
 window.renderCorreccion=renderCorreccion;
 window.iniciarCorreccion=iniciarCorreccion;
+window.confCorrEliminar=confCorrEliminar;
+window.corrEliminar=corrEliminar;
+window.confCorrDatos=confCorrDatos;
+window.selEstadoCorr=selEstadoCorr;
+window.corrDatos=corrDatos;
+window.confCorrLPN=confCorrLPN;
+window.corrLPN=corrLPN;
+window.corrCantidad=corrCantidad;
 window.confCorreccion=confCorreccion;
 window.calcCantidad=calcCantidad;
 window.aplicarCalculo=aplicarCalculo;
