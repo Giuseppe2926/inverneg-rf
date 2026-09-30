@@ -783,13 +783,42 @@ function cargarEventosSP(pedido){
     }).catch(function(){return[];});
 }
 function cargarSKUsSP(pedido,contenedor){
-  if(!DB.listIds.recepciones) return Promise.resolve([]);
-  return gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500')
-    .then(function(d){
-      return(d.value||[])
-        .map(function(i){return i.fields;})
-        .filter(function(f){return f.Pedido===pedido&&(!contenedor||f.Contenedor===contenedor);});
-    }).catch(function(){return[];});
+  if(!DB.listIds.recepciones){
+    console.warn('[CORREGIR] Lista recepciones no disponible');
+    return Promise.resolve([]);
+  }
+  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=2000';
+  console.log('[CORREGIR] Pedido seleccionado:',pedido);
+  console.log('[CORREGIR] URL consulta SP:',url);
+  return gGet(url).then(function(d){
+    var total=(d.value||[]).length;
+    console.log('[CORREGIR] Registros recibidos de SharePoint:',total);
+    if(total>0){
+      var f0=d.value[0].fields||{};
+      console.log('[CORREGIR] Muestra ítem[0]: Pedido="'+f0.Pedido+'" Cont="'+f0.Contenedor+
+        '" SKU="'+f0.CodProducto+'" Cant='+f0.Cantidad);
+      // Log pedidos distintos en SP para detectar diferencias de formato
+      var peds=[...new Set((d.value||[]).map(function(i){return(i.fields||{}).Pedido||'(vacío)';}))];
+      console.log('[CORREGIR] Pedidos distintos en LRecepciones:',peds.join(' | '));
+    }
+    var filtrados=(d.value||[])
+      .map(function(i){return i.fields||{};})
+      .filter(function(f){
+        // Usar normStr para evitar errores por trim/case/espacios
+        var matchPed=normStr(f.Pedido||'')===normStr(pedido);
+        var matchCont=!contenedor||normStr(f.Contenedor||'')===normStr(contenedor);
+        return matchPed&&matchCont;
+      });
+    console.log('[CORREGIR] Registros después del filtro pedido"'+pedido+'"'+(contenedor?' cont"'+contenedor+'"':'')+':',filtrados.length);
+    if(filtrados.length>0){
+      console.log('[CORREGIR] Primer registro filtrado: SKU="'+filtrados[0].CodProducto+
+        '" Cant='+filtrados[0].Cantidad+' Estado="'+filtrados[0].Estado+'"');
+    }
+    return filtrados;
+  }).catch(function(e){
+    console.error('[CORREGIR] Error cargando SP:',e.message);
+    return[];
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -812,42 +841,40 @@ function getPacingList(pedido){
 
 // ── Helpers pendiente por pedido ────────────────────────────────
 function saldoSKU(pedido,sku){
-  // caché = otros contenedores del pedido (el contenedor actual ya fue excluido al cargar)
-  // skusRegistrados = contenedor actual (cargado desde SP + nuevos de esta sesión)
-  // Sin solapamiento → sin doble conteo
-  var totalCache=0, totalSesion=0;
+  // Suma registros de SP de otros contenedores (caché) + sesión actual
+  // La comparación es a nivel Pedido + SKU (todos los contenedores)
+  var total=0;
+  // Registros ya persistidos en SP (otros contenedores del pedido)
   DB.skusPedidoCache.forEach(function(r){
     if(normStr(r.CodProducto||'')===normStr(sku))
-      totalCache+=Number(r.Cantidad)||0;
+      total+=Number(r.Cantidad)||0;
   });
+  // Registros de la sesión actual (aún no en el caché)
   S.skusRegistrados.forEach(function(r){
-    if(normStr(r.sku)===normStr(sku))
-      totalSesion+=Number(r.cantidad)||0;
+    if(normStr(r.sku)===normStr(sku)&&normStr(r.pedido||S.pedido)===normStr(pedido))
+      total+=Number(r.cantidad)||0;
   });
-  return totalCache+totalSesion;
+  return total;
 }
 
 // Cargar caché de SKUs del pedido desde SP (llamar al iniciar flujo de mercadería)
 function cargarCacheSKUsPedido(pedido){
-  // Carga todos los SKUs del pedido EXCEPTO el contenedor actual
-  // S.skusRegistrados ya tiene los del contenedor actual → sin solapamiento posible
   return cargarSKUsSP(pedido, null).then(function(regs){
-    var contActual=normStr(S.contenedor||'');
+    // Excluir registros de la sesión actual para no doble-contar
+    // Identificar por RecId de sesión
     DB.skusPedidoCache=regs.filter(function(r){
-      // Excluir registros del contenedor que está siendo recepcionado ahora
-      return normStr(r.Contenedor||'')!==contActual;
+      return (r.Sesion||'')!==S.recId;
     });
+    console.log('[CACHE-SKU] Pedido='+pedido+' registros SP total:'+regs.length+' en caché:'+DB.skusPedidoCache.length+' (excluidos sesión actual RecId='+S.recId+')');
+    // Log desglosado por SKU para verificar
     var porSKU={};
     DB.skusPedidoCache.forEach(function(r){
       var k=r.CodProducto||'?';
       porSKU[k]=(porSKU[k]||0)+(Number(r.Cantidad)||0);
     });
-    console.log('[CACHE-SKU] Pedido='+pedido+' ContActual='+contActual+
-      ' total SP='+regs.length+' en caché='+DB.skusPedidoCache.length+
-      ' (excluidos del cont actual='+(regs.length-DB.skusPedidoCache.length)+')');
-    console.log('[CACHE-SKU] Totales otros contenedores:',JSON.stringify(porSKU));
+    console.log('[CACHE-SKU] Totales por SKU en caché:',JSON.stringify(porSKU));
   }).catch(function(e){
-    console.warn('[CACHE-SKU] Error:',e.message);
+    console.warn('[CACHE-SKU] Error cargando caché:',e.message);
     DB.skusPedidoCache=[];
   });
 }
@@ -865,23 +892,9 @@ function esperadoSKU(sku){
 }
 function htmlPendiente(sku){
   // NUNCA mostrar cantidades esperadas, registradas ni pendientes al operador
-  var esp=esperadoSKU(sku);  // loguea internamente [PACKING] Esperado=...
+  var esp=esperadoSKU(sku);
+  if(esp===null) return ''; // SKU no en packing list → sin indicador
   var reg=saldoSKU(S.pedido,sku);
-  var _spSum=0,_sesSum=0;
-  DB.skusPedidoCache.forEach(function(r){if(normStr(r.CodProducto||'')===normStr(sku))_spSum+=Number(r.Cantidad)||0;});
-  S.skusRegistrados.forEach(function(r){if(normStr(r.sku)===normStr(sku))_sesSum+=Number(r.cantidad)||0;});
-  console.log('[PACKING] --- showIngresoCantidad ---');
-  console.log('[PACKING] Pedido='+S.pedido+' SKU='+sku);
-  console.log('[PACKING] Esperado='+(esp!==null?esp:'null(no en packing)'));
-  console.log('[PACKING] SP_cache='+_spSum+' ('+DB.skusPedidoCache.length+' regs en caché)');
-  console.log('[PACKING] Sesion='+_sesSum+' ('+S.skusRegistrados.length+' regs sesión)');
-  console.log('[PACKING] Total_actual='+reg);
-  if(esp===null){
-    console.log('[PACKING] Estado=SIN_INDICADOR (SKU no en packing)');
-    return ''; // SKU no en packing list → sin indicador
-  }
-  var estado=reg>=esp?'CANTIDAD_OK':'PENDIENTE';
-  console.log('[PACKING] Estado='+estado);
   if(reg>=esp){
     // Completo o sobrante — se maneja en confCantidad, aquí solo mostrar OK
     return '<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(63,185,80,.12);'+
@@ -1224,29 +1237,64 @@ function confirmarAnularAsig(){
 // ── Reaperturar contenedor (supervisor) ───────────────────────────
 function showReopenarContenedor(){
   S.step='reopenar';
-  // Mostrar contenedores Recibidos del pedido activo, o de todos los pedidos
   var cerrados=DB.contenedores.filter(function(c){
     return normStr(c.status)==='RECIBIDO';
   });
+  window._cerradosList=cerrados;
+  window._reopFiltCont='';
+  window._reopFiltPed='';
+
   var h='<div class="badge badge-sup">REAPERTURAR CONTENEDOR</div>';
-  if(!cerrados.length){
-    h+='<div class="alert-w">No hay contenedores con status Recibido.</div>';
-  } else {
-    h+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+cerrados.length+' contenedores Recibidos. Toca para reaperturar.</div>';
-    cerrados.forEach(function(c,i){
-      h+='<div class="card-item" style="margin-bottom:6px">'+
-        '<div style="flex:1">'+
-          '<div style="font-size:13px;font-weight:700">'+c.contenedor+'</div>'+
-          '<div style="font-size:11px;color:var(--mut)">'+c.pedido+(c.fechaProg?' · '+fechaDisplay(c.fechaProg):'')+'</div>'+
-        '</div>'+
-        '<button class="btn btn-warn" style="font-size:11px;padding:4px 10px;flex-shrink:0" '+
-          'onclick="window._reopIdx='+i+';confirmarReopenar()">Reaperturar</button>'+
-      '</div>';
-    });
-    window._cerradosList=cerrados;
-  }
-  h+='<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showMenuSup()">Volver</button>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'+
+    '<div>'+
+      '<div class="lbl" style="margin-top:0">Buscar por contenedor</div>'+
+      '<input class="inp inp-sm" id="reop-filt-cont" placeholder="Ej: CAIU, 877..." autocomplete="off" '+
+        'oninput="window._reopFiltCont=this.value;_actualizarListaReopenar()">'+
+    '</div>'+
+    '<div>'+
+      '<div class="lbl" style="margin-top:0">Buscar por pedido</div>'+
+      '<input class="inp inp-sm" id="reop-filt-ped" placeholder="Ej: NGK2605..." autocomplete="off" '+
+        'oninput="window._reopFiltPed=this.value;_actualizarListaReopenar()">'+
+    '</div>'+
+  '</div>'+
+  '<div id="reop-count" style="font-size:11px;color:var(--mut);margin-bottom:8px">'+cerrados.length+' contenedores Recibidos</div>'+
+  '<div id="lista-reop"></div>'+
+  '<button class="btn btn-sec btn-big" style="margin-top:10px" onclick="showMenuSup()">Volver</button>';
   render(h);
+  _actualizarListaReopenar();
+}
+
+function _actualizarListaReopenar(){
+  var cerrados=window._cerradosList||[];
+  var fc=(window._reopFiltCont||'').trim().toUpperCase();
+  var fp=(window._reopFiltPed||'').trim().toUpperCase();
+  var filtrados=cerrados.filter(function(c){
+    if(fc&&c.contenedor.toUpperCase().indexOf(fc)<0) return false;
+    if(fp&&c.pedido.toUpperCase().indexOf(fp)<0) return false;
+    return true;
+  });
+  var countEl=document.getElementById('reop-count');
+  if(countEl) countEl.textContent=filtrados.length+' contenedor'+(filtrados.length!==1?'es':'')+
+    (fc||fp?' encontrado'+(filtrados.length!==1?'s':''):'');
+  var lista=document.getElementById('lista-reop');
+  if(!lista) return;
+  if(!filtrados.length){
+    lista.innerHTML='<div class="alert-w">'+(fc||fp?'Sin resultados para ese criterio.':'No hay contenedores con status Recibido.')+'</div>';
+    return;
+  }
+  var h='';
+  filtrados.forEach(function(c,i){
+    var realIdx=cerrados.indexOf(c);
+    h+='<div class="card-item" style="margin-bottom:6px">'+
+      '<div style="flex:1">'+
+        '<div style="font-size:13px;font-weight:700">'+c.contenedor+'</div>'+
+        '<div style="font-size:11px;color:var(--mut)">'+c.pedido+(c.fechaProg?' · '+fechaDisplay(c.fechaProg):'')+'</div>'+
+      '</div>'+
+      '<button class="btn btn-warn" style="font-size:11px;padding:4px 10px;flex-shrink:0" '+
+        'onclick="window._reopIdx='+realIdx+';confirmarReopenar()">Reaperturar</button>'+
+    '</div>';
+  });
+  lista.innerHTML=h;
 }
 
 function confirmarReopenar(){
@@ -1832,10 +1880,9 @@ function showEscaneo(){
     }
   }
   html+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
-    '<button class="btn btn-sec" style="font-size:12px" onclick="showIngresarLPN()">🔄 Nuevo LPN</button>'+
-    '<button class="btn btn-sec" style="font-size:12px" onclick="showCorreccion()">✏ Corregir registro anterior</button>'+
-    '<button class="btn btn-ok btn-big" onclick="finalizarRecepcionMercaderia()">✓ FINALIZAR RECEPCIÓN</button>'+
-    '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">💾 Guardar y salir</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="showIngresarLPN()">Nuevo LPN</button>'+
+    '<button class="btn btn-ok btn-big" onclick="finalizarRecepcionMercaderia()">FINALIZAR RECEPCIÓN</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">Guardar y salir</button>'+
   '</div>';
   render(html);
   setTimeout(function(){var el=document.getElementById('inp-scan');if(el)el.focus();},100);
@@ -1889,14 +1936,7 @@ function showIngresoCantidad(){
   h+='<div style="font-size:13px;font-weight:700;color:var(--acc)">'+sk.sku+'</div>';
   h+='<div style="font-size:12px;color:var(--txt);margin-top:2px">'+sk.desc+'</div>';
   h+='<div style="font-size:11px;color:var(--mut)">Tipo: '+sk.tipo+'</div></div>';
-  var _hpResult=htmlPendiente(sk.sku);
-  console.log('[PACKING-UI] Pedido='+S.pedido+' SKU='+sk.sku);
-  console.log('[PACKING-UI] htmlPendiente()="'+(_hpResult||'(vacío — SKU no encontrado en DB.packing)').slice(0,80)+'"');
-  console.log('[PACKING-UI] DB.packing.length='+DB.packing.length);
-  console.log('[PACKING-UI] DB.packing para este pedido:',
-    DB.packing.filter(function(r){return normStr(r.pedido)===normStr(S.pedido);}).map(function(r){return r.sku;}).join(', ')||'(ninguno)');
-  console.log('[PACKING-UI] S.pedido="'+S.pedido+'"');
-  h+=_hpResult;
+  h+=htmlPendiente(sk.sku);
   h+='<details style="margin:8px 0">';
   h+='<summary style="font-size:11px;color:var(--acc);cursor:pointer">Calculadora de unidades</summary>';
   h+='<div style="background:var(--sur2);border-radius:6px;padding:10px;margin-top:6px">';
@@ -1954,11 +1994,51 @@ function confCantidad(){
   var cant=parseInt(document.getElementById('inp-cant').value);
   if(isNaN(cant)||cant<0){toast('Ingresa una cantidad válida');return;}
   var sk=S.skuActual;
+
+  // LOG CRÍTICO: estado de DB.packing y S.skusRegistrados antes de evaluar
+  console.log('[CONF-CANT] ==========================================');
+  console.log('[CONF-CANT] Pedido="'+S.pedido+'" SKU="'+sk.sku+'" CantIngresada='+cant);
+  console.log('[CONF-CANT] DB.packing total='+DB.packing.length+' items');
+  console.log('[CONF-CANT] S.skusRegistrados total='+S.skusRegistrados.length+' items');
+  console.log('[CONF-CANT] DB.skusPedidoCache total='+DB.skusPedidoCache.length+' items');
+  // Mostrar items del packing para este pedido
+  var packingDelPedido=DB.packing.filter(function(r){return normStr(r.pedido)===normStr(S.pedido);});
+  console.log('[CONF-CANT] Packing del pedido "'+S.pedido+'": '+packingDelPedido.length+' SKUs');
+  packingDelPedido.forEach(function(r){
+    console.log('[CONF-CANT]   SKU="'+r.sku+'" desc="'+r.desc+'" cant='+r.cantidad+
+      ' normSKU="'+normStr(r.sku)+'" normSKUbuscado="'+normStr(sk.sku)+'" match='+(normStr(r.sku)===normStr(sk.sku)));
+  });
+  // Mostrar registros de sesión para este SKU
+  var sesionDelSKU=S.skusRegistrados.filter(function(r){return normStr(r.sku)===normStr(sk.sku);});
+  console.log('[CONF-CANT] Sesion SKU "'+sk.sku+'": '+sesionDelSKU.length+' registros, suma='+
+    sesionDelSKU.reduce(function(a,r){return a+(Number(r.cantidad)||0);},0));
+
   var esp=esperadoSKU(sk.sku);
-  // saldoSKU: caché (otros contenedores) + skusRegistrados (contenedor actual) sin doble conteo
-  var reg_actual=saldoSKU(S.pedido,sk.sku);
+
+  // Log detallado de componentes del saldo para diagnóstico
+  var _spSum=0;
+  DB.skusPedidoCache.forEach(function(r){
+    if(normStr(r.CodProducto||'')===normStr(sk.sku)) _spSum+=Number(r.Cantidad)||0;
+  });
+  var _sesSum=0;
+  S.skusRegistrados.forEach(function(r){
+    if(normStr(r.sku)===normStr(sk.sku)) _sesSum+=Number(r.cantidad)||0;
+  });
+  var reg_actual=_spSum+_sesSum; // = saldoSKU(S.pedido, sk.sku)
   var total=reg_actual+cant;
-  console.log('[PACKING] confCantidad: SKU='+sk.sku+' Esperado='+esp+' Actual='+reg_actual+' Nueva='+cant+' Total='+total+' Excede='+(esp!==null&&total>esp?'SI':'NO'));
+
+  console.log('[EXCESO] Pedido='+S.pedido+' SKU='+sk.sku+
+    ' Esperado='+(esp!==null?esp:'null(no en packing)')+
+    ' SPCache='+_spSum+' ('+DB.skusPedidoCache.length+' regs)'+
+    ' Sesion='+_sesSum+' ('+S.skusRegistrados.length+' regs)'+
+    ' CantNueva='+cant+
+    ' Total='+(reg_actual+cant)+
+    ' Excede='+(esp!==null&&total>esp?'SI':'NO'));
+
+  // Si el caché está vacío y hay registros anteriores, puede ser que no se cargó
+  if(DB.skusPedidoCache.length===0&&_sesSum===0){
+    console.warn('[EXCESO] ATENCION: caché SP vacío — ¿se llamó cargarCacheSKUsPedido?');
+  }
 
   // Verificar sobrante ANTES de guardar — sin mostrar cantidades
   if(esp!==null&&total>esp){
@@ -2008,8 +2088,6 @@ function _guardarSKU(cant){
 
 function showCorreccion(){
   S.step='correccion';
-  // Resetear filtros al entrar
-  window._filtSKU=''; window._filtCont=''; window._filtLPN='';
   render('<div class="loading"><div class="loading-icon">...</div><div class="loading-txt">Cargando registros...</div></div>');
   cargarSKUsSP(S.pedido,null).then(function(spRegs){
     window._regsCorreccion=spRegs;
@@ -2020,84 +2098,45 @@ function showCorreccion(){
   });
 }
 function renderCorreccion(regs,filtSKU,filtCont){
-  // BUG FIX: separar el render inicial (con filtros) del re-render de resultados.
-  // oninput solo actualiza el contenedor #lista-corr, no reconstruye los inputs.
-  window._filtSKU=filtSKU||'';
-  window._filtCont=filtCont||'';
-  window._filtLPN=window._filtLPN||'';
-  _actualizarListaCorreccion();
-}
-
-function _actualizarListaCorreccion(){
-  var regs=window._regsCorreccion||[];
-  var filtSKU=window._filtSKU||'';
-  var filtCont=window._filtCont||'';
-  var filtLPN=window._filtLPN||'';
   var filtrados=regs.filter(function(r){
     if((r.Estado||r.estado||'')==='CORRECCION') return false;
     var sku=(r.CodProducto||r.sku||'').toUpperCase();
     var cont=(r.Contenedor||r.contenedor||'').toUpperCase();
-    var lpn=(r.LPN||r.lpn||'').toUpperCase();
     if(filtSKU&&sku.indexOf(filtSKU.toUpperCase())<0) return false;
     if(filtCont&&cont.indexOf(filtCont.toUpperCase())<0) return false;
-    if(filtLPN&&lpn.indexOf(filtLPN.toUpperCase())<0) return false;
     return true;
   });
   window._filtrados=filtrados;
-
-  // Si ya existe el contenedor de lista, solo actualizarlo (sin tocar los inputs)
-  var listaEl=document.getElementById('lista-corr');
-  if(!listaEl){
-    // Primera vez: construir pantalla completa con inputs
-    var h='<div class="badge badge-rec">CORREGIR REGISTRO</div>';
-    h+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Pedido: <strong>'+S.pedido+'</strong> · <span id="count-corr">'+filtrados.length+'</span> registros</div>';
-    h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">';
-    h+='<input class="inp inp-sm" id="filt-sku" placeholder="Filtrar SKU" value="'+filtSKU+'" oninput="window._filtSKU=this.value;_actualizarListaCorreccion()">';
-    h+='<input class="inp inp-sm" id="filt-cont" placeholder="Filtrar contenedor" value="'+filtCont+'" oninput="window._filtCont=this.value;_actualizarListaCorreccion()">';
-    h+='<input class="inp inp-sm" id="filt-lpn" placeholder="Filtrar LPN" value="'+filtLPN+'" oninput="window._filtLPN=this.value;_actualizarListaCorreccion()">';
-    h+='</div>';
-    h+='<div id="lista-corr" style="max-height:50vh;overflow-y:auto"></div>';
-    h+='<button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">Volver</button>';
-    render(h);
-    listaEl=document.getElementById('lista-corr');
-  }
-
-  // Actualizar contador
-  var countEl=document.getElementById('count-corr');
-  if(countEl) countEl.textContent=filtrados.length;
-
-  // Actualizar SOLO la lista — sin tocar los inputs → sin perder el foco
-  if(!listaEl) return;
+  var h='<div class="badge badge-rec">CORREGIR REGISTRO</div>';
+  h+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Pedido: <strong>'+S.pedido+'</strong>';
+  h+=' '+filtrados.length+' registros</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">';
+  h+='<input class="inp inp-sm" id="filt-sku" placeholder="Filtrar SKU" value="'+filtSKU+'" ';
+  h+='oninput="renderCorreccion(window._regsCorreccion,this.value,document.getElementById(\'filt-cont\').value)">';
+  h+='<input class="inp inp-sm" id="filt-cont" placeholder="Filtrar contenedor" value="'+filtCont+'" ';
+  h+='oninput="renderCorreccion(window._regsCorreccion,document.getElementById(\'filt-sku\').value,this.value)">'+
+  '</div><div style="max-height:50vh;overflow-y:auto">';
   if(!filtrados.length){
-    listaEl.innerHTML='<div class="alert-w">Sin registros que coincidan.</div>';
-    return;
+    h+='<div class="alert-w">Sin registros.</div>';
+  } else {
+    filtrados.slice().reverse().slice(0,50).forEach(function(r,i){
+      var sku=r.CodProducto||r.sku||'';
+      var desc=r.Nombre||r.desc||'';
+      var cant=Number(r.Cantidad!==undefined?r.Cantidad:r.cantidad)||0;
+      var cont=r.Contenedor||r.contenedor||'';
+      var op=r.Operario||r.operario||'';
+      h+='<div class="card-item" style="margin-bottom:6px" onclick="iniciarCorreccion('+i+',\'' +sku+ '\','+cant+')">';
+      h+='<div style="display:flex;justify-content:space-between">';
+      h+='<div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--acc)">'+sku+'</div>';
+      h+='<div style="font-size:11px;color:var(--txt)">'+desc+'</div>';
+      h+='<div style="font-size:10px;color:var(--mut)">'+cont+(op?' · '+op:'')+'</div></div>';
+      h+='<div style="text-align:right;margin-left:10px">';
+      h+='<div style="font-size:16px;font-weight:700">'+cant+'</div>';
+      h+='<div style="font-size:10px;color:var(--mut)">un</div></div></div></div>';
+    });
   }
-  var items='';
-  filtrados.slice().reverse().slice(0,80).forEach(function(r,i){
-    var sku=r.CodProducto||r.sku||'';
-    var desc=r.Nombre||r.desc||'';
-    var cant=Number(r.Cantidad!==undefined?r.Cantidad:r.cantidad)||0;
-    var cont=r.Contenedor||r.contenedor||'';
-    var lpn=r.LPN||r.lpn||'';
-    var op=r.Operario||r.operario||'';
-    var est=r.Estado||r.estado||'';
-    var colorEst=est==='DAÑADO'||est==='DANADO'?'color:var(--dan)':'color:var(--mut)';
-    items+='<div class="card-item" style="margin-bottom:6px;cursor:pointer" onclick="iniciarCorreccion('+i+',\''+sku.replace(/'/g,"\\'")+'\''+','+cant+')">';
-    items+='<div style="flex:1">';
-    items+='<div style="font-size:12px;font-weight:700;color:var(--acc)">'+sku+'</div>';
-    items+='<div style="font-size:11px;color:var(--txt)">'+desc+'</div>';
-    items+='<div style="font-size:10px;color:var(--mut);margin-top:2px">';
-    if(lpn) items+='LPN: <span style="color:var(--warn)">'+lpn+'</span> · ';
-    items+=cont;
-    if(op) items+=' · '+op;
-    if(est) items+=' · <span style="'+colorEst+'">'+est+'</span>';
-    items+='</div></div>';
-    items+='<div style="text-align:right;margin-left:10px;flex-shrink:0">';
-    items+='<div style="font-size:18px;font-weight:700">'+cant+'</div>';
-    items+='<div style="font-size:10px;color:var(--mut)">un</div></div>';
-    items+='</div>';
-  });
-  listaEl.innerHTML=items;
+  h+='</div><button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">Volver</button>';
+  render(h);
 }
 function iniciarCorreccion(idx,sku,cantOrig){
   window._corrSKU=sku; window._corrOriginal=cantOrig; window._corrIdx=idx;
@@ -2693,6 +2732,7 @@ window.S=S;window.DB=DB;
 window.goHome=goHome;
 window.showAnularAsignacion=showAnularAsignacion;
 window.showReopenarContenedor=showReopenarContenedor;
+window._actualizarListaReopenar=_actualizarListaReopenar;
 window.showOpcionesContenedor=showOpcionesContenedor;
 window.showRegistrarHoras=showRegistrarHoras;
 window.confRegistrarHoras=confRegistrarHoras;
@@ -2704,7 +2744,6 @@ window.recargarCatalogos=recargarCatalogos;
 window.actualizarStatusContenedorExcel=actualizarStatusContenedorExcel;
 window.refrescarContenedoresExcel=refrescarContenedoresExcel;
 window.showCorreccion=showCorreccion;
-window._actualizarListaCorreccion=_actualizarListaCorreccion;
 window.renderCorreccion=renderCorreccion;
 window.iniciarCorreccion=iniciarCorreccion;
 window.confCorreccion=confCorreccion;
