@@ -1846,6 +1846,7 @@ function showEventoApertura(){
 // 20. RECEPCIÓN — ESCANEO DE SKUs
 // ═══════════════════════════════════════════════════════════════════
 function showEscaneo(){
+  console.log('[TRACE] showEscaneo llamado desde:', new Error().stack.split('\n')[1]||'?');
   S.step='escaneo';
   var nSkus=S.skusRegistrados.length;
   // Agrupar skus por LPN para mostrar resumen
@@ -2087,6 +2088,7 @@ function _guardarSKU(cant){
 
 
 function showCorreccion(){
+  console.log('[TRACE] showCorreccion llamado, S.step='+S.step);
   S.step='correccion';
   render('<div class="loading"><div class="loading-icon">...</div><div class="loading-txt">Cargando registros...</div></div>');
   cargarSKUsSP(S.pedido,null).then(function(spRegs){
@@ -2098,6 +2100,7 @@ function showCorreccion(){
   });
 }
 function renderCorreccion(regs,filtSKU,filtCont){
+  console.log('[TRACE] renderCorreccion regs='+regs.length);
   window._filtSKU=filtSKU||''; window._filtCont=filtCont||''; window._filtLPN=window._filtLPN||'';
   var filtrados=regs.filter(function(r){
     if(normStr(r.Estado||r.estado||'')==='CORRECCION') return false;
