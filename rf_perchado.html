@@ -931,7 +931,19 @@ function showMenuPrincipal(){
       drop.style.display='block';
     }
 
-    inp.addEventListener('input',filtrar);
+    inp.addEventListener('input',function(){
+    var q=(inp.value||'').trim();
+    // Coincidencia exacta (case-insensitive) → seleccionar automáticamente sin dropdown
+    var exacto=q?opciones.find(function(o){return o.toUpperCase()===q.toUpperCase();}):null;
+    if(exacto){
+      inp.value=exacto;
+      if(drop){ drop.style.display='none'; drop.innerHTML=''; }
+      if(badge){ badge.textContent='✓ '+exacto; badge.style.display='block'; }
+      onSelect(exacto);
+      return; // no mostrar dropdown
+    }
+    filtrar();
+  });
     inp.addEventListener('focus',filtrar);
     inp.addEventListener('blur',function(){setTimeout(function(){drop.style.display='none';},180);});
     inp.addEventListener('keydown',function(e){
@@ -1214,6 +1226,25 @@ function showListaSKUParaLPN(lpn,skus){
     })(lpn,s.sku,s.saldo));
     cont.appendChild(card);
   });
+  // Botón Nuevo LPN siempre visible en modo LPN
+  if(S.subModo==='lpn'){
+    var footerLPN=document.createElement('div');
+    footerLPN.className='btn-row';
+    footerLPN.style.marginTop='12px';
+    var btnVolver=document.createElement('button');
+    btnVolver.className='btn btn-sec';
+    btnVolver.style.flex='1';
+    btnVolver.textContent='← Volver';
+    btnVolver.onclick=function(){goBack();};
+    var btnNuevoLPN=document.createElement('button');
+    btnNuevoLPN.className='btn btn-perc';
+    btnNuevoLPN.style.flex='1';
+    btnNuevoLPN.textContent='📦 Nuevo LPN';
+    btnNuevoLPN.onclick=function(){showPerchadoPorLPN();};
+    footerLPN.appendChild(btnVolver);
+    footerLPN.appendChild(btnNuevoLPN);
+    cont.parentNode.appendChild(footerLPN);
+  }
   // ← NO hay render(h) aquí — eso borraba las tarjetas recién creadas
 }
 
@@ -1404,7 +1435,19 @@ function _initBuscadorDrop(inpId,dropId,badgeId,opciones,onSelect){
     drop.style.display='block';
   }
 
-  inp.addEventListener('input',filtrar);
+  inp.addEventListener('input',function(){
+    var q=(inp.value||'').trim();
+    // Coincidencia exacta (case-insensitive) → seleccionar automáticamente sin dropdown
+    var exacto=q?opciones.find(function(o){return o.toUpperCase()===q.toUpperCase();}):null;
+    if(exacto){
+      inp.value=exacto;
+      if(drop){ drop.style.display='none'; drop.innerHTML=''; }
+      if(badge){ badge.textContent='✓ '+exacto; badge.style.display='block'; }
+      onSelect(exacto);
+      return; // no mostrar dropdown
+    }
+    filtrar();
+  });
   inp.addEventListener('focus',filtrar);
   inp.addEventListener('blur',function(){setTimeout(function(){drop.style.display='none';},180);});
   inp.addEventListener('keydown',function(e){
@@ -1636,6 +1679,53 @@ function ejecutarMovimiento(sku,cant,alm,ubic,obs){
 
 /* ── Pantalla 6: Resultado y opciones post-movimiento ────────── */
 function showResultadoMovimiento(sku,cant,lpn){
+  // Flujo LPN: refrescar automáticamente sin parar en pantalla de confirmación
+  if(S.subModo==='lpn'){
+    render('<div class="loading"><div class="loading-icon">⏳</div>'+
+      '<div>✓ '+cant+' un de '+sku+'<br>Actualizando LPN '+lpn+'...</div></div>');
+    Promise.all([
+      cargarRecepcionesPedido(S.pedido),
+      cargarMovimientosPedido(S.pedido),
+    ]).then(function(res){
+      DB._movsCache=res[1];
+      var saldos=calcularSaldos(res[0],res[1]);
+      var skus=Object.keys(saldos)
+        .map(function(k){return saldos[k];})
+        .filter(function(s){
+          return normLPN(s.lpn).toUpperCase()===normLPN(lpn).toUpperCase()&&s.saldo>0;
+        })
+        .sort(function(a,b){return String(a.sku).localeCompare(String(b.sku));});
+      if(skus.length>0){
+        // LPN aún tiene SKUs pendientes → mostrar lista actualizada directamente
+        showListaSKUParaLPN(lpn,skus);
+      } else {
+        // LPN completado
+        pushScreen('lpn-done',function(){showPerchadoPorLPN();});actualizarBack();
+        render(
+          '<div style="text-align:center;padding:30px 0">'+
+            '<div style="font-size:52px;margin-bottom:12px">✅</div>'+
+            '<div style="font-size:18px;font-weight:700;color:var(--ok);margin-bottom:6px">LPN completado</div>'+
+            '<div style="background:var(--sur2);border-radius:8px;padding:8px 16px;display:inline-block;'+
+              'font-size:15px;font-weight:700;color:var(--perc);margin-bottom:16px">'+lpn+'</div>'+
+            '<div style="font-size:12px;color:var(--mut)">No quedan SKUs con saldo en este LPN</div>'+
+          '</div>'+
+          '<div class="btn-row" style="flex-direction:column">'+
+            '<button class="btn btn-perc btn-big" onclick="showPerchadoPorLPN()">📦 Escanear nuevo LPN</button>'+
+            '<button class="btn btn-sec" onclick="showMenuPrincipal()">⌂ Menú principal</button>'+
+          '</div>'
+        );
+      }
+    }).catch(function(e){
+      // Si falla la recarga, mostrar opciones manuales
+      _showResultadoFallback(sku,cant,lpn);
+    });
+    return;
+  }
+  // Flujo SKU: comportamiento original
+  _showResultadoFallback(sku,cant,lpn);
+}
+
+function _showResultadoFallback(sku,cant,lpn){
   S.historial=[{id:'menu',fn:showMenuPrincipal}];actualizarBack();
   render(
     '<div style="text-align:center;padding:24px 0">'+
@@ -1644,11 +1734,8 @@ function showResultadoMovimiento(sku,cant,lpn){
       '<div style="font-size:13px;color:var(--mut)">'+cant+' un de '+sku+' perchadas en almacén</div>'+
     '</div>'+
     '<div class="btn-row" style="flex-direction:column">'+
-      (S.subModo!=='lpn'?
-        '<button class="btn btn-perc" onclick="buscarSKU_mismoSKU(\''+sku+'\')">Perchar más '+sku+'</button>':'')+ 
+      '<button class="btn btn-perc" onclick="buscarSKU_mismoSKU(\''+sku+'\')">Perchar más '+sku+'</button>'+
       '<button class="btn btn-sec" onclick="showPerchadoPorSKU()">Otro SKU</button>'+
-      (S.subModo==='lpn'?
-        '<button class="btn btn-perc" onclick="buscarLPN_mismoLPN(\''+lpn+'\')">Siguiente SKU en '+lpn+'</button>':'')+ 
       '<button class="btn btn-sec" onclick="showMenuPrincipal()">⌂ Menú principal</button>'+
     '</div>'
   );
