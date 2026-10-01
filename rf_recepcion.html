@@ -2098,45 +2098,113 @@ function showCorreccion(){
   });
 }
 function renderCorreccion(regs,filtSKU,filtCont){
+  window._filtSKU=filtSKU||''; window._filtCont=filtCont||''; window._filtLPN=window._filtLPN||'';
   var filtrados=regs.filter(function(r){
-    if((r.Estado||r.estado||'')==='CORRECCION') return false;
+    if(normStr(r.Estado||r.estado||'')==='CORRECCION') return false;
     var sku=(r.CodProducto||r.sku||'').toUpperCase();
     var cont=(r.Contenedor||r.contenedor||'').toUpperCase();
+    var lpn=(r.LPN||r.lpn||'').toUpperCase();
     if(filtSKU&&sku.indexOf(filtSKU.toUpperCase())<0) return false;
     if(filtCont&&cont.indexOf(filtCont.toUpperCase())<0) return false;
+    if(window._filtLPN&&lpn.indexOf(window._filtLPN.toUpperCase())<0) return false;
     return true;
   });
   window._filtrados=filtrados;
-  var h='<div class="badge badge-rec">CORREGIR REGISTRO</div>';
-  h+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Pedido: <strong>'+S.pedido+'</strong>';
-  h+=' '+filtrados.length+' registros</div>';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">';
-  h+='<input class="inp inp-sm" id="filt-sku" placeholder="Filtrar SKU" value="'+filtSKU+'" ';
-  h+='oninput="renderCorreccion(window._regsCorreccion,this.value,document.getElementById(\'filt-cont\').value)">';
-  h+='<input class="inp inp-sm" id="filt-cont" placeholder="Filtrar contenedor" value="'+filtCont+'" ';
-  h+='oninput="renderCorreccion(window._regsCorreccion,document.getElementById(\'filt-sku\').value,this.value)">'+
-  '</div><div style="max-height:50vh;overflow-y:auto">';
-  if(!filtrados.length){
-    h+='<div class="alert-w">Sin registros.</div>';
-  } else {
-    filtrados.slice().reverse().slice(0,50).forEach(function(r,i){
-      var sku=r.CodProducto||r.sku||'';
-      var desc=r.Nombre||r.desc||'';
-      var cant=Number(r.Cantidad!==undefined?r.Cantidad:r.cantidad)||0;
-      var cont=r.Contenedor||r.contenedor||'';
-      var op=r.Operario||r.operario||'';
-      h+='<div class="card-item" style="margin-bottom:6px" onclick="iniciarCorreccion('+i+',\'' +sku+ '\','+cant+')">';
-      h+='<div style="display:flex;justify-content:space-between">';
-      h+='<div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--acc)">'+sku+'</div>';
-      h+='<div style="font-size:11px;color:var(--txt)">'+desc+'</div>';
-      h+='<div style="font-size:10px;color:var(--mut)">'+cont+(op?' · '+op:'')+'</div></div>';
-      h+='<div style="text-align:right;margin-left:10px">';
-      h+='<div style="font-size:16px;font-weight:700">'+cant+'</div>';
-      h+='<div style="font-size:10px;color:var(--mut)">un</div></div></div></div>';
+  console.log('[CORREGIR] renderCorreccion: regs='+regs.length+' filtrados='+filtrados.length);
+
+  // Shell con filtros — DOM para los filtros, render solo una vez
+  render(
+    '<div class="badge badge-rec">CORREGIR REGISTRO</div>'+
+    '<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Pedido: <strong>'+
+      S.pedido+'</strong> · <span id="count-corr">'+filtrados.length+'</span> registros</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">'+
+      '<input class="inp inp-sm" id="filt-sku" placeholder="Filtrar SKU" value="'+(filtSKU||'')+'" autocomplete="off">'+
+      '<input class="inp inp-sm" id="filt-cont" placeholder="Filtrar contenedor" value="'+(filtCont||'')+'" autocomplete="off">'+
+      '<input class="inp inp-sm" id="filt-lpn" placeholder="Filtrar LPN" value="'+(window._filtLPN||'')+'" autocomplete="off">'+
+    '</div>'+
+    '<div id="lista-corr" style="max-height:50vh;overflow-y:auto"></div>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">← Volver</button>'
+  );
+  console.log('[CORREGIR] render() ejecutado, buscando lista-corr...');
+  var lista=document.getElementById('lista-corr');
+  console.log('[CORREGIR] lista-corr encontrado:', !!lista);
+
+  // Conectar filtros via DOM (sin oninput en HTML — evita re-render completo)
+  ['filt-sku','filt-cont','filt-lpn'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.addEventListener('input',function(){
+      window._filtSKU=(document.getElementById('filt-sku')||{value:''}).value;
+      window._filtCont=(document.getElementById('filt-cont')||{value:''}).value;
+      window._filtLPN=(document.getElementById('filt-lpn')||{value:''}).value;
+      _actualizarListaCorreccion();
     });
+  });
+
+  _actualizarListaCorreccion();
+}
+
+function _actualizarListaCorreccion(){
+  var regs=window._regsCorreccion||[];
+  var filtSKU=window._filtSKU||'';
+  var filtCont=window._filtCont||'';
+  var filtLPN=window._filtLPN||'';
+  var filtrados=regs.filter(function(r){
+    if(normStr(r.Estado||r.estado||'')==='CORRECCION') return false;
+    var sku=(r.CodProducto||r.sku||'').toUpperCase();
+    var cont=(r.Contenedor||r.contenedor||'').toUpperCase();
+    var lpn=(r.LPN||r.lpn||'').toUpperCase();
+    if(filtSKU&&sku.indexOf(filtSKU.toUpperCase())<0) return false;
+    if(filtCont&&cont.indexOf(filtCont.toUpperCase())<0) return false;
+    if(filtLPN&&lpn.indexOf(filtLPN.toUpperCase())<0) return false;
+    return true;
+  });
+  window._filtrados=filtrados;
+
+  var countEl=document.getElementById('count-corr');
+  if(countEl) countEl.textContent=filtrados.length;
+  var lista=document.getElementById('lista-corr');
+  if(!lista) return;
+
+  if(!filtrados.length){
+    lista.innerHTML='<div class="alert-w">Sin registros que coincidan.</div>';
+    return;
   }
-  h+='</div><button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">Volver</button>';
-  render(h);
+
+  // Construir tarjetas via DOM — sin onclick en HTML, sin problemas de quoting
+  lista.innerHTML='';
+  filtrados.slice().reverse().slice(0,80).forEach(function(r,i){
+    var sku=r.CodProducto||r.sku||'';
+    var desc=r.Nombre||r.desc||'';
+    var cant=Number(r.Cantidad!==undefined?r.Cantidad:r.cantidad)||0;
+    var cont=r.Contenedor||r.contenedor||'';
+    var lpn=r.LPN||r.lpn||'';
+    var op=r.Operario||r.operario||'';
+    var est=r.Estado||r.estado||'';
+    var colorEst=est==='DAÑADO'||est==='DANADO'?'color:var(--dan)':'color:var(--mut)';
+
+    var card=document.createElement('div');
+    card.className='card-item';
+    card.style.marginBottom='6px';
+    card.innerHTML=
+      '<div style="flex:1">'+
+        '<div style="font-size:12px;font-weight:700;color:var(--acc)">'+sku+'</div>'+
+        '<div style="font-size:11px;color:var(--txt)">'+desc+'</div>'+
+        '<div style="font-size:10px;color:var(--mut);margin-top:2px">'+
+          (lpn?'LPN: <span style="color:var(--warn)">'+lpn+'</span> · ':'')+
+          cont+(op?' · '+op:'')+(est?' · <span style="'+colorEst+'">'+est+'</span>':'')+
+        '</div>'+
+      '</div>'+
+      '<div style="text-align:right;margin-left:10px;flex-shrink:0">'+
+        '<div style="font-size:18px;font-weight:700">'+cant+'</div>'+
+        '<div style="font-size:10px;color:var(--mut)">un</div>'+
+      '</div>';
+    // Índice real en window._filtrados (ya refiltrado arriba)
+    card.addEventListener('click',(function(idx){ 
+      return function(){ iniciarCorreccion(idx,window._filtrados[idx].CodProducto||window._filtrados[idx].sku||'',
+        Number(window._filtrados[idx].Cantidad||window._filtrados[idx].cantidad||0)); };
+    })(filtrados.length-1-i)); // reverse() → índice correcto
+    lista.appendChild(card);
+  });
 }
 function iniciarCorreccion(idx,sku,cantOrig){
   window._corrSKU=sku; window._corrOriginal=cantOrig; window._corrIdx=idx;
