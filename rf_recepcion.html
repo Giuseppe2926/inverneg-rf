@@ -1139,8 +1139,10 @@ function showHome(){
   render(
     '<div class="lbl">¿con qué rol ingresas?</div>'+
     '<div class="grid2">'+
-      '<div class="card-t'+(estAct==='OK'?' sel':'')+'" id="ed-ok" onclick="selEstadoCorr(\'OK\')">OK</div>'+
-      '<div class="card-t'+(estAct==='DAÑADO'?' sel':'')+'" id="ed-dan" onclick="selEstadoCorr(\'DAÑADO\')">DAÑADO</div>'+
+      '<div class="card-t'+(S.rol==='supervisor'?' sel':'')+'" onclick="S.rol=\'supervisor\';S.operario=\'\';showHome()">'+
+        '<div class="card-t-icon">👔</div><div class="card-t-lbl">SUPERVISOR</div></div>'+
+      '<div class="card-t'+(S.rol==='operario'?' sel':'')+'" onclick="S.rol=\'operario\';S.operario=\'\';showHome()">'+
+        '<div class="card-t-icon">👷</div><div class="card-t-lbl">OPERARIO</div></div>'+
     '</div>'+
     '<div class="lbl" style="margin-top:10px">'+(S.rol==='supervisor'?'supervisor':'operario')+'</div>'+
     '<select class="inp" id="sel-quien" onchange="S.operario=this.value;updateFtr()">'+
