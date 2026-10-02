@@ -2094,6 +2094,28 @@ function _ejecutarSepConLPN(sku,cantReq,destino,lpnOrigen){
   console.log('[SEP-LPN] LPN='+lpnOrigen+' SKU='+sku+' Cant='+cantReq+' Dest='+destino);
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Registrando separación...</div></div>');
   gPost(urlLista(DB.listIds.movimientos)+'/items',{fields:fields}).then(function(){
+    // Actualizar DB._movsCache inmediatamente para que sepPendienteSKU refleje el movimiento
+    if(!DB._movsCache) DB._movsCache=[];
+    DB._movsCache.push(fields);
+    console.log('[SEP-PEND] Cache actualizado: '+DB._movsCache.length+' movimientos');
+    // Log del pendiente tras descontar
+    var necesidad=0;
+    DB.separacionPendiente.forEach(function(r){
+      if(normStr(r.pedido)===normStr(S.pedido)&&normStr(r.sku)===normStr(sku)&&
+         normStr(r.destino)===normStr(destino)) necesidad+=r.cantidad;
+    });
+    var ejecutado=0;
+    DB._movsCache.forEach(function(m){
+      if(normStr(m.TipoMovimiento||'')===normStr('SEPARACION')&&
+         normStr(m.Pedido||'')===normStr(S.pedido)&&
+         normStr(m.SKU||'')===normStr(sku)&&
+         (normStr(m.DestinoSeparacion||m.AlmacenDestino||'')===normStr(destino)))
+        ejecutado+=Number(m.Cantidad)||0;
+    });
+    console.log('[SEP-PEND] SKU:', sku, 'Destino:', destino);
+    console.log('[SEP-PEND] Necesidad original:', necesidad);
+    console.log('[SEP-PEND] Ya separado:', ejecutado);
+    console.log('[SEP-PEND] Pendiente:', necesidad-ejecutado);
     render(
       '<div style="text-align:center;padding:24px 0">'+
         '<div style="font-size:48px;margin-bottom:12px">✓</div>'+
