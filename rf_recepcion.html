@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <title>RF Recepción — Inverneg</title>
@@ -1882,6 +1885,7 @@ function showEscaneo(){
   }
   html+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
     '<button class="btn btn-sec" style="font-size:12px" onclick="showIngresarLPN()">Nuevo LPN</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="window._btnCorregir()">✏ Corregir registro anterior</button>'+
     '<button class="btn btn-ok btn-big" onclick="finalizarRecepcionMercaderia()">FINALIZAR RECEPCIÓN</button>'+
     '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">Guardar y salir</button>'+
   '</div>';
@@ -2088,7 +2092,7 @@ function _guardarSKU(cant){
 
 
 function showCorreccion(){
-  console.log('[TRACE] showCorreccion llamado, S.step='+S.step);
+  alert('SHOWCORRECCION v2');console.log('[TRACE] showCorreccion llamado, S.step='+S.step);
   S.step='correccion';
   render('<div class="loading"><div class="loading-icon">...</div><div class="loading-txt">Cargando registros...</div></div>');
   cargarSKUsSP(S.pedido,null).then(function(spRegs){
@@ -3025,6 +3029,7 @@ window.reasignarExistente=reasignarExistente;
 window.recargarCatalogos=recargarCatalogos;
 window.actualizarStatusContenedorExcel=actualizarStatusContenedorExcel;
 window.refrescarContenedoresExcel=refrescarContenedoresExcel;
+window._btnCorregir=function(){alert('BOTON CORREGIR OK');console.log('[BOTON] Corregir registro anterior presionado');showCorreccion();};
 window.showCorreccion=showCorreccion;
 window.renderCorreccion=renderCorreccion;
 window.iniciarCorreccion=iniciarCorreccion;
