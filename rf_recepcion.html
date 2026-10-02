@@ -2,9 +2,6 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <title>RF Recepción — Inverneg</title>
@@ -1849,7 +1846,6 @@ function showEventoApertura(){
 // 20. RECEPCIÓN — ESCANEO DE SKUs
 // ═══════════════════════════════════════════════════════════════════
 function showEscaneo(){
-  console.log('[TRACE] showEscaneo llamado desde:', new Error().stack.split('\n')[1]||'?');
   S.step='escaneo';
   var nSkus=S.skusRegistrados.length;
   // Agrupar skus por LPN para mostrar resumen
@@ -2092,7 +2088,6 @@ function _guardarSKU(cant){
 
 
 function showCorreccion(){
-  alert('SHOWCORRECCION v2');console.log('[TRACE] showCorreccion llamado, S.step='+S.step);
   S.step='correccion';
   render('<div class="loading"><div class="loading-icon">...</div><div class="loading-txt">Cargando registros...</div></div>');
   cargarSKUsSP(S.pedido,null).then(function(spRegs){
@@ -2104,70 +2099,7 @@ function showCorreccion(){
   });
 }
 function renderCorreccion(regs,filtSKU,filtCont){
-  console.log('[TRACE] renderCorreccion regs='+regs.length);
-  window._filtSKU=filtSKU||''; window._filtCont=filtCont||''; window._filtLPN=window._filtLPN||'';
-  var filtrados=regs.filter(function(r){
-    if(normStr(r.Estado||r.estado||'')==='CORRECCION') return false;
-    var sku=(r.CodProducto||r.sku||'').toUpperCase();
-    var cont=(r.Contenedor||r.contenedor||'').toUpperCase();
-    var lpn=(r.LPN||r.lpn||'').toUpperCase();
-    if(filtSKU&&sku.indexOf(filtSKU.toUpperCase())<0) return false;
-    if(filtCont&&cont.indexOf(filtCont.toUpperCase())<0) return false;
-    if(window._filtLPN&&lpn.indexOf(window._filtLPN.toUpperCase())<0) return false;
-    return true;
-  });
-  window._filtrados=filtrados;
-  console.log('[CORREGIR] renderCorreccion: regs='+regs.length+' filtrados='+filtrados.length);
-
-  // Shell con filtros — DOM para los filtros, render solo una vez
-  render(
-    '<div class="badge badge-rec">CORREGIR REGISTRO</div>'+
-    '<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Pedido: <strong>'+
-      S.pedido+'</strong> · <span id="count-corr">'+filtrados.length+'</span> registros</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">'+
-      '<input class="inp inp-sm" id="filt-sku" placeholder="Filtrar SKU" value="'+(filtSKU||'')+'" autocomplete="off">'+
-      '<input class="inp inp-sm" id="filt-cont" placeholder="Filtrar contenedor" value="'+(filtCont||'')+'" autocomplete="off">'+
-      '<input class="inp inp-sm" id="filt-lpn" placeholder="Filtrar LPN" value="'+(window._filtLPN||'')+'" autocomplete="off">'+
-    '</div>'+
-    '<div id="lista-corr" style="max-height:50vh;overflow-y:auto"></div>'+
-    '<button class="btn btn-sec btn-big" style="margin-top:8px" onclick="showEscaneo()">← Volver</button>'
-  );
-  console.log('[CORREGIR] render() ejecutado, buscando lista-corr...');
   var lista=document.getElementById('lista-corr');
-  console.log('[CORREGIR] lista-corr encontrado:', !!lista);
-
-  // Conectar filtros via DOM (sin oninput en HTML — evita re-render completo)
-  ['filt-sku','filt-cont','filt-lpn'].forEach(function(id){
-    var el=document.getElementById(id);
-    if(el) el.addEventListener('input',function(){
-      window._filtSKU=(document.getElementById('filt-sku')||{value:''}).value;
-      window._filtCont=(document.getElementById('filt-cont')||{value:''}).value;
-      window._filtLPN=(document.getElementById('filt-lpn')||{value:''}).value;
-      _actualizarListaCorreccion();
-    });
-  });
-
-  _actualizarListaCorreccion();
-}
-
-function _actualizarListaCorreccion(){
-  var regs=window._regsCorreccion||[];
-  var filtSKU=window._filtSKU||'';
-  var filtCont=window._filtCont||'';
-  var filtLPN=window._filtLPN||'';
-  var filtrados=regs.filter(function(r){
-    if(normStr(r.Estado||r.estado||'')==='CORRECCION') return false;
-    var sku=(r.CodProducto||r.sku||'').toUpperCase();
-    var cont=(r.Contenedor||r.contenedor||'').toUpperCase();
-    var lpn=(r.LPN||r.lpn||'').toUpperCase();
-    if(filtSKU&&sku.indexOf(filtSKU.toUpperCase())<0) return false;
-    if(filtCont&&cont.indexOf(filtCont.toUpperCase())<0) return false;
-    if(filtLPN&&lpn.indexOf(filtLPN.toUpperCase())<0) return false;
-    return true;
-  });
-  window._filtrados=filtrados;
-
-  var countEl=document.getElementById('count-corr');
   if(countEl) countEl.textContent=filtrados.length;
   var lista=document.getElementById('lista-corr');
   if(!lista) return;
@@ -3029,7 +2961,7 @@ window.reasignarExistente=reasignarExistente;
 window.recargarCatalogos=recargarCatalogos;
 window.actualizarStatusContenedorExcel=actualizarStatusContenedorExcel;
 window.refrescarContenedoresExcel=refrescarContenedoresExcel;
-window._btnCorregir=function(){alert('BOTON CORREGIR OK');console.log('[BOTON] Corregir registro anterior presionado');showCorreccion();};
+window._btnCorregir=function(){showCorreccion();};
 window.showCorreccion=showCorreccion;
 window.renderCorreccion=renderCorreccion;
 window.iniciarCorreccion=iniciarCorreccion;
