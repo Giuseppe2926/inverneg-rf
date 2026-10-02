@@ -1881,6 +1881,7 @@ function showEscaneo(){
   }
   html+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
     '<button class="btn btn-sec" style="font-size:12px" onclick="showIngresarLPN()">Nuevo LPN</button>'+
+    '<button class="btn btn-sec" style="font-size:12px" onclick="window._btnCorregir()">✏ Corregir registro anterior</button>'+
     '<button class="btn btn-ok btn-big" onclick="finalizarRecepcionMercaderia()">FINALIZAR RECEPCIÓN</button>'+
     '<button class="btn btn-sec" style="font-size:12px" onclick="guardarYSalir()">Guardar y salir</button>'+
   '</div>';
@@ -3015,6 +3016,7 @@ window.reasignarExistente=reasignarExistente;
 window.recargarCatalogos=recargarCatalogos;
 window.actualizarStatusContenedorExcel=actualizarStatusContenedorExcel;
 window.refrescarContenedoresExcel=refrescarContenedoresExcel;
+window._btnCorregir=function(){showCorreccion();};
 window.showCorreccion=showCorreccion;
 window.renderCorreccion=renderCorreccion;
 window.iniciarCorreccion=iniciarCorreccion;
