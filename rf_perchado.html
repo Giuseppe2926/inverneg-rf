@@ -1899,7 +1899,13 @@ function _renderSKUsPorDestino(dest,skuMap,saldoXsku){
   if(!grid) return;
 
   skus.forEach(function(sku){
-    var cant=skuMap[sku];
+    var cantOriginal=skuMap[sku];
+    // Calcular pendiente real descontando movimientos ya ejecutados
+    var pendMap=sepPendienteSKU(S.pedido,sku);
+    var pendiente=pendMap?( pendMap[dest]!==undefined ? pendMap[dest] : 0 ) : 0;
+    console.log('[SEP-RENDER]',sku,'original=',cantOriginal,'pendiente=',pendiente);
+    if(pendiente<=0) return; // SKU completamente separado — no mostrar
+    var cant=pendiente; // usar el pendiente real, no la cantidad original
     var disp=saldoXsku[normStr(sku)]||0;
     var factible=disp>=cant;
 
