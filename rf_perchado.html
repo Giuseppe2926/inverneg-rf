@@ -1851,10 +1851,14 @@ function showSeparacion(){
       porDestSku[dest][sku]+=Number(r.cantidad)||0;
     });
 
-    // Filtrar SKU con cantidad <= 0 y destinos vacíos
+    // Filtrar usando pendientes reales (descuenta separaciones ya ejecutadas en SP)
     Object.keys(porDestSku).forEach(function(dest){
       Object.keys(porDestSku[dest]).forEach(function(sku){
-        if(porDestSku[dest][sku]<=0) delete porDestSku[dest][sku];
+        var pendMap=sepPendienteSKU(S.pedido,sku);
+        var pend=pendMap&&pendMap[dest]!==undefined?pendMap[dest]:porDestSku[dest][sku];
+        console.log('[DEST-TAREA]',dest,'sku=',sku,'pendiente=',pend);
+        if(pend<=0) delete porDestSku[dest][sku];
+        else porDestSku[dest][sku]=pend; // usar pendiente real como cantidad
       });
       if(!Object.keys(porDestSku[dest]).length) delete porDestSku[dest];
     });
