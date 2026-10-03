@@ -1912,6 +1912,22 @@ function _renderSKUsPorDestino(dest,skuMap,saldoXsku){
   pushScreen('sep-destino-'+dest,function(){_renderSKUsPorDestino(dest,skuMap,saldoXsku);});
   actualizarBack();
 
+  // Siempre recargar movimientos de SP para que sepPendienteSKU tenga historial completo
+  // Esto cubre tanto la navegación normal como el uso de goBack() desde el historial
+  if(!DB._movsCache||DB._movsCache.length===0){
+    console.log('[SEP-CACHE-ANTES]',DB._movsCache?DB._movsCache.length:'undefined');
+    cargarMovimientosPedido(S.pedido).then(function(movs){
+      DB._movsCache=movs;
+      window._sepCalcLogged=false;
+      console.log('[SEP-CACHE-DESPUES]',DB._movsCache.length);
+      _renderSKUsPorDestinoInner(dest,skuMap,saldoXsku);
+    });
+    return;
+  }
+  _renderSKUsPorDestinoInner(dest,skuMap,saldoXsku);
+}
+
+function _renderSKUsPorDestinoInner(dest,skuMap,saldoXsku){
   var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(dest);});
   var skus=Object.keys(skuMap).filter(function(s){return skuMap[s]>0;}).sort(function(a,b){
     return String(a).localeCompare(String(b));
