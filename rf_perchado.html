@@ -1815,6 +1815,9 @@ function showSeparacion(){
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando tareas de separación...</div></div>');
 
   Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
+    DB._movsCache=res[1]; // historial completo para sepPendienteSKU
+    window._sepCalcLogged=false;
+    console.log('[SEP] Movimientos históricos desde SP:',res[1].length);
     var saldos=calcularSaldos(res[0],res[1]);
 
     // Saldo total por SKU (todos los LPN)
