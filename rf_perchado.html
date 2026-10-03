@@ -766,18 +766,37 @@ function sepPendienteSKU(pedido,sku){
   });
   // Descontar movimientos SEPARACION ya ejecutados en SP (cargados en DB._movsCache)
   var movsEjec=DB._movsCache||[];
+  // Log raw del cache — solo una vez (cuando se evalúa el primer SKU)
+  if(!window._sepCalcLogged){
+    window._sepCalcLogged=true;
+    console.log('[SEP-CALC-RAW] Total en cache:',movsEjec.length);
+    movsEjec.slice(0,20).forEach(function(m,i){
+      console.log('[SEP-CALC-RAW]['+i+']',JSON.stringify({
+        SKU:m.SKU, TipoMovimiento:m.TipoMovimiento,
+        DestinoSeparacion:m.DestinoSeparacion, Destino:m.Destino,
+        Cantidad:m.Cantidad, Pedido:m.Pedido
+      }));
+    });
+  }
   var movsFiltrados=movsEjec.filter(function(m){
     return normStr(m.TipoMovimiento)==='SEPARACION'&&
            normStr(m.Pedido||'')===normStr(pedido)&&
            normStr(m.SKU||'')===normStr(sku);
   });
   console.log('[SEP-CALC]',sku,'movimientos encontrados:',movsFiltrados.length,
-    movsFiltrados.map(function(m){return 'dest='+( m.DestinoSeparacion||m.AlmacenDestino||'?')+' cant='+m.Cantidad;}).join(' | '));
+    movsFiltrados.map(function(m){return 'dest='+(m.DestinoSeparacion||m.AlmacenDestino||'?')+' cant='+m.Cantidad;}).join(' | '));
+  // Log de descartados para comparar con el SKU buscado
   movsEjec.forEach(function(m){
-    console.log('[SEP-CALC] TipoMovimiento:',m.TipoMovimiento,'Destino:',m.DestinoSeparacion||m.AlmacenDestino,'SKU:',m.SKU);
-    if(normStr(m.TipoMovimiento)!=='SEPARACION') return;
-    if(normStr(m.Pedido||'')!==normStr(pedido)) return;
-    if(normStr(m.SKU||'')!==normStr(sku)) return;
+    var tipoOk=normStr(m.TipoMovimiento)==='SEPARACION';
+    var pedOk=normStr(m.Pedido||'')===normStr(pedido);
+    var skuOk=normStr(m.SKU||'')===normStr(sku);
+    if(tipoOk&&pedOk&&!skuOk){
+      console.log('[SEP-DESCARTADO] SKU:"'+m.SKU+'" vs buscado:"'+sku+
+        '" | Tipo:'+m.TipoMovimiento+' | Dest:'+m.DestinoSeparacion+' | Cant:'+m.Cantidad);
+    }
+    if(!tipoOk){return;}
+    if(!pedOk){return;}
+    if(!skuOk){return;}
     var dest=m.DestinoSeparacion||m.AlmacenDestino||'Sin destino';
     // Intentar coincidir con alguna clave del porDest
     var matchKey=Object.keys(porDest).find(function(k2){
@@ -1487,6 +1506,7 @@ function _confirmarFormMovimiento(sku,saldoDisp){
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Validando saldo...</div></div>');
   Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
     DB._movsCache=res[1]; // poblar cache para sepPendienteSKU — incluye historial SP
+    window._sepCalcLogged=false; // resetear flag de log raw
     console.log('[SEP] Movimientos históricos cargados desde SP:',res[1].length);
     var saldos=calcularSaldos(res[0],res[1]);
     // normLPN garantiza string para que la clave coincida con la del mapa de saldos
