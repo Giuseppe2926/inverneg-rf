@@ -766,7 +766,15 @@ function sepPendienteSKU(pedido,sku){
   });
   // Descontar movimientos SEPARACION ya ejecutados en SP (cargados en DB._movsCache)
   var movsEjec=DB._movsCache||[];
+  var movsFiltrados=movsEjec.filter(function(m){
+    return normStr(m.TipoMovimiento)==='SEPARACION'&&
+           normStr(m.Pedido||'')===normStr(pedido)&&
+           normStr(m.SKU||'')===normStr(sku);
+  });
+  console.log('[SEP-CALC]',sku,'movimientos encontrados:',movsFiltrados.length,
+    movsFiltrados.map(function(m){return 'dest='+( m.DestinoSeparacion||m.AlmacenDestino||'?')+' cant='+m.Cantidad;}).join(' | '));
   movsEjec.forEach(function(m){
+    console.log('[SEP-CALC] TipoMovimiento:',m.TipoMovimiento,'Destino:',m.DestinoSeparacion||m.AlmacenDestino,'SKU:',m.SKU);
     if(normStr(m.TipoMovimiento)!=='SEPARACION') return;
     if(normStr(m.Pedido||'')!==normStr(pedido)) return;
     if(normStr(m.SKU||'')!==normStr(sku)) return;
@@ -1478,6 +1486,8 @@ function _confirmarFormMovimiento(sku,saldoDisp){
 
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Validando saldo...</div></div>');
   Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
+    DB._movsCache=res[1]; // poblar cache para sepPendienteSKU — incluye historial SP
+    console.log('[SEP] Movimientos históricos cargados desde SP:',res[1].length);
     var saldos=calcularSaldos(res[0],res[1]);
     // normLPN garantiza string para que la clave coincida con la del mapa de saldos
     var lpnNorm=normLPN(S.lpnActual).toUpperCase();
