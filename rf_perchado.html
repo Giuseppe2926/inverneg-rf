@@ -437,9 +437,25 @@ function parsearUbicaciones(d){
   console.log('[UBIC-PARSE] Total cargadas:',DB.ubicaciones.length);
 }
 function parsearDestinos(d){
-  DB.destinosSep=parsearHoja(d.values,function(h,r){
-    return{destino:r[idx(h,['destino'])]||'',almacen:r[idx(h,['almacen'])]||'',ubicacion:r[idx(h,['ubicacion'])]||''};
+  if(!d||!d.values||d.values.length<2){DB.destinosSep=[];return;}
+  var hdr=d.values[0].map(function(v){return(v||'').toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,''); // quitar tildes para comparar
   });
+  console.log('[DESTINOS] Encabezados raw:',d.values[0].map(function(v,i){return i+'="'+v+'"';}).join(' | '));
+  var iDest=idx(hdr,['destino','destination']);
+  var iAlm =idx(hdr,['almacen','almacén','almacen destino','almacen_destino','warehouse']);
+  var iUbic=idx(hdr,['ubicacion','ubicación','ubicacion destino','ubicacion_destino','location','ubic']);
+  console.log('[DESTINOS] índices: destino='+iDest+' almacen='+iAlm+' ubicacion='+iUbic);
+  DB.destinosSep=d.values.slice(1).map(function(r){
+    var obj={
+      destino: iDest>=0?(r[iDest]||'').toString().trim():'',
+      almacen: iAlm>=0?(r[iAlm]||'').toString().trim():'',
+      ubicacion:iUbic>=0?(r[iUbic]||'').toString().trim():'',
+    };
+    if(obj.destino) console.log('[DESTINO-LKUP]',obj.destino,JSON.stringify(obj));
+    return obj;
+  }).filter(function(r){return r.destino;});
+  console.log('[DESTINOS] Cargados:',DB.destinosSep.length);
 }
 function parsearOperadores(d){
   if(!d||!d.values||d.values.length<2){DB.operadores=[];return;}
@@ -1877,11 +1893,23 @@ function _renderDestinosSep(destinos,porDestSku,saldoXsku){
   if(!grid) return;
 
   destinos.forEach(function(dest){
-    var skus=Object.keys(porDestSku[dest]);
-    var totalCant=skus.reduce(function(a,sku){return a+porDestSku[dest][sku];},0);
-    // Verificar si todos los SKU son factibles
+    // Calcular pendientes reales (descontando separaciones ya ejecutadas)
+    var skusConPend=Object.keys(porDestSku[dest]).filter(function(sku){
+      var pendMap=sepPendienteSKU(S.pedido,sku);
+      var pend=pendMap&&pendMap[dest]!==undefined?pendMap[dest]:porDestSku[dest][sku];
+      return pend>0;
+    });
+    if(!skusConPend.length) return; // destino completo — no mostrar
+    var skus=skusConPend;
+    var totalCant=skus.reduce(function(a,sku){
+      var pendMap=sepPendienteSKU(S.pedido,sku);
+      return a+(pendMap&&pendMap[dest]!==undefined?pendMap[dest]:porDestSku[dest][sku]);
+    },0);
+    // Verificar factibilidad contra pendientes
     var algunoInsuf=skus.some(function(sku){
-      return (saldoXsku[normStr(sku)]||0)<porDestSku[dest][sku];
+      var pendMap=sepPendienteSKU(S.pedido,sku);
+      var pend=pendMap&&pendMap[dest]!==undefined?pendMap[dest]:porDestSku[dest][sku];
+      return (saldoXsku[normStr(sku)]||0)<pend;
     });
     var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(dest);});
 
