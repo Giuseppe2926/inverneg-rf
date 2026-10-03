@@ -2908,7 +2908,22 @@ function generarExcelSeparacion(destinos){
       showSeleccionDestinosSep();
       return;
     }
-    var filas=_consolidarMovimientos(seps);
+    // Enriquecer cada movimiento con almacén/ubicación de DestinosSeparacion antes de consolidar
+    // Esto garantiza que el Excel usa los valores actuales de la hoja, no los grabados en SP
+    var sepsEnriquecidos=seps.map(function(m){
+      var destNom=normStr(m.DestinoSeparacion||m.AlmacenDestino||'');
+      var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===destNom;});
+      if(destInfo){
+        var enr=Object.assign({},m);
+        enr.AlmacenDestino=destInfo.almacen;
+        enr.UbicacionDestino=destInfo.ubicacion;
+        console.log('[EXCEL-D365] Destino="'+destNom+'" → Alm="'+destInfo.almacen+'" Ubic="'+destInfo.ubicacion+'"');
+        return enr;
+      }
+      console.warn('[EXCEL-D365] Destino "'+destNom+'" no encontrado en DestinosSeparacion — usando valores de SP');
+      return m;
+    });
+    var filas=_consolidarMovimientos(sepsEnriquecidos);
     console.log('[EXCEL-D365] SEP filas consolidadas:',filas.length);
     var sufijo=destinos.length===1?destinos[0]:'MULTI';
     _generarXLSX(filas,'D365_SEP_'+S.pedido+'_'+sufijo+'_'+ahora().fecha.replace(/-/g,'')+'.xlsx');
