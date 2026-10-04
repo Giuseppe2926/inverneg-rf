@@ -814,13 +814,21 @@ function sepPendienteSKU(pedido,sku){
     if(!pedOk){return;}
     if(!skuOk){return;}
     var dest=m.DestinoSeparacion||m.AlmacenDestino||'Sin destino';
-    // Intentar coincidir con alguna clave del porDest
     var matchKey=Object.keys(porDest).find(function(k2){
       return normStr(k2)===normStr(dest);
     })||dest;
+    var antesDesc=porDest[matchKey];
+    console.log('[SEP-MATH]',sku,
+      'dest="'+dest+'" matchKey="'+matchKey+'"',
+      'porDest=',JSON.stringify(porDest),
+      'antesDesc=',antesDesc,
+      'separado=',Number(m.Cantidad)||0);
     if(porDest[matchKey]!==undefined){
       porDest[matchKey]-=Number(m.Cantidad)||0;
       if(porDest[matchKey]<0) porDest[matchKey]=0;
+      console.log('[SEP-MATH]',sku,'original=',antesDesc,'separado=',Number(m.Cantidad)||0,'pendiente=',porDest[matchKey]);
+    } else {
+      console.warn('[SEP-MATH]',sku,'matchKey="'+matchKey+'" NO encontrado en porDest. Claves:',Object.keys(porDest));
     }
   });
   // Eliminar destinos con pendiente <= 0
