@@ -1865,9 +1865,24 @@ function showSeparacion(){
     // Filtrar usando pendientes reales (descuenta separaciones ya ejecutadas en SP)
     Object.keys(porDestSku).forEach(function(dest){
       Object.keys(porDestSku[dest]).forEach(function(sku){
+        // Verificar si existen movimientos de separación para este SKU
+        var hayMovsSep=(DB._movsCache||[]).some(function(m){
+          return normStr(m.TipoMovimiento)==='SEPARACION'&&
+                 normStr(m.Pedido||'')===normStr(S.pedido)&&
+                 normStr(m.SKU||'')===normStr(sku);
+        });
         var pendMap=sepPendienteSKU(S.pedido,sku);
-        var pend=pendMap&&pendMap[dest]!==undefined?pendMap[dest]:porDestSku[dest][sku];
-        console.log('[DEST-TAREA]',dest,'sku=',sku,'pendiente=',pend);
+        var pend;
+        if(!hayMovsSep){
+          // Sin movimientos de separación — usar cantidad original
+          pend=porDestSku[dest][sku];
+        } else if(!pendMap||pendMap[dest]===undefined){
+          // Hubo movimientos y pendMap no tiene la clave → pendiente=0 (ya completado)
+          pend=0;
+        } else {
+          pend=pendMap[dest];
+        }
+        console.log('[DEST-TAREA]',dest,'sku=',sku,'pendiente=',pend,'hayMovs=',hayMovsSep);
         if(pend<=0) delete porDestSku[dest][sku];
         else porDestSku[dest][sku]=pend; // usar pendiente real como cantidad
       });
