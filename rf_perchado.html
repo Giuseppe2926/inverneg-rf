@@ -437,25 +437,9 @@ function parsearUbicaciones(d){
   console.log('[UBIC-PARSE] Total cargadas:',DB.ubicaciones.length);
 }
 function parsearDestinos(d){
-  if(!d||!d.values||d.values.length<2){DB.destinosSep=[];return;}
-  var hdr=d.values[0].map(function(v){return(v||'').toString().trim().toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g,''); // quitar tildes para comparar
+  DB.destinosSep=parsearHoja(d.values,function(h,r){
+    return{destino:r[idx(h,['destino'])]||'',almacen:r[idx(h,['almacen'])]||'',ubicacion:r[idx(h,['ubicacion'])]||''};
   });
-  console.log('[DESTINOS] Encabezados raw:',d.values[0].map(function(v,i){return i+'="'+v+'"';}).join(' | '));
-  var iDest=idx(hdr,['destino','destination']);
-  var iAlm =idx(hdr,['almacen','almacén','almacen destino','almacen_destino','warehouse']);
-  var iUbic=idx(hdr,['ubicacion','ubicación','ubicacion destino','ubicacion_destino','location','ubic']);
-  console.log('[DESTINOS] índices: destino='+iDest+' almacen='+iAlm+' ubicacion='+iUbic);
-  DB.destinosSep=d.values.slice(1).map(function(r){
-    var obj={
-      destino: iDest>=0?(r[iDest]||'').toString().trim():'',
-      almacen: iAlm>=0?(r[iAlm]||'').toString().trim():'',
-      ubicacion:iUbic>=0?(r[iUbic]||'').toString().trim():'',
-    };
-    if(obj.destino) console.log('[DESTINO-LKUP]',obj.destino,JSON.stringify(obj));
-    return obj;
-  }).filter(function(r){return r.destino;});
-  console.log('[DESTINOS] Cargados:',DB.destinosSep.length);
 }
 function parsearOperadores(d){
   if(!d||!d.values||d.values.length<2){DB.operadores=[];return;}
@@ -782,53 +766,18 @@ function sepPendienteSKU(pedido,sku){
   });
   // Descontar movimientos SEPARACION ya ejecutados en SP (cargados en DB._movsCache)
   var movsEjec=DB._movsCache||[];
-  // Log raw del cache — solo una vez (cuando se evalúa el primer SKU)
-  if(!window._sepCalcLogged){
-    window._sepCalcLogged=true;
-    console.log('[SEP-CALC-RAW] Total en cache:',movsEjec.length);
-    movsEjec.slice(0,20).forEach(function(m,i){
-      console.log('[SEP-CALC-RAW]['+i+']',JSON.stringify({
-        SKU:m.SKU, TipoMovimiento:m.TipoMovimiento,
-        DestinoSeparacion:m.DestinoSeparacion, Destino:m.Destino,
-        Cantidad:m.Cantidad, Pedido:m.Pedido
-      }));
-    });
-  }
-  var movsFiltrados=movsEjec.filter(function(m){
-    return normStr(m.TipoMovimiento)==='SEPARACION'&&
-           normStr(m.Pedido||'')===normStr(pedido)&&
-           normStr(m.SKU||'')===normStr(sku);
-  });
-  console.log('[SEP-CALC]',sku,'movimientos encontrados:',movsFiltrados.length,
-    movsFiltrados.map(function(m){return 'dest='+(m.DestinoSeparacion||m.AlmacenDestino||'?')+' cant='+m.Cantidad;}).join(' | '));
-  // Log de descartados para comparar con el SKU buscado
   movsEjec.forEach(function(m){
-    var tipoOk=normStr(m.TipoMovimiento)==='SEPARACION';
-    var pedOk=normStr(m.Pedido||'')===normStr(pedido);
-    var skuOk=normStr(m.SKU||'')===normStr(sku);
-    if(tipoOk&&pedOk&&!skuOk){
-      console.log('[SEP-DESCARTADO] SKU:"'+m.SKU+'" vs buscado:"'+sku+
-        '" | Tipo:'+m.TipoMovimiento+' | Dest:'+m.DestinoSeparacion+' | Cant:'+m.Cantidad);
-    }
-    if(!tipoOk){return;}
-    if(!pedOk){return;}
-    if(!skuOk){return;}
+    if(normStr(m.TipoMovimiento)!=='SEPARACION') return;
+    if(normStr(m.Pedido||'')!==normStr(pedido)) return;
+    if(normStr(m.SKU||'')!==normStr(sku)) return;
     var dest=m.DestinoSeparacion||m.AlmacenDestino||'Sin destino';
+    // Intentar coincidir con alguna clave del porDest
     var matchKey=Object.keys(porDest).find(function(k2){
       return normStr(k2)===normStr(dest);
     })||dest;
-    var antesDesc=porDest[matchKey];
-    console.log('[SEP-MATH]',sku,
-      'dest="'+dest+'" matchKey="'+matchKey+'"',
-      'porDest=',JSON.stringify(porDest),
-      'antesDesc=',antesDesc,
-      'separado=',Number(m.Cantidad)||0);
     if(porDest[matchKey]!==undefined){
       porDest[matchKey]-=Number(m.Cantidad)||0;
       if(porDest[matchKey]<0) porDest[matchKey]=0;
-      console.log('[SEP-MATH]',sku,'original=',antesDesc,'separado=',Number(m.Cantidad)||0,'pendiente=',porDest[matchKey]);
-    } else {
-      console.warn('[SEP-MATH]',sku,'matchKey="'+matchKey+'" NO encontrado en porDest. Claves:',Object.keys(porDest));
     }
   });
   // Eliminar destinos con pendiente <= 0
@@ -921,7 +870,8 @@ function showMenuPrincipal(){
   render(
     '<div class="lbl">pedido</div>'+
     '<input class="inp" id="inp-busca-pedido" type="text" placeholder="Escribe para buscar pedido..." '+
-      'autocomplete="off" autocorrect="off" spellcheck="false" style="font-size:15px">'+
+      'autocomplete="off" autocorrect="off" spellcheck="false" style="font-size:15px" '+
+      'oninput="_filtrarPedidoMenu(this.value)" onfocus="_filtrarPedidoMenu(this.value)">'+
     '<div id="drop-pedidos" style="background:var(--sur2);border:1px solid var(--bor);'+
       'border-top:none;border-radius:0 0 7px 7px;display:none;max-height:200px;overflow-y:auto"></div>'+
     '<div id="badge-pedido-sel" style="display:none;margin-top:5px;padding:5px 10px;'+
@@ -955,47 +905,12 @@ function showMenuPrincipal(){
       '</div>'+
     '</div>'
   );
-  // Inicializar buscador de pedidos via DOM
+  // Buscador: oninput/onfocus están en el HTML para evitar problemas de timing.
+  // Solo registramos blur y keydown via JS (no críticos para el primer keystroke).
   setTimeout(function(){
     var inp=document.getElementById('inp-busca-pedido');
     var drop=document.getElementById('drop-pedidos');
-    var badge=document.getElementById('badge-pedido-sel');
     if(!inp||!drop) return;
-
-    function filtrar(){
-      var q=(inp.value||'').trim().toUpperCase();
-      drop.innerHTML='';
-      var matches=DB.pedidos.filter(function(p){return !q||p.toUpperCase().indexOf(q)>=0;}).slice(0,25);
-      if(!matches.length||!q){drop.style.display='none';return;}
-      matches.forEach(function(p){
-        var item=document.createElement('div');
-        item.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);font-size:14px;font-weight:600;color:var(--txt)';
-        item.textContent=p;
-        item.addEventListener('mouseover',function(){this.style.background='var(--bor)';});
-        item.addEventListener('mouseout',function(){this.style.background='';});
-        item.addEventListener('mousedown',function(e){
-          e.preventDefault();
-          selPedidoBuscador(p);
-        });
-        drop.appendChild(item);
-      });
-      drop.style.display='block';
-    }
-
-    inp.addEventListener('input',function(){
-    var q=(inp.value||'').trim();
-    // Coincidencia exacta (case-insensitive) → seleccionar automáticamente sin dropdown
-    var exacto=q?opciones.find(function(o){return o.toUpperCase()===q.toUpperCase();}):null;
-    if(exacto){
-      inp.value=exacto;
-      if(drop){ drop.style.display='none'; drop.innerHTML=''; }
-      if(badge){ badge.textContent='✓ '+exacto; badge.style.display='block'; }
-      onSelect(exacto);
-      return; // no mostrar dropdown
-    }
-    filtrar();
-  });
-    inp.addEventListener('focus',filtrar);
     inp.addEventListener('blur',function(){setTimeout(function(){drop.style.display='none';},180);});
     inp.addEventListener('keydown',function(e){
       if(e.key==='Enter'){
@@ -1005,8 +920,45 @@ function showMenuPrincipal(){
         else if(window._pedidoActualMenu) selPedidoBuscador(window._pedidoActualMenu);
       }
     });
-  },0);
+    inp.focus();
+  },50);
 }
+
+function _filtrarPedidoMenu(val){
+  var q=(val||'').trim();
+  var drop=document.getElementById('drop-pedidos');
+  var badge=document.getElementById('badge-pedido-sel');
+  var inp=document.getElementById('inp-busca-pedido');
+  if(!drop) return;
+  if(!q){drop.style.display='none';return;}
+  // Coincidencia exacta → autoseleccionar (scanner RF escanea código completo)
+  var exacto=DB.pedidos.find(function(p){return p.toUpperCase()===q.toUpperCase();});
+  if(exacto){
+    if(inp) inp.value=exacto;
+    drop.style.display='none';
+    if(badge){badge.textContent='✓ '+exacto;badge.style.display='block';}
+    selPedidoBuscador(exacto);
+    return;
+  }
+  // Filtro parcial
+  var matches=DB.pedidos.filter(function(p){return p.toUpperCase().indexOf(q.toUpperCase())>=0;}).slice(0,25);
+  drop.innerHTML='';
+  if(!matches.length){drop.style.display='none';return;}
+  matches.forEach(function(p){
+    var item=document.createElement('div');
+    item.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);font-size:14px;font-weight:600;color:var(--txt)';
+    item.textContent=p;
+    item.addEventListener('mouseover',function(){this.style.background='var(--bor)';});
+    item.addEventListener('mouseout',function(){this.style.background='';});
+    item.addEventListener('mousedown',function(e){
+      e.preventDefault();
+      selPedidoBuscador(p);
+    });
+    drop.appendChild(item);
+  });
+  drop.style.display='block';
+}
+window._filtrarPedidoMenu=_filtrarPedidoMenu;
 
 function selPedidoBuscador(p){
   window._pedidoActualMenu=p;
@@ -1529,9 +1481,6 @@ function _confirmarFormMovimiento(sku,saldoDisp){
 
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Validando saldo...</div></div>');
   Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
-    DB._movsCache=res[1]; // poblar cache para sepPendienteSKU — incluye historial SP
-    window._sepCalcLogged=false; // resetear flag de log raw
-    console.log('[SEP] Movimientos históricos cargados desde SP:',res[1].length);
     var saldos=calcularSaldos(res[0],res[1]);
     // normLPN garantiza string para que la clave coincida con la del mapa de saldos
     var lpnNorm=normLPN(S.lpnActual).toUpperCase();
@@ -1823,9 +1772,6 @@ function showSeparacion(){
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando tareas de separación...</div></div>');
 
   Promise.all([cargarRecepcionesPedido(S.pedido),cargarMovimientosPedido(S.pedido)]).then(function(res){
-    DB._movsCache=res[1]; // historial completo para sepPendienteSKU
-    window._sepCalcLogged=false;
-    console.log('[SEP] Movimientos históricos desde SP:',res[1].length);
     var saldos=calcularSaldos(res[0],res[1]);
 
     // Saldo total por SKU (todos los LPN)
@@ -1862,29 +1808,10 @@ function showSeparacion(){
       porDestSku[dest][sku]+=Number(r.cantidad)||0;
     });
 
-    // Filtrar usando pendientes reales (descuenta separaciones ya ejecutadas en SP)
+    // Filtrar SKU con cantidad <= 0 y destinos vacíos
     Object.keys(porDestSku).forEach(function(dest){
       Object.keys(porDestSku[dest]).forEach(function(sku){
-        // Verificar si existen movimientos de separación para este SKU
-        var hayMovsSep=(DB._movsCache||[]).some(function(m){
-          return normStr(m.TipoMovimiento)==='SEPARACION'&&
-                 normStr(m.Pedido||'')===normStr(S.pedido)&&
-                 normStr(m.SKU||'')===normStr(sku);
-        });
-        var pendMap=sepPendienteSKU(S.pedido,sku);
-        var pend;
-        if(!hayMovsSep){
-          // Sin movimientos de separación — usar cantidad original
-          pend=porDestSku[dest][sku];
-        } else if(!pendMap||pendMap[dest]===undefined){
-          // Hubo movimientos y pendMap no tiene la clave → pendiente=0 (ya completado)
-          pend=0;
-        } else {
-          pend=pendMap[dest];
-        }
-        console.log('[DEST-TAREA]',dest,'sku=',sku,'pendiente=',pend,'hayMovs=',hayMovsSep);
-        if(pend<=0) delete porDestSku[dest][sku];
-        else porDestSku[dest][sku]=pend; // usar pendiente real como cantidad
+        if(porDestSku[dest][sku]<=0) delete porDestSku[dest][sku];
       });
       if(!Object.keys(porDestSku[dest]).length) delete porDestSku[dest];
     });
@@ -1923,23 +1850,11 @@ function _renderDestinosSep(destinos,porDestSku,saldoXsku){
   if(!grid) return;
 
   destinos.forEach(function(dest){
-    // Calcular pendientes reales (descontando separaciones ya ejecutadas)
-    var skusConPend=Object.keys(porDestSku[dest]).filter(function(sku){
-      var pendMap=sepPendienteSKU(S.pedido,sku);
-      var pend=pendMap&&pendMap[dest]!==undefined?pendMap[dest]:porDestSku[dest][sku];
-      return pend>0;
-    });
-    if(!skusConPend.length) return; // destino completo — no mostrar
-    var skus=skusConPend;
-    var totalCant=skus.reduce(function(a,sku){
-      var pendMap=sepPendienteSKU(S.pedido,sku);
-      return a+(pendMap&&pendMap[dest]!==undefined?pendMap[dest]:porDestSku[dest][sku]);
-    },0);
-    // Verificar factibilidad contra pendientes
+    var skus=Object.keys(porDestSku[dest]);
+    var totalCant=skus.reduce(function(a,sku){return a+porDestSku[dest][sku];},0);
+    // Verificar si todos los SKU son factibles
     var algunoInsuf=skus.some(function(sku){
-      var pendMap=sepPendienteSKU(S.pedido,sku);
-      var pend=pendMap&&pendMap[dest]!==undefined?pendMap[dest]:porDestSku[dest][sku];
-      return (saldoXsku[normStr(sku)]||0)<pend;
+      return (saldoXsku[normStr(sku)]||0)<porDestSku[dest][sku];
     });
     var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(dest);});
 
@@ -1970,22 +1885,6 @@ function _renderSKUsPorDestino(dest,skuMap,saldoXsku){
   pushScreen('sep-destino-'+dest,function(){_renderSKUsPorDestino(dest,skuMap,saldoXsku);});
   actualizarBack();
 
-  // Siempre recargar movimientos de SP para que sepPendienteSKU tenga historial completo
-  // Esto cubre tanto la navegación normal como el uso de goBack() desde el historial
-  if(!DB._movsCache||DB._movsCache.length===0){
-    console.log('[SEP-CACHE-ANTES]',DB._movsCache?DB._movsCache.length:'undefined');
-    cargarMovimientosPedido(S.pedido).then(function(movs){
-      DB._movsCache=movs;
-      window._sepCalcLogged=false;
-      console.log('[SEP-CACHE-DESPUES]',DB._movsCache.length);
-      _renderSKUsPorDestinoInner(dest,skuMap,saldoXsku);
-    });
-    return;
-  }
-  _renderSKUsPorDestinoInner(dest,skuMap,saldoXsku);
-}
-
-function _renderSKUsPorDestinoInner(dest,skuMap,saldoXsku){
   var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===normStr(dest);});
   var skus=Object.keys(skuMap).filter(function(s){return skuMap[s]>0;}).sort(function(a,b){
     return String(a).localeCompare(String(b));
@@ -2003,13 +1902,7 @@ function _renderSKUsPorDestinoInner(dest,skuMap,saldoXsku){
   if(!grid) return;
 
   skus.forEach(function(sku){
-    var cantOriginal=skuMap[sku];
-    // Calcular pendiente real descontando movimientos ya ejecutados
-    var pendMap=sepPendienteSKU(S.pedido,sku);
-    var pendiente=pendMap?( pendMap[dest]!==undefined ? pendMap[dest] : 0 ) : 0;
-    console.log('[SEP-RENDER]',sku,'original=',cantOriginal,'pendiente=',pendiente);
-    if(pendiente<=0) return; // SKU completamente separado — no mostrar
-    var cant=pendiente; // usar el pendiente real, no la cantidad original
+    var cant=skuMap[sku];
     var disp=saldoXsku[normStr(sku)]||0;
     var factible=disp>=cant;
 
@@ -2204,28 +2097,6 @@ function _ejecutarSepConLPN(sku,cantReq,destino,lpnOrigen){
   console.log('[SEP-LPN] LPN='+lpnOrigen+' SKU='+sku+' Cant='+cantReq+' Dest='+destino);
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Registrando separación...</div></div>');
   gPost(urlLista(DB.listIds.movimientos)+'/items',{fields:fields}).then(function(){
-    // Actualizar DB._movsCache inmediatamente para que sepPendienteSKU refleje el movimiento
-    if(!DB._movsCache) DB._movsCache=[];
-    DB._movsCache.push(fields);
-    console.log('[SEP-PEND] Cache actualizado: '+DB._movsCache.length+' movimientos');
-    // Log del pendiente tras descontar
-    var necesidad=0;
-    DB.separacionPendiente.forEach(function(r){
-      if(normStr(r.pedido)===normStr(S.pedido)&&normStr(r.sku)===normStr(sku)&&
-         normStr(r.destino)===normStr(destino)) necesidad+=r.cantidad;
-    });
-    var ejecutado=0;
-    DB._movsCache.forEach(function(m){
-      if(normStr(m.TipoMovimiento||'')===normStr('SEPARACION')&&
-         normStr(m.Pedido||'')===normStr(S.pedido)&&
-         normStr(m.SKU||'')===normStr(sku)&&
-         (normStr(m.DestinoSeparacion||m.AlmacenDestino||'')===normStr(destino)))
-        ejecutado+=Number(m.Cantidad)||0;
-    });
-    console.log('[SEP-PEND] SKU:', sku, 'Destino:', destino);
-    console.log('[SEP-PEND] Necesidad original:', necesidad);
-    console.log('[SEP-PEND] Ya separado:', ejecutado);
-    console.log('[SEP-PEND] Pendiente:', necesidad-ejecutado);
     render(
       '<div style="text-align:center;padding:24px 0">'+
         '<div style="font-size:48px;margin-bottom:12px">✓</div>'+
@@ -3012,22 +2883,7 @@ function generarExcelSeparacion(destinos){
       showSeleccionDestinosSep();
       return;
     }
-    // Enriquecer cada movimiento con almacén/ubicación de DestinosSeparacion antes de consolidar
-    // Esto garantiza que el Excel usa los valores actuales de la hoja, no los grabados en SP
-    var sepsEnriquecidos=seps.map(function(m){
-      var destNom=normStr(m.DestinoSeparacion||m.AlmacenDestino||'');
-      var destInfo=DB.destinosSep.find(function(d){return normStr(d.destino)===destNom;});
-      if(destInfo){
-        var enr=Object.assign({},m);
-        enr.AlmacenDestino=destInfo.almacen;
-        enr.UbicacionDestino=destInfo.ubicacion;
-        console.log('[EXCEL-D365] Destino="'+destNom+'" → Alm="'+destInfo.almacen+'" Ubic="'+destInfo.ubicacion+'"');
-        return enr;
-      }
-      console.warn('[EXCEL-D365] Destino "'+destNom+'" no encontrado en DestinosSeparacion — usando valores de SP');
-      return m;
-    });
-    var filas=_consolidarMovimientos(sepsEnriquecidos);
+    var filas=_consolidarMovimientos(seps);
     console.log('[EXCEL-D365] SEP filas consolidadas:',filas.length);
     var sufijo=destinos.length===1?destinos[0]:'MULTI';
     _generarXLSX(filas,'D365_SEP_'+S.pedido+'_'+sufijo+'_'+ahora().fecha.replace(/-/g,'')+'.xlsx');
