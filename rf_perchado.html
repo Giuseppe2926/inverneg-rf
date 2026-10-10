@@ -257,6 +257,7 @@ var CFG={
   listas:{
     recepciones:'RF_PRecepciones_LRecepciones',
     movimientos:'RF_PRecepciones_LMovimientos',
+    estadoPerchado:'RF_EstadoPerchado',
   },
   empresas:{
     'INV':{almacenOrigen:'CND2-IMPO', ubicOrigen:'N1-IMPO', label:'INV — Inverneg'},
@@ -295,8 +296,10 @@ var DB={
   codigosBarra:[],         // hoja C.Barra del Excel recepcion
   perchadoDriveId:null,perchadoItemId:null,
   recepDriveId:null,recepItemId:null,
-  listIds:{recepciones:null,movimientos:null},
+  listIds:{recepciones:null,movimientos:null,estadoPerchado:null},
   catalogosPesadosCargados:false,  // true cuando Ubicaciones + CodigosBarra terminaron
+  estadosPerchado:{},  // {pedido → {estado:'Finalizado', itemId:'42', fecha:'...', usuario:'...'}}
+  pedidosTodos:[],     // todos los pedidos de LRecepciones (sin filtro de estado)
 };
 
 /* ── Utils ───────────────────────────────────────────────────── */
@@ -363,6 +366,17 @@ function gPost(url,body){
   }).then(function(r){
     if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,120));});
     return r.json();
+  });
+}
+function gPatch(url,body){
+  return getToken().then(function(r){
+    return fetch(url,{method:'PATCH',
+      headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,120));});
+    // PATCH /fields devuelve 200 con JSON
+    return r.json().catch(function(){return{};});
   });
 }
 function urlWB(driveId,itemId,hoja){
@@ -957,6 +971,11 @@ function showMenuPrincipal(){
         '<div class="mode-icon">📥</div>'+
         '<div><div class="mode-title">Generar Excel D365</div>'+
         '<div class="mode-sub">Exportar movimientos para carga en D365</div></div>'+
+      '</div>'+
+      '<div class="mode-card" style="border-left:3px solid var(--acc);opacity:.85" onclick="showPedidosTotales()">'+
+        '<div class="mode-icon">📋</div>'+
+        '<div><div class="mode-title">Pedidos Totales</div>'+
+        '<div class="mode-sub">Ver y administrar todos los pedidos, incluyendo finalizados</div></div>'+
       '</div>'+
     '</div>'
   );
@@ -2374,27 +2393,58 @@ function boot(){
   cargarCatalogos().then(function(){
     setStatus('LIVE',true);
     // Obtener lista de pedidos de LRecepciones (pedidos únicos)
-    if(DB.listIds.recepciones){
-      var tPed=performance.now();
-      gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=2000')
-        .then(function(d){
-          var ps=[...new Set((d.value||[]).map(function(i){return(i.fields||{}).Pedido||'';}).filter(Boolean))].sort();
-          DB.pedidos=ps;
-          console.log('[TIME] ListaPedidos (SP LRecepciones):',Math.round(performance.now()-tPed),'ms ('+ps.length+' pedidos)');
-          console.log('[TIME] BOOT TOTAL (hasta menú):',Math.round(performance.now()-_tBoot),'ms');
-          showSeleccionOperador();
-          // Iniciar carga pesada en background — no bloquea al operario
-          cargarCatalogosLazy();
-        }).catch(function(){
-          console.log('[TIME] ListaPedidos ERROR — boot total hasta aquí:',Math.round(performance.now()-_tBoot),'ms');
-          showSeleccionOperador();
-          cargarCatalogosLazy();
-        });
-    } else {
-      console.log('[TIME] BOOT TOTAL (sin lista pedidos):',Math.round(performance.now()-_tBoot),'ms');
+    // Cargar pedidos (LRecepciones) y estados (RF_EstadoPerchado) en paralelo
+    var promPedidos=DB.listIds.recepciones
+      ? (function(){
+          var tPed=performance.now();
+          return gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$select=id,fields/Pedido&$top=2000')
+            .then(function(d){
+              var ps=[...new Set((d.value||[]).map(function(i){return((i.fields||{}).Pedido||'').trim();}).filter(Boolean))].sort();
+              DB.pedidosTodos=ps;
+              console.log('[TIME] ListaPedidos (SP LRecepciones):',Math.round(performance.now()-tPed),'ms ('+ps.length+' pedidos)');
+            }).catch(function(e){
+              console.warn('[BOOT] Error cargando pedidos:',e.message);
+            });
+        })()
+      : Promise.resolve();
+
+    var promEstados=DB.listIds.estadoPerchado
+      ? (function(){
+          var tEst=performance.now();
+          return gGet(urlLista(DB.listIds.estadoPerchado)+
+            '/items?$expand=fields&$select=id,fields/Pedido,fields/Estado,fields/FechaActualizacion,fields/UsuarioActualizacion&$top=2000')
+            .then(function(d){
+              DB.estadosPerchado={};
+              (d.value||[]).forEach(function(i){
+                var f=i.fields||{};
+                var ped=(f.Pedido||'').trim();
+                if(ped) DB.estadosPerchado[ped]={
+                  estado:f.Estado||'Abierto',
+                  itemId:i.id||null,
+                  fecha:f.FechaActualizacion||null,
+                  usuario:f.UsuarioActualizacion||null,
+                };
+              });
+              console.log('[TIME] EstadosPerchado (RF_EstadoPerchado):',Math.round(performance.now()-tEst),'ms ('+Object.keys(DB.estadosPerchado).length+' registros)');
+            }).catch(function(e){
+              console.warn('[BOOT] Error cargando estados perchado:',e.message);
+            });
+        })()
+      : Promise.resolve();
+
+    Promise.all([promPedidos,promEstados]).then(function(){
+      // DB.pedidos = solo los que NO están como Finalizado en RF_EstadoPerchado
+      DB.pedidos=DB.pedidosTodos.filter(function(p){
+        return(DB.estadosPerchado[p]||{}).estado!=='Finalizado';
+      });
+      console.log('[TIME] BOOT TOTAL (hasta menú):',Math.round(performance.now()-_tBoot),'ms — '+DB.pedidos.length+' abiertos de '+DB.pedidosTodos.length);
       showSeleccionOperador();
       cargarCatalogosLazy();
-    }
+    }).catch(function(){
+      DB.pedidos=DB.pedidosTodos.slice();
+      showSeleccionOperador();
+      cargarCatalogosLazy();
+    });
   }).catch(function(e){
     console.error('[BOOT]',e.message);
     console.log('[TIME] BOOT ERROR en:',Math.round(performance.now()-_tBoot),'ms');
@@ -2419,6 +2469,187 @@ function categorizarMovimiento(mov){
   return tipoUbicacion(mov.AlmacenDestino||'', mov.UbicacionDestino||'');
 }
 
+
+// ── Pedidos Totales — buscador + administración de estado ────────
+function showPedidosTotales(){
+  pushScreen('pedidos-totales',showPedidosTotales);
+  window._pedidoTotalesActual='';
+  actualizarBack();
+  render(
+    '<div class="badge" style="background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.3);color:var(--acc);'+
+      'font-size:11px;font-weight:700;letter-spacing:.06em;padding:3px 10px;border-radius:5px;display:inline-block">'+
+      'PEDIDOS TOTALES</div>'+
+    '<div class="lbl" style="margin-top:12px">buscar pedido (todos)</div>'+
+    '<input class="inp" id="inp-busca-total" type="text" placeholder="Escribe para buscar pedido..." '+
+      'autocomplete="off" autocorrect="off" spellcheck="false" style="font-size:15px" '+
+      'oninput="_filtrarPedidoTotal(this.value)" onfocus="_filtrarPedidoTotal(this.value)">'+
+    '<div id="drop-pedidos-total" style="background:var(--sur2);border:1px solid var(--bor);'+
+      'border-top:none;border-radius:0 0 7px 7px;display:none;max-height:200px;overflow-y:auto"></div>'+
+    '<div id="panel-estado-pedido" style="margin-top:12px"></div>'
+  );
+  setTimeout(function(){
+    var inp=document.getElementById('inp-busca-total');
+    var drop=document.getElementById('drop-pedidos-total');
+    if(!inp||!drop) return;
+    inp.addEventListener('blur',function(){setTimeout(function(){drop.style.display='none';},180);});
+    inp.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){
+        var q=(inp.value||'').trim().toUpperCase();
+        var exacto=DB.pedidosTodos.find(function(p){return p.toUpperCase()===q;});
+        if(exacto) _selPedidoTotal(exacto);
+        else if(window._pedidoTotalesActual) _selPedidoTotal(window._pedidoTotalesActual);
+      }
+    });
+    inp.focus();
+  },50);
+}
+
+function _filtrarPedidoTotal(val){
+  var q=(val||'').trim();
+  var drop=document.getElementById('drop-pedidos-total');
+  var inp=document.getElementById('inp-busca-total');
+  if(!drop) return;
+  if(!q){drop.style.display='none';return;}
+  var exacto=DB.pedidosTodos.find(function(p){return p.toUpperCase()===q.toUpperCase();});
+  if(exacto){
+    if(inp) inp.value=exacto;
+    drop.style.display='none';
+    _selPedidoTotal(exacto);
+    return;
+  }
+  var matches=DB.pedidosTodos.filter(function(p){return p.toUpperCase().indexOf(q.toUpperCase())>=0;}).slice(0,25);
+  drop.innerHTML='';
+  if(!matches.length){drop.style.display='none';return;}
+  matches.forEach(function(p){
+    var item=document.createElement('div');
+    item.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);font-size:14px;font-weight:600;color:var(--txt)';
+    item.textContent=p;
+    item.addEventListener('mouseover',function(){this.style.background='var(--bor)';});
+    item.addEventListener('mouseout',function(){this.style.background='';});
+    item.addEventListener('mousedown',function(e){e.preventDefault();_selPedidoTotal(p);});
+    drop.appendChild(item);
+  });
+  drop.style.display='block';
+}
+window._filtrarPedidoTotal=_filtrarPedidoTotal;
+
+function _selPedidoTotal(pedido){
+  window._pedidoTotalesActual=pedido;
+  var inp=document.getElementById('inp-busca-total');
+  var drop=document.getElementById('drop-pedidos-total');
+  if(inp) inp.value=pedido;
+  if(drop) drop.style.display='none';
+  _renderPanelEstado(pedido);
+}
+
+function _renderPanelEstado(pedido){
+  var panel=document.getElementById('panel-estado-pedido');
+  if(!panel) return;
+  var info=DB.estadosPerchado[pedido]||{};
+  var estado=info.estado||'Abierto';
+  var esAbierto=estado!=='Finalizado';
+
+  // Formatear fecha si existe
+  var fechaStr='';
+  if(!esAbierto&&info.fecha){
+    try{
+      var d=new Date(info.fecha);
+      fechaStr=pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+
+               ' '+pad(d.getHours())+':'+pad(d.getMinutes());
+    }catch(x){}
+  }
+
+  panel.innerHTML=
+    '<div style="background:var(--sur2);border:1px solid var(--bor);border-radius:10px;padding:16px;margin-top:4px">'+
+      '<div style="margin-bottom:12px">'+
+        '<div class="lbl" style="margin-top:0">pedido</div>'+
+        '<div style="font-size:17px;font-weight:700;color:var(--acc)">'+pedido+'</div>'+
+      '</div>'+
+      '<div style="margin-bottom:14px">'+
+        '<div class="lbl" style="margin-top:0">estado</div>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<span style="font-size:20px">'+(esAbierto?'🟢':'🔴')+'</span>'+
+          '<span style="font-size:16px;font-weight:700;color:'+(esAbierto?'var(--ok)':'var(--dan)')+'">'+
+            (esAbierto?'ABIERTO':'FINALIZADO')+
+          '</span>'+
+        '</div>'+
+        (!esAbierto&&fechaStr?
+          '<div style="font-size:11px;color:var(--mut);margin-top:4px">'+
+            'Cerrado: '+fechaStr+(info.usuario?' — '+info.usuario:'')+
+          '</div>':'')+''+
+      '</div>'+
+      (esAbierto?
+        '<button class="btn btn-warn" onclick="_accionEstadoPerchado(\''+pedido+'\',\'Finalizado\')">✅ Cerrar pedido</button>':
+        '<button class="btn btn-ok" onclick="_accionEstadoPerchado(\''+pedido+'\',\'Abierto\')">🔄 Reabrir pedido</button>')+
+    '</div>';
+}
+
+window._accionEstadoPerchado=function(pedido,nuevoEstado){
+  if(!DB.listIds.estadoPerchado){toast('Lista RF_EstadoPerchado no disponible');return;}
+  var msg=nuevoEstado==='Finalizado'
+    ?'¿Cerrar el pedido "'+pedido+'"? Desaparecerá del selector principal.'
+    :'¿Reabrir el pedido "'+pedido+'"? Volverá a aparecer en el selector principal.';
+  if(!confirm(msg)) return;
+
+  var usuario=msalAcc?(msalAcc.username||msalAcc.name||''):'';
+  var fecha=new Date().toISOString();
+  var panel=document.getElementById('panel-estado-pedido');
+  if(panel) panel.innerHTML='<div style="color:var(--mut);font-size:12px;padding:10px 0">⏳ Guardando...</div>';
+
+  var info=DB.estadosPerchado[pedido]||{};
+
+  function _doWrite(itemId){
+    var url=urlLista(DB.listIds.estadoPerchado)+'/items/'+itemId+'/fields';
+    return gPatch(url,{Estado:nuevoEstado,FechaActualizacion:fecha,UsuarioActualizacion:usuario});
+  }
+  function _doInsert(){
+    var url=urlLista(DB.listIds.estadoPerchado)+'/items';
+    return gPost(url,{fields:{Pedido:pedido,Estado:nuevoEstado,FechaActualizacion:fecha,UsuarioActualizacion:usuario}})
+      .then(function(r){
+        var newId=(r&&r.id)||null;
+        if(newId) DB.estadosPerchado[pedido]={estado:nuevoEstado,itemId:newId,fecha:fecha,usuario:usuario};
+        return r;
+      });
+  }
+
+  var p;
+  if(info.itemId){
+    // itemId conocido → PATCH directo
+    p=_doWrite(info.itemId);
+  } else {
+    // Verificar en SP antes de insertar
+    p=gGet(urlLista(DB.listIds.estadoPerchado)+
+        '/items?$expand=fields&$select=id,fields/Pedido&$filter=fields/Pedido eq \''+pedido+'\'&$top=1')
+      .then(function(d){
+        var found=d.value&&d.value[0];
+        if(found){
+          var id=found.id;
+          if(!DB.estadosPerchado[pedido]) DB.estadosPerchado[pedido]={};
+          DB.estadosPerchado[pedido].itemId=id;
+          return _doWrite(id);
+        } else {
+          return _doInsert();
+        }
+      });
+  }
+
+  p.then(function(){
+    // Actualizar cache
+    if(!DB.estadosPerchado[pedido]) DB.estadosPerchado[pedido]={};
+    DB.estadosPerchado[pedido].estado=nuevoEstado;
+    DB.estadosPerchado[pedido].fecha=fecha;
+    DB.estadosPerchado[pedido].usuario=usuario;
+    // Recalcular DB.pedidos (solo Abiertos)
+    DB.pedidos=DB.pedidosTodos.filter(function(p){
+      return(DB.estadosPerchado[p]||{}).estado!=='Finalizado';
+    });
+    toast(nuevoEstado==='Finalizado'?'Pedido cerrado':'Pedido reabierto');
+    _renderPanelEstado(pedido);
+  }).catch(function(e){
+    toast('Error al guardar: '+(e.message||'').slice(0,60));
+    _renderPanelEstado(pedido);
+  });
+};
 
 // ── Calcular resumen de perchado para un pedido ───────────────────
 function calcularResumenPerchado(recepciones, movimientos){
