@@ -2397,7 +2397,7 @@ function boot(){
     var promPedidos=DB.listIds.recepciones
       ? (function(){
           var tPed=performance.now();
-          return gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$select=id,fields/Pedido&$top=2000')
+          return gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select=Pedido)&$top=2000')
             .then(function(d){
               var ps=[...new Set((d.value||[]).map(function(i){return((i.fields||{}).Pedido||'').trim();}).filter(Boolean))].sort();
               DB.pedidosTodos=ps;
@@ -2412,7 +2412,7 @@ function boot(){
       ? (function(){
           var tEst=performance.now();
           return gGet(urlLista(DB.listIds.estadoPerchado)+
-            '/items?$expand=fields&$select=id,fields/Pedido,fields/Estado,fields/FechaActualizacion,fields/UsuarioActualizacion&$top=2000')
+            '/items?$expand=fields($select=Pedido,Estado,FechaActualizacion,UsuarioActualizacion)&$top=2000')
             .then(function(d){
               DB.estadosPerchado={};
               (d.value||[]).forEach(function(i){
@@ -2619,7 +2619,7 @@ window._accionEstadoPerchado=function(pedido,nuevoEstado){
   } else {
     // Verificar en SP antes de insertar
     p=gGet(urlLista(DB.listIds.estadoPerchado)+
-        '/items?$expand=fields&$select=id,fields/Pedido&$filter=fields/Pedido eq \''+pedido+'\'&$top=1')
+        '/items?$expand=fields($select=Pedido)&$filter=fields/Pedido eq \''+pedido+'\'&$top=1')
       .then(function(d){
         var found=d.value&&d.value[0];
         if(found){
