@@ -574,60 +574,82 @@ function parsearCBarra(d){
 /* ── Carga de catálogos ──────────────────────────────────────── */
 function cargarCatalogos(){
   console.log('[CATALOGOS] Iniciando carga...');
+  var _t0=performance.now();
   return Promise.all([
     descubrirExcel(CFG.perchadoNombre).then(function(f){
       DB.perchadoDriveId=f.driveId;DB.perchadoItemId=f.itemId;
       console.log('[CATALOGOS] Archivo perchado encontrado. Cargando hojas...');
       return Promise.all([
-        gGet(urlWB(f.driveId,f.itemId,'Ubicaciones'))
-          .then(function(d){
-            parsearUbicaciones(d);
-            console.log('[CATALOGOS] Ubicaciones cargadas =',DB.ubicaciones.length);
-          })
-          .catch(function(e){ console.error('[CATALOGOS] Ubicaciones ERROR:',e.message); }),
-        gGet(urlWB(f.driveId,f.itemId,'DestinosSeparacion'))
-          .then(function(d){
-            parsearDestinos(d);
-            console.log('[CATALOGOS] DestinosSeparacion cargados =',DB.destinosSep.length);
-          })
-          .catch(function(e){ console.error('[CATALOGOS] DestinosSeparacion ERROR:',e.message); }),
-        gGet(urlWB(f.driveId,f.itemId,'Separacion'))
-          .then(function(d){
-            parsearSeparacion(d);
-            console.log('[CATALOGOS] Separacion cargada =',DB.separacionPendiente.length);
-          })
-          .catch(function(e){ console.error('[CATALOGOS] Separacion ERROR:',e.message); }),
-        gGet(urlWB(f.driveId,f.itemId,'Operadores'))
-          .then(function(d){
-            parsearOperadores(d);
-            console.log('[CATALOGOS] Operadores cargados =',DB.operadores.length);
-          })
-          .catch(function(e){
-            console.error('[CATALOGOS] Operadores ERROR:',e.message);
-            console.warn('[CATALOGOS] Continuando sin operadores — verifica que la hoja se llama exactamente "Operadores"');
-            DB.operadores=[];  // garantizar array vacío para que la pantalla funcione igual
-          }),
+        (function(){
+          var t=performance.now();
+          return gGet(urlWB(f.driveId,f.itemId,'Ubicaciones'))
+            .then(function(d){
+              parsearUbicaciones(d);
+              console.log('[TIME] Ubicaciones:',Math.round(performance.now()-t),'ms ('+DB.ubicaciones.length+' filas)');
+            })
+            .catch(function(e){ console.error('[CATALOGOS] Ubicaciones ERROR:',e.message); });
+        })(),
+        (function(){
+          var t=performance.now();
+          return gGet(urlWB(f.driveId,f.itemId,'DestinosSeparacion'))
+            .then(function(d){
+              parsearDestinos(d);
+              console.log('[TIME] DestinosSeparacion:',Math.round(performance.now()-t),'ms ('+DB.destinosSep.length+' filas)');
+            })
+            .catch(function(e){ console.error('[CATALOGOS] DestinosSeparacion ERROR:',e.message); });
+        })(),
+        (function(){
+          var t=performance.now();
+          return gGet(urlWB(f.driveId,f.itemId,'Separacion'))
+            .then(function(d){
+              parsearSeparacion(d);
+              console.log('[TIME] Separacion:',Math.round(performance.now()-t),'ms ('+DB.separacionPendiente.length+' filas)');
+            })
+            .catch(function(e){ console.error('[CATALOGOS] Separacion ERROR:',e.message); });
+        })(),
+        (function(){
+          var t=performance.now();
+          return gGet(urlWB(f.driveId,f.itemId,'Operadores'))
+            .then(function(d){
+              parsearOperadores(d);
+              console.log('[TIME] Operadores:',Math.round(performance.now()-t),'ms ('+DB.operadores.length+' filas)');
+            })
+            .catch(function(e){
+              console.error('[CATALOGOS] Operadores ERROR:',e.message);
+              console.warn('[CATALOGOS] Continuando sin operadores — verifica que la hoja se llama exactamente "Operadores"');
+              DB.operadores=[];  // garantizar array vacío para que la pantalla funcione igual
+            });
+        })(),
       ]);
     }).catch(function(e){
       console.error('[CATALOGOS] Error encontrando archivo perchado:',e.message);
     }),
-    descubrirExcel(CFG.recepcionNombre).then(function(f){
-      DB.recepDriveId=f.driveId;DB.recepItemId=f.itemId;
-      return gGet(urlWB(f.driveId,f.itemId,'C.Barra'))
-        .then(function(d){
-          parsearCBarra(d);
-          console.log('[CATALOGOS] C.Barra cargada =',DB.codigosBarra.length);
-        })
-        .catch(function(e){ console.error('[CATALOGOS] C.Barra ERROR:',e.message); });
-    }).catch(function(e){
-      console.error('[CATALOGOS] Error encontrando archivo recepcion:',e.message);
-    }),
-    descubrirListas().then(function(){
-      console.log('[CATALOGOS] Listas SP:',JSON.stringify(DB.listIds));
-    }).catch(function(e){
-      console.error('[CATALOGOS] Error descubriendo listas:',e.message);
-    }),
+    (function(){
+      var t=performance.now();
+      return descubrirExcel(CFG.recepcionNombre).then(function(f){
+        DB.recepDriveId=f.driveId;DB.recepItemId=f.itemId;
+        var tCB=performance.now();
+        return gGet(urlWB(f.driveId,f.itemId,'C.Barra'))
+          .then(function(d){
+            parsearCBarra(d);
+            console.log('[TIME] CodigosBarra:',Math.round(performance.now()-tCB),'ms ('+DB.codigosBarra.length+' SKUs)');
+            console.log('[TIME] recepcion Excel (descubrir+C.Barra):',Math.round(performance.now()-t),'ms');
+          })
+          .catch(function(e){ console.error('[CATALOGOS] C.Barra ERROR:',e.message); });
+      }).catch(function(e){
+        console.error('[CATALOGOS] Error encontrando archivo recepcion:',e.message);
+      });
+    })(),
+    (function(){
+      var t=performance.now();
+      return descubrirListas().then(function(){
+        console.log('[TIME] DescubrirListas (SharePoint):',Math.round(performance.now()-t),'ms — IDs:',JSON.stringify(DB.listIds));
+      }).catch(function(e){
+        console.error('[CATALOGOS] Error descubriendo listas:',e.message);
+      });
+    })(),
   ]).then(function(){
+    console.log('[TIME] cargarCatalogos TOTAL:',Math.round(performance.now()-_t0),'ms');
     console.log('[CATALOGOS] Carga completa. Mostrando selección de operador.');
   });
 }
@@ -2310,23 +2332,32 @@ function loginPage(){
 }
 
 function boot(){
+  var _tBoot=performance.now();
   $r('ftr-user').textContent=msalAcc.username||msalAcc.name||'—';
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando catálogos...</div></div>');
   cargarCatalogos().then(function(){
     setStatus('LIVE',true);
     // Obtener lista de pedidos de LRecepciones (pedidos únicos)
     if(DB.listIds.recepciones){
+      var tPed=performance.now();
       gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=2000')
         .then(function(d){
           var ps=[...new Set((d.value||[]).map(function(i){return(i.fields||{}).Pedido||'';}).filter(Boolean))].sort();
           DB.pedidos=ps;
+          console.log('[TIME] ListaPedidos (SP LRecepciones):',Math.round(performance.now()-tPed),'ms ('+ps.length+' pedidos)');
+          console.log('[TIME] BOOT TOTAL:',Math.round(performance.now()-_tBoot),'ms');
           showSeleccionOperador();
-        }).catch(function(){showSeleccionOperador();});
+        }).catch(function(){
+          console.log('[TIME] ListaPedidos ERROR — boot total hasta aquí:',Math.round(performance.now()-_tBoot),'ms');
+          showSeleccionOperador();
+        });
     } else {
+      console.log('[TIME] BOOT TOTAL (sin lista pedidos):',Math.round(performance.now()-_tBoot),'ms');
       showSeleccionOperador();
     }
   }).catch(function(e){
     console.error('[BOOT]',e.message);
+    console.log('[TIME] BOOT ERROR en:',Math.round(performance.now()-_tBoot),'ms');
     setStatus('ERROR',false);
     showMenuPrincipal();
   });
