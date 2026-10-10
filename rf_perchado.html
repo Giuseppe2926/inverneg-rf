@@ -2426,6 +2426,7 @@ function boot(){
                 };
               });
               console.log('[TIME] EstadosPerchado (RF_EstadoPerchado):',Math.round(performance.now()-tEst),'ms ('+Object.keys(DB.estadosPerchado).length+' registros)');
+              if(d.value&&d.value[0]) console.log('[RF_ESTADO_SAMPLE]',JSON.stringify(d.value[0]));
             }).catch(function(e){
               console.warn('[BOOT] Error cargando estados perchado:',e.message);
             });
@@ -2617,16 +2618,26 @@ window._accionEstadoPerchado=function(pedido,nuevoEstado){
     // itemId conocido → PATCH directo
     p=_doWrite(info.itemId);
   } else {
-    // Verificar en SP antes de insertar
+    // Verificar en SP antes de insertar: carga todos los items y busca en memoria
+    // (evita problemas de compatibilidad OData $filter con SP Graph API)
     p=gGet(urlLista(DB.listIds.estadoPerchado)+
-        '/items?$expand=fields($select=Pedido)&$filter=fields/Pedido eq \''+pedido+'\'&$top=1')
+        '/items?$expand=fields($select=Pedido,Estado,FechaActualizacion,UsuarioActualizacion)&$top=2000')
       .then(function(d){
-        var found=d.value&&d.value[0];
-        if(found){
-          var id=found.id;
-          if(!DB.estadosPerchado[pedido]) DB.estadosPerchado[pedido]={};
-          DB.estadosPerchado[pedido].itemId=id;
-          return _doWrite(id);
+        // Actualizar cache completo de paso
+        DB.estadosPerchado={};
+        (d.value||[]).forEach(function(i){
+          var f=i.fields||{};
+          var p2=(f.Pedido||'').trim();
+          if(p2) DB.estadosPerchado[p2]={
+            estado:f.Estado||'Abierto',
+            itemId:i.id||null,
+            fecha:f.FechaActualizacion||null,
+            usuario:f.UsuarioActualizacion||null,
+          };
+        });
+        var found=DB.estadosPerchado[pedido];
+        if(found&&found.itemId){
+          return _doWrite(found.itemId);
         } else {
           return _doInsert();
         }
