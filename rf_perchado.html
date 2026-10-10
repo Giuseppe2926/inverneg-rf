@@ -296,6 +296,7 @@ var DB={
   perchadoDriveId:null,perchadoItemId:null,
   recepDriveId:null,recepItemId:null,
   listIds:{recepciones:null,movimientos:null},
+  catalogosPesadosCargados:false,  // true cuando Ubicaciones + CodigosBarra terminaron
 };
 
 /* ── Utils ───────────────────────────────────────────────────── */
@@ -571,24 +572,15 @@ function parsearCBarra(d){
   console.log('[CBARRA] Cargados:',DB.codigosBarra.length,'SKUs con equivalencias de códigos de barras');
 }
 
-/* ── Carga de catálogos ──────────────────────────────────────── */
+/* ── Carga de catálogos livianos (boot) ──────────────────────── */
 function cargarCatalogos(){
-  console.log('[CATALOGOS] Iniciando carga...');
+  console.log('[CATALOGOS] Iniciando carga liviana...');
   var _t0=performance.now();
   return Promise.all([
     descubrirExcel(CFG.perchadoNombre).then(function(f){
       DB.perchadoDriveId=f.driveId;DB.perchadoItemId=f.itemId;
-      console.log('[CATALOGOS] Archivo perchado encontrado. Cargando hojas...');
+      console.log('[CATALOGOS] Archivo perchado encontrado. Cargando hojas livianas...');
       return Promise.all([
-        (function(){
-          var t=performance.now();
-          return gGet(urlWB(f.driveId,f.itemId,'Ubicaciones'))
-            .then(function(d){
-              parsearUbicaciones(d);
-              console.log('[TIME] Ubicaciones:',Math.round(performance.now()-t),'ms ('+DB.ubicaciones.length+' filas)');
-            })
-            .catch(function(e){ console.error('[CATALOGOS] Ubicaciones ERROR:',e.message); });
-        })(),
         (function(){
           var t=performance.now();
           return gGet(urlWB(f.driveId,f.itemId,'DestinosSeparacion'))
@@ -617,7 +609,7 @@ function cargarCatalogos(){
             .catch(function(e){
               console.error('[CATALOGOS] Operadores ERROR:',e.message);
               console.warn('[CATALOGOS] Continuando sin operadores — verifica que la hoja se llama exactamente "Operadores"');
-              DB.operadores=[];  // garantizar array vacío para que la pantalla funcione igual
+              DB.operadores=[];
             });
         })(),
       ]);
@@ -628,14 +620,8 @@ function cargarCatalogos(){
       var t=performance.now();
       return descubrirExcel(CFG.recepcionNombre).then(function(f){
         DB.recepDriveId=f.driveId;DB.recepItemId=f.itemId;
-        var tCB=performance.now();
-        return gGet(urlWB(f.driveId,f.itemId,'C.Barra'))
-          .then(function(d){
-            parsearCBarra(d);
-            console.log('[TIME] CodigosBarra:',Math.round(performance.now()-tCB),'ms ('+DB.codigosBarra.length+' SKUs)');
-            console.log('[TIME] recepcion Excel (descubrir+C.Barra):',Math.round(performance.now()-t),'ms');
-          })
-          .catch(function(e){ console.error('[CATALOGOS] C.Barra ERROR:',e.message); });
+        // Solo guardamos IDs aquí — C.Barra se carga en lazy
+        console.log('[TIME] recepcion Excel (descubrir):',Math.round(performance.now()-t),'ms');
       }).catch(function(e){
         console.error('[CATALOGOS] Error encontrando archivo recepcion:',e.message);
       });
@@ -649,9 +635,56 @@ function cargarCatalogos(){
       });
     })(),
   ]).then(function(){
-    console.log('[TIME] cargarCatalogos TOTAL:',Math.round(performance.now()-_t0),'ms');
-    console.log('[CATALOGOS] Carga completa. Mostrando selección de operador.');
+    console.log('[TIME] cargarCatalogos (liviano) TOTAL:',Math.round(performance.now()-_t0),'ms');
+    console.log('[CATALOGOS] Carga liviana completa.');
   });
+}
+
+/* ── Carga diferida: Ubicaciones + CodigosBarra (pesados) ────── */
+function cargarCatalogosLazy(){
+  console.log('[LAZY] Iniciando carga de catálogos pesados...');
+  var _t=performance.now();
+  DB.catalogosPesadosCargados=false;
+  var tareas=[];
+  // Ubicaciones (22k filas)
+  if(DB.perchadoDriveId&&DB.perchadoItemId){
+    tareas.push((function(){
+      var t=performance.now();
+      return gGet(urlWB(DB.perchadoDriveId,DB.perchadoItemId,'Ubicaciones'))
+        .then(function(d){
+          parsearUbicaciones(d);
+          console.log('[TIME] Ubicaciones (lazy):',Math.round(performance.now()-t),'ms ('+DB.ubicaciones.length+' filas)');
+        })
+        .catch(function(e){ console.error('[LAZY] Ubicaciones ERROR:',e.message); });
+    })());
+  } else {
+    console.warn('[LAZY] perchadoDriveId no disponible — Ubicaciones no se cargarán');
+  }
+  // CodigosBarra / C.Barra (5.8k filas)
+  if(DB.recepDriveId&&DB.recepItemId){
+    tareas.push((function(){
+      var t=performance.now();
+      return gGet(urlWB(DB.recepDriveId,DB.recepItemId,'C.Barra'))
+        .then(function(d){
+          parsearCBarra(d);
+          console.log('[TIME] CodigosBarra (lazy):',Math.round(performance.now()-t),'ms ('+DB.codigosBarra.length+' SKUs)');
+        })
+        .catch(function(e){ console.error('[LAZY] C.Barra ERROR:',e.message); });
+    })());
+  } else {
+    console.warn('[LAZY] recepDriveId no disponible — CodigosBarra no se cargarán');
+  }
+  return Promise.all(tareas).then(function(){
+    DB.catalogosPesadosCargados=true;
+    console.log('[TIME] LAZY TOTAL:',Math.round(performance.now()-_t),'ms — listo para usar');
+  });
+}
+
+/* ── Guard: bloquea si catálogos pesados no están listos ─────── */
+function _guardCatalogosPesados(){
+  if(DB.catalogosPesadosCargados) return true;
+  toast('Cargando catálogos, espere un momento...');
+  return false;
 }
 
 /* ── Consultas SP: recepciones y movimientos ─────────────────── */
@@ -1064,6 +1097,7 @@ function resolverSKU(codigoLeido){
   return null;
 }
 function buscarSKU(){
+  if(!_guardCatalogosPesados()) return;
   var codigoLeido=($r('inp-sku').value||'').trim();
   if(!codigoLeido){toast('Ingresa un SKU o código de barras');return;}
   var resuelto=resolverSKU(codigoLeido);
@@ -1275,6 +1309,7 @@ function showListaSKUParaLPN(lpn,skus){
 
 /* ── Pantalla 4: Formulario de movimiento (Perchado) ─────────── */
 function showFormMovimiento(lpn,sku,saldoDisp){
+  if(!_guardCatalogosPesados()) return;
   pushScreen('form-movimiento',function(){showFormMovimiento(lpn,sku,saldoDisp);});actualizarBack();
   S.lpnActual=lpn;
   window._almSeleccionado=''; window._ubicSeleccionada=''; // resetear por cada apertura
@@ -1485,6 +1520,7 @@ function _initBuscadorDrop(inpId,dropId,badgeId,opciones,onSelect){
 }
 
 function _confirmarFormMovimiento(sku,saldoDisp){
+  if(!_guardCatalogosPesados()) return;
   var cant=parseInt((document.getElementById('inp-qty')||{}).value||'0');
   var alm=window._almSeleccionado||'';
   var ubic=window._ubicSeleccionada||'';
@@ -2345,15 +2381,19 @@ function boot(){
           var ps=[...new Set((d.value||[]).map(function(i){return(i.fields||{}).Pedido||'';}).filter(Boolean))].sort();
           DB.pedidos=ps;
           console.log('[TIME] ListaPedidos (SP LRecepciones):',Math.round(performance.now()-tPed),'ms ('+ps.length+' pedidos)');
-          console.log('[TIME] BOOT TOTAL:',Math.round(performance.now()-_tBoot),'ms');
+          console.log('[TIME] BOOT TOTAL (hasta menú):',Math.round(performance.now()-_tBoot),'ms');
           showSeleccionOperador();
+          // Iniciar carga pesada en background — no bloquea al operario
+          cargarCatalogosLazy();
         }).catch(function(){
           console.log('[TIME] ListaPedidos ERROR — boot total hasta aquí:',Math.round(performance.now()-_tBoot),'ms');
           showSeleccionOperador();
+          cargarCatalogosLazy();
         });
     } else {
       console.log('[TIME] BOOT TOTAL (sin lista pedidos):',Math.round(performance.now()-_tBoot),'ms');
       showSeleccionOperador();
+      cargarCatalogosLazy();
     }
   }).catch(function(e){
     console.error('[BOOT]',e.message);
@@ -2431,6 +2471,7 @@ function calcularResumenPerchado(recepciones, movimientos){
 
 // ── Pantalla: Resumen de Perchado ────────────────────────────────
 function showResumenPerchado(){
+  if(!_guardCatalogosPesados()) return;
   pushScreen('resumen',showResumenPerchado);actualizarBack();
 
   var pedido=S.pedido;
@@ -2871,6 +2912,7 @@ function _generarXLSX(filas,nombreArchivo){
 }
 
 function generarExcelPerchado(){
+  if(!_guardCatalogosPesados()) return;
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando movimientos...</div></div>');
   cargarMovimientosPedido(S.pedido).then(function(movs){
     var perchados=movs.filter(function(m){
@@ -2901,6 +2943,7 @@ function generarExcelPerchado(){
 }
 
 function generarExcelSeparacion(destinos){
+  if(!_guardCatalogosPesados()) return;
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando movimientos...</div></div>');
   cargarMovimientosPedido(S.pedido).then(function(movs){
     var seps=movs.filter(function(m){
