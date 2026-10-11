@@ -2592,7 +2592,7 @@ window._accionEstadoPerchado=function(pedido,nuevoEstado){
     :'¿Reabrir el pedido "'+pedido+'"? Volverá a aparecer en el selector principal.';
   if(!confirm(msg)) return;
 
-  var usuario=msalAcc?(msalAcc.username||msalAcc.name||''):'';
+  var usuario=S.operador||(msalAcc?(msalAcc.username||msalAcc.name||''):'');
   var fecha=new Date().toISOString();
   var panel=document.getElementById('panel-estado-pedido');
   if(panel) panel.innerHTML='<div style="color:var(--mut);font-size:12px;padding:10px 0">⏳ Guardando...</div>';
