@@ -663,7 +663,30 @@ function generarInforme(){
         });
       }
     });
-    
+
+    // SKUs recibidos que NO existen en el Packing List → SOBRANTE total
+    var skusEnPacking={};
+    packingPedido.forEach(function(pk){skusEnPacking[normStr(pk.sku)]=true;});
+    var netoFueraPacking={}; // {sku: {cant, cont, lote}}
+    recepciones.forEach(function(r){
+      var sku=normStr(r.CodProducto||'');
+      if(!sku||skusEnPacking[sku]) return;
+      if(!netoFueraPacking[sku]) netoFueraPacking[sku]={cant:0,cont:'',lote:'',skuOrig:r.CodProducto||''};
+      netoFueraPacking[sku].cant+=Number(r.Cantidad)||0;
+      if(!netoFueraPacking[sku].cont){netoFueraPacking[sku].cont=r.Contenedor||'';netoFueraPacking[sku].lote=r.Lote||'';}
+    });
+    Object.keys(netoFueraPacking).forEach(function(k){
+      var e=netoFueraPacking[k];
+      if(e.cant!==0){
+        lineasNovedad.push({
+          sku:e.skuOrig,lote:e.lote,cantidad:Math.abs(e.cant),
+          marca:getMarca(e.skuOrig),
+          obs:'SOBRANTE',
+          contenedor:e.cont,
+        });
+      }
+    });
+
     var orden={'DAÑADO':0,'FALTANTE':1,'SOBRANTE':2};
     lineasNovedad.sort(function(a,b){
       var oa=orden[a.obs]!==undefined?orden[a.obs]:3;
