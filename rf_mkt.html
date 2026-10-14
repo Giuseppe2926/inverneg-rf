@@ -248,7 +248,7 @@ const MSAL_CFG = {
 };
 const SITE = 'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906';
 const SCOPES = ['https://graph.microsoft.com/Sites.ReadWrite.All'];
-const EXCEL_PATH = 'Documentos compartidos/Control Cumplimiento MKT/MKT_Catalogo_Materiales.xlsx';
+const EXCEL_PATH = 'Control Cumplimiento MKT/MKT_Catalogo_Materiales.xlsx';
 const BASE = 'https://graph.microsoft.com/v1.0';
 
 /* ── STATE ───────────────────────────────────────────────────────────────── */
@@ -298,7 +298,7 @@ async function loadCats() {
   try {
     const encodedPath = EXCEL_PATH.split('/').map(encodeURIComponent).join('/');
     const fileUrl = `${BASE}/sites/${SITE}/drive/root:/${encodedPath}`;
-    console.log('[CATALOGO URL]', fileUrl);
+    console.log('[CATALOGO URL COMPLETA]', fileUrl);
     console.log('[CATALOGO] Buscando archivo:', fileUrl);
     const fileInfo = await gGet(fileUrl);
     console.log('[CATALOGO] Archivo encontrado:', fileInfo.name);
