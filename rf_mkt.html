@@ -784,6 +784,20 @@ function verHTML(){
         </div>
         ${sol.Observacion?`<div class="sol-fld"><span class="sol-lbl">Observación</span><span class="sol-val">${esc(sol.Observacion)}</span></div>`:''}
       </div>
+      ${(()=>{ const hasCancelable=ls.some(l=>CANCELABLES.has(l.EstadoLinea||'Pendiente')); return hasCancelable?`
+      <div style="padding:0 16px 16px">
+        <button class="btn btn-danger btn-sm" id="btn-cancel-sol" style="gap:6px">🚫 Cancelar Solicitud</button>
+      </div>
+      <div class="ver-cancel-form" id="cf-sol" style="margin:0 16px 16px">
+        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:var(--err)">Cancelar toda la solicitud</p>
+        <p style="margin:0 0 6px;font-size:12px;color:var(--fg-muted)">Se cancelarán todas las líneas en estado Pendiente, Aprobada, Reprogramada o No Presentado. Las líneas ya ejecutadas no se modificarán.</p>
+        <textarea id="cfm-sol" placeholder="Motivo de cancelación (obligatorio)"></textarea>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-danger btn-sm" id="cfok-sol">Confirmar cancelación de solicitud</button>
+          <button class="btn btn-secondary btn-sm" id="cfcx-sol">Cancelar</button>
+        </div>
+      </div>`:'';
+      })()}
     </div>
     <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-muted);margin:0 0 10px">
       Líneas de la Solicitud
@@ -851,12 +865,41 @@ function bindVer(){
     });
   });
 
-  // Dismiss cancel form
+  // Dismiss cancel form (líneas individuales)
   document.querySelectorAll('[id^="cfcx-"]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const lid = btn.dataset.lid;
       document.getElementById(`cf-${lid}`)?.classList.remove('open');
     });
+  });
+
+  // Cancelar Solicitud — abrir/cerrar form
+  document.getElementById('btn-cancel-sol')?.addEventListener('click',()=>{
+    document.getElementById('cf-sol')?.classList.toggle('open');
+  });
+  document.getElementById('cfcx-sol')?.addEventListener('click',()=>{
+    document.getElementById('cf-sol')?.classList.remove('open');
+  });
+
+  // Confirmar cancelación de solicitud
+  document.getElementById('cfok-sol')?.addEventListener('click', async ()=>{
+    const ta = document.getElementById('cfm-sol');
+    const motivo = ta?.value?.trim();
+    if(!motivo){ ta.style.borderColor='var(--err)'; ta.focus(); return; }
+    const btn = document.getElementById('cfok-sol');
+    btn.disabled = true; btn.textContent = 'Cancelando…';
+    const cancelables = lineas.filter(l=>
+      (String(l.SolicitudId)===String(viewId) || l.NroSolicitud===sols.find(s=>s.id===viewId)?.NroSolicitud)
+      && CANCELABLES.has(l.EstadoLinea||'Pendiente')
+    );
+    try {
+      for(const l of cancelables){ await cancelLinea(l.id, motivo); }
+      renderContent();
+    } catch(e) {
+      btn.disabled = false; btn.textContent = 'Confirmar cancelación de solicitud';
+      const p = document.querySelector('#cf-sol p');
+      if(p) p.textContent = 'Error: '+e.message;
+    }
   });
 }
 
