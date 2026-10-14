@@ -268,6 +268,7 @@ const BASE = 'https://graph.microsoft.com/v1.0';
 let msalApp, me;
 let cats = {marcas:[],materiales:[],proveedores:[]};
 let catsReady = false;
+const CANCELABLES = new Set(['Pendiente','Aprobada','Reprogramada','No Presentado']);
 let screen = 'mis'; // 'mis' | 'nueva' | 'ver'
 let fEstado = 'Todas';
 let sols = [], lineas = [];
@@ -718,8 +719,6 @@ function verHTML(){
   // group by proveedor
   const grps={};
   ls.forEach(l=>{ const p=l.Proveedor||'(Sin proveedor)'; if(!grps[p])grps[p]=[]; grps[p].push(l); });
-
-  const CANCELABLES = new Set(['Pendiente','Aprobada','Reprogramada','No Presentado']);
 
   const grpsHTML=Object.entries(grps).map(([p,lls])=>{
     const rows=lls.map(l=>{
