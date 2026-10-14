@@ -1,0 +1,780 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RF Programación MKT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── TOKENS ──────────────────────────────────────────────────────────────── */
+:root {
+  --bg:#f1f5f9; --bg-card:#ffffff; --bg-muted:#f8fafc;
+  --fg:#0f172a; --fg-muted:#64748b; --fg-subtle:#94a3b8;
+  --border:#e2e8f0; --border-focus:#2563eb;
+  --primary:#2563eb; --primary-h:#1d4ed8; --primary-fg:#fff;
+  --ok:#16a34a; --ok-bg:#f0fdf4; --ok-bd:#bbf7d0;
+  --warn:#d97706; --warn-bg:#fffbeb; --warn-bd:#fde68a;
+  --err:#dc2626; --err-bg:#fef2f2; --err-bd:#fecaca;
+  --info:#2563eb; --info-bg:#eff6ff; --info-bd:#bfdbfe;
+  --gray:#f1f5f9;
+  --r:8px; --r-lg:12px;
+  --sh:0 1px 3px rgba(0,0,0,.08);
+  --sh-md:0 4px 12px rgba(0,0,0,.1);
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f172a; --bg-card:#1e293b; --bg-muted:#162032;
+    --fg:#f1f5f9; --fg-muted:#94a3b8; --fg-subtle:#64748b;
+    --border:#334155; --border-focus:#3b82f6;
+    --primary:#3b82f6; --primary-h:#2563eb;
+    --ok-bg:#052e16; --ok-bd:#14532d;
+    --warn-bg:#1c1400; --warn-bd:#78350f;
+    --err-bg:#1c0a0a; --err-bd:#7f1d1d;
+    --info-bg:#0f1f3d; --info-bd:#1e3a5f;
+    --gray:#1e293b;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f172a; --bg-card:#1e293b; --bg-muted:#162032;
+  --fg:#f1f5f9; --fg-muted:#94a3b8; --fg-subtle:#64748b;
+  --border:#334155; --border-focus:#3b82f6;
+  --primary:#3b82f6; --primary-h:#2563eb;
+  --ok-bg:#052e16; --ok-bd:#14532d;
+  --warn-bg:#1c1400; --warn-bd:#78350f;
+  --err-bg:#1c0a0a; --err-bd:#7f1d1d;
+  --info-bg:#0f1f3d; --info-bd:#1e3a5f;
+  --gray:#1e293b;
+  color-scheme:dark;
+}
+
+/* ── RESET / BASE ─────────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.5;
+     color:var(--fg);background:var(--bg);padding:0}
+
+/* ── LAYOUT ──────────────────────────────────────────────────────────────── */
+#app{display:flex;flex-direction:column;min-height:100%}
+
+.app-header{
+  background:var(--primary);color:var(--primary-fg);
+  padding:0 20px;height:52px;display:flex;align-items:center;
+  justify-content:space-between;flex-shrink:0;
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:100;
+  box-shadow:0 2px 8px rgba(0,0,0,.2);
+}
+.app-header h1{font-size:15px;font-weight:700;margin:0;letter-spacing:-.02em}
+.app-header h1 span{opacity:.7;font-weight:400}
+.hdr-user{display:flex;align-items:center;gap:8px;font-size:13px}
+.avatar{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);
+        display:flex;align-items:center;justify-content:center;
+        font-weight:700;font-size:11px;flex-shrink:0}
+
+.app-nav{background:var(--bg-card);border-bottom:1px solid var(--border);
+         padding:0 16px;display:flex;flex-shrink:0;overflow-x:auto}
+.nav-btn{padding:12px 14px;font-size:13px;font-weight:500;color:var(--fg-muted);
+         background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;
+         transition:color .15s,border-color .15s;white-space:nowrap;font-family:inherit}
+.nav-btn:hover{color:var(--fg)}
+.nav-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+.app-main{flex:1;padding:20px;max-width:1060px;width:100%;margin:0 auto}
+
+/* ── CARDS ────────────────────────────────────────────────────────────────── */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh)}
+.card-hdr{padding:14px 20px;border-bottom:1px solid var(--border);
+          display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card-title{font-size:15px;font-weight:600;margin:0}
+.card-body{padding:20px}
+
+/* ── BUTTONS ──────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;
+     border-radius:var(--r);font-size:13px;font-weight:500;font-family:inherit;
+     cursor:pointer;border:1px solid transparent;transition:background .15s,opacity .15s;
+     text-decoration:none;white-space:nowrap;line-height:1.4}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--primary-h)}
+.btn-secondary{background:var(--bg-card);color:var(--fg);border-color:var(--border)}
+.btn-secondary:hover:not(:disabled){background:var(--gray)}
+.btn-ghost{background:none;color:var(--fg-muted);border-color:transparent}
+.btn-ghost:hover:not(:disabled){background:var(--gray);color:var(--fg)}
+.btn-danger{background:var(--err);color:#fff}
+.btn-danger:hover:not(:disabled){background:#b91c1c}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-icon{padding:5px;width:28px;height:28px;justify-content:center;flex-shrink:0}
+
+/* ── FORMS ────────────────────────────────────────────────────────────────── */
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-label{font-size:11px;font-weight:600;color:var(--fg-muted);
+            text-transform:uppercase;letter-spacing:.05em}
+.req{color:var(--err);margin-left:2px}
+.form-ctrl{padding:8px 11px;border:1px solid var(--border);border-radius:var(--r);
+           font-size:14px;font-family:inherit;color:var(--fg);background:var(--bg-card);
+           transition:border-color .15s,box-shadow .15s;width:100%}
+.form-ctrl:focus{outline:none;border-color:var(--border-focus);
+                 box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.form-ctrl::placeholder{color:var(--fg-subtle)}
+textarea.form-ctrl{resize:vertical;min-height:68px}
+
+/* ── AUTOCOMPLETE ─────────────────────────────────────────────────────────── */
+.ac-wrap{position:relative}
+.ac-drop{position:absolute;top:calc(100% + 3px);left:0;right:0;
+         background:var(--bg-card);border:1px solid var(--border);
+         border-radius:var(--r);box-shadow:var(--sh-md);z-index:300;
+         max-height:210px;overflow-y:auto;list-style:none;margin:0;padding:4px}
+.ac-item{padding:7px 10px;cursor:pointer;border-radius:5px;font-size:13px;color:var(--fg)}
+.ac-item:hover,.ac-item.hi{background:var(--info-bg);color:var(--primary)}
+.ac-none{padding:9px 10px;color:var(--fg-muted);font-size:12px;font-style:italic}
+
+/* ── BADGES ───────────────────────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;
+       font-size:11px;font-weight:600;letter-spacing:.02em;text-transform:uppercase}
+.b-pendiente{background:var(--gray);color:var(--fg-muted);border:1px solid var(--border)}
+.b-aprobada{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+.b-rechazada{background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
+.b-reprogramada{background:var(--info-bg);color:var(--info);border:1px solid var(--info-bd)}
+.b-parcial{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
+.b-cancelada{background:var(--gray);color:var(--fg-subtle);border:1px solid var(--border)}
+
+/* ── FILTER TABS ──────────────────────────────────────────────────────────── */
+.ftabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.ftab{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;
+      cursor:pointer;border:1px solid var(--border);background:var(--bg-card);
+      color:var(--fg-muted);transition:all .15s;font-family:inherit}
+.ftab:hover{border-color:var(--primary);color:var(--primary)}
+.ftab.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* ── TABLE ────────────────────────────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:0}
+th{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;
+   color:var(--fg-muted);text-align:left;padding:10px 12px;
+   border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid var(--border);font-size:13px;
+   color:var(--fg);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.tbl-row{cursor:pointer;transition:background .1s}
+.tbl-row:hover td{background:var(--gray)}
+
+/* ── EMPTY / LOADING ─────────────────────────────────────────────────────── */
+.empty{text-align:center;padding:44px 20px;color:var(--fg-muted)}
+.empty-icon{font-size:34px;margin-bottom:10px}
+.loading{display:flex;align-items:center;justify-content:center;
+         padding:40px;color:var(--fg-muted);gap:10px}
+.spin{width:18px;height:18px;border:2px solid var(--border);
+      border-top-color:var(--primary);border-radius:50%;
+      animation:spin .6s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── ALERT ────────────────────────────────────────────────────────────────── */
+.alert{padding:11px 14px;border-radius:var(--r);font-size:13px;
+       margin-bottom:14px;border:1px solid;line-height:1.5}
+.a-err{background:var(--err-bg);color:var(--err);border-color:var(--err-bd)}
+.a-ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-bd)}
+.a-warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn-bd)}
+.a-info{background:var(--info-bg);color:var(--info);border-color:var(--info-bd)}
+
+/* ── NUEVA SOLICITUD ─────────────────────────────────────────────────────── */
+.grupo-card{border:1px solid var(--border);border-radius:var(--r-lg);
+            margin-bottom:14px;background:var(--bg-card);overflow:hidden}
+.grupo-hdr{background:var(--gray);padding:11px 14px;display:flex;
+           align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+.grupo-lbl{font-size:11px;font-weight:700;text-transform:uppercase;
+           letter-spacing:.06em;color:var(--fg-muted);white-space:nowrap}
+.grupo-body{padding:14px}
+.lineas-list{display:flex;flex-direction:column;gap:10px}
+.linea-row{background:var(--bg-muted);border:1px solid var(--border);
+           border-radius:var(--r);padding:12px}
+.linea-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.linea-num{font-size:11px;font-weight:700;color:var(--fg-muted);
+           text-transform:uppercase;letter-spacing:.05em}
+.linea-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.full{grid-column:1/-1}
+@media(max-width:560px){.linea-fields{grid-template-columns:1fr}}
+
+/* ── VER SOLICITUD ────────────────────────────────────────────────────────── */
+.sol-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:18px}
+.sol-fld{display:flex;flex-direction:column;gap:3px}
+.sol-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-muted)}
+.sol-val{font-size:14px;color:var(--fg);font-weight:500}
+.ver-grupo{border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:18px;overflow:hidden}
+.ver-ghdr{background:var(--gray);padding:10px 16px;font-size:13px;font-weight:600;
+          border-bottom:1px solid var(--border)}
+.ver-linea{padding:12px 16px;border-bottom:1px solid var(--border);
+           display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.ver-linea:last-child{border-bottom:none}
+.ver-cell{display:flex;flex-direction:column;gap:2px}
+.ver-clbl{font-size:10px;font-weight:600;text-transform:uppercase;
+          letter-spacing:.05em;color:var(--fg-muted)}
+.ver-cval{font-size:13px;color:var(--fg)}
+.ver-cval.dim{color:var(--fg-muted);font-style:italic}
+
+/* ── LOGIN ────────────────────────────────────────────────────────────────── */
+.login-wrap{display:flex;flex-direction:column;align-items:center;
+            justify-content:center;min-height:100vh;padding:24px;text-align:center}
+.login-card{background:var(--bg-card);border:1px solid var(--border);
+            border-radius:var(--r-lg);padding:40px;max-width:380px;width:100%;
+            box-shadow:var(--sh-md)}
+.login-card h2{font-size:20px;font-weight:700;margin:0 0 6px}
+.login-card p{color:var(--fg-muted);font-size:13px;margin:0 0 22px}
+
+/* ── RESPONSIVE ───────────────────────────────────────────────────────────── */
+@media(max-width:600px){
+  .app-main{padding:12px}
+  .card-hdr{padding:12px 14px}
+  .card-body{padding:14px}
+  .nav-btn{padding:10px 10px;font-size:12px}
+}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading" style="min-height:100vh"><div class="spin"></div>Iniciando…</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js"></script>
+<script>
+'use strict';
+
+/* ── CONFIG ──────────────────────────────────────────────────────────────── */
+const MSAL_CFG = {
+  auth:{
+    clientId:'ec976114-e146-4ce4-850c-5d978e12acfd',
+    authority:'https://login.microsoftonline.com/5e008bd3-17b6-4f83-8d23-019691a40609',
+    redirectUri: location.origin + location.pathname
+  },
+  cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:false}
+};
+const SITE = 'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906';
+const SCOPES = ['https://graph.microsoft.com/Sites.ReadWrite.All'];
+const EXCEL_PATH = 'MKT/Cat%C3%A1logos/MKT_Catalogo_Materiales.xlsx';
+const BASE = 'https://graph.microsoft.com/v1.0';
+
+/* ── STATE ───────────────────────────────────────────────────────────────── */
+let msal, me;
+let cats = {marcas:[],materiales:[],proveedores:[]};
+let catsReady = false;
+let screen = 'mis'; // 'mis' | 'nueva' | 'ver'
+let fEstado = 'Todas';
+let sols = [], lineas = [];
+let viewId = null; // SP item id (string) of solicitud being viewed
+let busy = false;
+let formGrupos = [];
+
+/* ── MSAL ─────────────────────────────────────────────────────────────────── */
+async function initAuth() {
+  msal = new msal.PublicClientApplication(MSAL_CFG);
+  await msal.initialize();
+  const r = await msal.handleRedirectPromise();
+  if (r?.account) msal.setActiveAccount(r.account);
+  const all = msal.getAllAccounts();
+  if (all.length) { msal.setActiveAccount(all[0]); me = all[0]; return true; }
+  return false;
+}
+async function login() { await msal.loginRedirect({scopes:SCOPES}); }
+async function tok() {
+  const acc = msal.getActiveAccount();
+  if (!acc) throw new Error('Sin sesión');
+  try {
+    const r = await msal.acquireTokenSilent({scopes:SCOPES,account:acc});
+    return r.accessToken;
+  } catch {
+    await msal.acquireTokenRedirect({scopes:SCOPES});
+    throw new Error('redirect');
+  }
+}
+
+/* ── GRAPH HELPERS ────────────────────────────────────────────────────────── */
+async function gGet(url) {
+  const t = await tok();
+  const r = await fetch(url, {headers:{Authorization:`Bearer ${t}`}});
+  if (!r.ok) { const e = await r.text(); throw new Error(`${r.status} ${e}`); }
+  return r.json();
+}
+async function gPost(url, body) {
+  const t = await tok();
+  const r = await fetch(url, {method:'POST',headers:{Authorization:`Bearer ${t}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if (!r.ok) { const e = await r.text(); throw new Error(`${r.status} ${e}`); }
+  return r.json();
+}
+async function gAll(url) {
+  let res=[], next=url;
+  while(next){ const d=await gGet(next); res=res.concat(d.value||[]); next=d['@odata.nextLink']||null; }
+  return res;
+}
+
+/* ── CATALOGS ─────────────────────────────────────────────────────────────── */
+async function loadCats() {
+  try {
+    const wb = `${BASE}/sites/${SITE}/drive/root:/${EXCEL_PATH}:/workbook/worksheets`;
+    const [rM,rMat,rP] = await Promise.all([
+      gGet(`${wb}/Marcas/usedRange?$select=values`),
+      gGet(`${wb}/Materiales/usedRange?$select=values`),
+      gGet(`${wb}/Proveedores/usedRange?$select=values`)
+    ]);
+    const ex = (d,skip) => (d.values||[]).map(r=>String(r[0]||'').trim())
+      .filter(v=>v&&v.toLowerCase()!==skip).sort();
+    cats.marcas     = ex(rM,  'marca');
+    cats.materiales = ex(rMat,'material');
+    cats.proveedores= ex(rP,  'proveedor');
+  } catch(e) { console.warn('Catálogos:',e.message); }
+  catsReady = true;
+}
+
+/* ── AUTOCOMPLETE ─────────────────────────────────────────────────────────── */
+class AC {
+  constructor(inp, src, onPick) {
+    this.inp=inp; this.src=src; this.onPick=onPick;
+    this.dd=null; this.items=[]; this.hi=-1;
+    inp.setAttribute('autocomplete','off');
+    const wrap=inp.closest('.ac-wrap')||inp.parentElement;
+    wrap.style.position='relative';
+    this.dd=Object.assign(document.createElement('ul'),{className:'ac-drop'});
+    this.dd.hidden=true;
+    wrap.appendChild(this.dd);
+    inp.addEventListener('input', ()=>this._inp());
+    inp.addEventListener('keydown',e=>this._key(e));
+    inp.addEventListener('blur', ()=>setTimeout(()=>this._hide(),180));
+  }
+  _inp(){ const q=this.inp.value.trim(); if(!q){this._hide();return;} this._show(this.src(q)); }
+  _show(items){
+    this.items=items.slice(0,8); this.hi=-1;
+    this.dd.innerHTML='';
+    if(!this.items.length){ this.dd.innerHTML='<li class="ac-none">Sin coincidencias</li>'; this.dd.hidden=false; return; }
+    this.items.forEach((v,i)=>{
+      const li=document.createElement('li');
+      li.className='ac-item'; li.textContent=v;
+      li.addEventListener('mousedown',e=>{e.preventDefault();this._pick(v);});
+      this.dd.appendChild(li);
+    });
+    this.dd.hidden=false;
+  }
+  _hide(){ this.dd.hidden=true; this.hi=-1; }
+  _pick(v){ this.inp.value=v; this._hide(); if(this.onPick)this.onPick(v); this.inp.dispatchEvent(new Event('change')); }
+  _key(e){
+    if(this.dd.hidden) return;
+    if(e.key==='ArrowDown'){e.preventDefault();this.hi=Math.min(this.hi+1,this.items.length-1);this._hl();}
+    else if(e.key==='ArrowUp'){e.preventDefault();this.hi=Math.max(this.hi-1,-1);this._hl();}
+    else if(e.key==='Enter'&&this.hi>=0){e.preventDefault();this._pick(this.items[this.hi]);}
+    else if(e.key==='Escape')this._hide();
+  }
+  _hl(){ [...this.dd.querySelectorAll('.ac-item')].forEach((li,i)=>li.classList.toggle('hi',i===this.hi)); }
+}
+const fil = (list,q) => { const lq=q.toLowerCase(); return list.filter(v=>v.toLowerCase().includes(lq)); };
+
+/* ── DATA ─────────────────────────────────────────────────────────────────── */
+async function loadData() {
+  busy=true; renderContent();
+  try {
+    const [s,l] = await Promise.all([
+      gAll(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items?$expand=fields&$top=500&$orderby=fields/FechaCreacion%20desc`),
+      gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`)
+    ]);
+    sols  = s.map(i=>({id:i.id,...i.fields}));
+    lineas= l.map(i=>({id:i.id,...i.fields}));
+  } catch(e){ showAlert('err','Error al cargar datos: '+e.message); }
+  busy=false; renderContent();
+}
+
+/* ── NRO SOLICITUD (provisional — reemplazar con PA en Etapa 6) ───────────── */
+async function nextNro() {
+  const d=new Date(), yy=d.getFullYear(),
+    mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+  const pfx=`${yy}-${mm}-${dd}-`;
+  const cnt=sols.filter(s=>s.NroSolicitud&&s.NroSolicitud.startsWith(pfx)).length;
+  return pfx+String(cnt+1).padStart(3,'0');
+}
+
+/* ── SUBMIT ───────────────────────────────────────────────────────────────── */
+async function doSubmit() {
+  const errs=validate();
+  if(errs.length){ showAlert('err','Corrija los siguientes errores:<br>• '+errs.join('<br>• ')); return; }
+  const btn=document.getElementById('btn-reg');
+  if(btn){btn.disabled=true;btn.textContent='Registrando…';}
+  try {
+    const nro=await nextNro(), now=new Date().toISOString();
+    // 1) Solicitud
+    const solR=await gPost(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items`,{
+      fields:{Title:nro,NroSolicitud:nro,Estado:'Pendiente',FechaCreacion:now}
+    });
+    const solId=parseInt(solR.id);
+    // 2) Líneas + historial (secuencial para evitar conflictos de numeración)
+    let n=1;
+    for(const g of formGrupos){
+      for(const l of g.lineas){
+        const lbl=`${nro}-L${String(n).padStart(2,'0')}`;
+        const lR=await gPost(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items`,{
+          fields:{Title:lbl,SolicitudId:solId,NroSolicitud:nro,
+                  Proveedor:g.proveedor,Marca:l.marca,Material:l.material,
+                  Cantidad:parseInt(l.cantidad),FechaSolicitada:l.fecha,
+                  HoraSolicitada:l.hora||'',ObservacionMKT:l.obs||'',
+                  EstadoLinea:'Pendiente',EstadoRecepcion:'Pendiente',
+                  EsAnticipada:false,EsReprogramacion:false}
+        });
+        await gPost(`${BASE}/sites/${SITE}/lists/MKT_Historial/items`,{
+          fields:{Title:lbl,LineaId:parseInt(lR.id),SolicitudId:solId,
+                  NroSolicitud:nro,Campo:'Creación',ValorAnterior:'',
+                  ValorNuevo:'Pendiente',Modulo:'Marketing',Timestamp:now,
+                  Observacion:'Solicitud creada'}
+        });
+        n++;
+      }
+    }
+    await loadData();
+    viewId=solR.id; screen='ver';
+    renderContent();
+    showAlert('ok',`✅ Solicitud <strong>${nro}</strong> registrada exitosamente.`);
+  } catch(e){
+    showAlert('err','Error al registrar: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Registrar Solicitud';}
+  }
+}
+
+function validate(){
+  const e=[];
+  if(!formGrupos.length){e.push('Agregue al menos un proveedor.');return e;}
+  formGrupos.forEach((g,gi)=>{
+    if(!g.proveedor.trim()) e.push(`Grupo ${gi+1}: Proveedor requerido.`);
+    if(!g.lineas.length) e.push(`Grupo ${gi+1}: Sin líneas.`);
+    g.lineas.forEach((l,li)=>{
+      const ref=`G${gi+1} L${li+1}`;
+      if(!l.marca.trim())    e.push(`${ref}: Marca requerida.`);
+      if(!l.material.trim()) e.push(`${ref}: Material requerido.`);
+      if(!l.cantidad||parseInt(l.cantidad)<1) e.push(`${ref}: Cantidad ≥ 1.`);
+      if(!l.fecha)           e.push(`${ref}: Fecha requerida.`);
+    });
+  });
+  return e;
+}
+
+/* ── FORM HELPERS ─────────────────────────────────────────────────────────── */
+const emptyL = () => ({marca:'',material:'',cantidad:'',fecha:'',hora:'',obs:''});
+const addG = () => { formGrupos.push({proveedor:'',lineas:[emptyL()]}); rNueva(); };
+const remG = gi => { formGrupos.splice(gi,1); rNueva(); };
+const addL = gi => { formGrupos[gi].lineas.push(emptyL()); rNueva(); };
+const remL = (gi,li) => {
+  formGrupos[gi].lineas.splice(li,1);
+  if(!formGrupos[gi].lineas.length) formGrupos[gi].lineas.push(emptyL());
+  rNueva();
+};
+
+/* ── UTILS ────────────────────────────────────────────────────────────────── */
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fDate = s => { if(!s)return'—'; try{return new Date(s).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});}catch{return s;} };
+const fDT   = s => { if(!s)return'—'; try{return new Date(s).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch{return s;} };
+function badge(e){
+  const m={Pendiente:'pendiente',Aprobada:'aprobada',Rechazada:'rechazada',
+           Reprogramada:'reprogramada',Parcial:'parcial',Cancelada:'cancelada'};
+  return `<span class="badge b-${m[e]||'pendiente'}">${e||'Pendiente'}</span>`;
+}
+let alertTimer;
+function showAlert(type,msg){
+  const el=document.getElementById('ac'); if(!el)return;
+  el.innerHTML=`<div class="alert a-${type}">${msg}</div>`;
+  clearTimeout(alertTimer);
+  if(type==='ok') alertTimer=setTimeout(()=>{el.innerHTML='';},5000);
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+const initials = n => (!n?'?':n.split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2));
+const firstName = n => (!n?'':n.split(' ')[0]||n);
+
+/* ── RENDER ORCHESTRATOR ──────────────────────────────────────────────────── */
+function render() {
+  const app=document.getElementById('app');
+  if(!me){ app.innerHTML=loginHTML(); bindLogin(); return; }
+  app.innerHTML=`${hdrHTML()}${navHTML()}<main class="app-main"><div id="ac"></div><div id="sc"></div></main>`;
+  document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>{
+    if(b.dataset.s==='nueva'){formGrupos=[{proveedor:'',lineas:[emptyL()]}];}
+    screen=b.dataset.s; renderContent();
+  }));
+  renderContent();
+}
+function renderContent(){
+  const sc=document.getElementById('sc'); if(!sc)return;
+  if(busy){sc.innerHTML='<div class="loading"><div class="spin"></div>Cargando datos…</div>';return;}
+  if(screen==='mis')   { sc.innerHTML=misSolHTML();  bindMis();   }
+  else if(screen==='nueva'){ sc.innerHTML=catsReady?nuevaHTML():'<div class="loading"><div class="spin"></div>Cargando catálogos…</div>'; if(catsReady)bindNueva(); }
+  else if(screen==='ver')  { sc.innerHTML=verHTML();   bindVer();   }
+  // keep active nav
+  document.querySelectorAll('.nav-btn').forEach(b=>
+    b.classList.toggle('active', b.dataset.s===screen||(screen==='ver'&&b.dataset.s==='mis')));
+}
+// Re-render only the form (preserve scroll)
+function rNueva(){
+  const sc=document.getElementById('sc'),sy=window.scrollY;
+  if(!sc)return; sc.innerHTML=nuevaHTML(); bindNueva(); window.scrollTo(0,sy);
+}
+
+/* ── LOGIN ────────────────────────────────────────────────────────────────── */
+function loginHTML(){
+  return `<div class="login-wrap"><div class="login-card">
+    <div style="font-size:36px;margin-bottom:12px">📦</div>
+    <h2>RF Programación MKT</h2>
+    <p>Programación de recepciones de materiales de marketing</p>
+    <button class="btn btn-primary" id="btn-login" style="width:100%;justify-content:center">Iniciar sesión con Microsoft</button>
+  </div></div>`;
+}
+function bindLogin(){ document.getElementById('btn-login')?.addEventListener('click',login); }
+
+/* ── HEADER / NAV ─────────────────────────────────────────────────────────── */
+function hdrHTML(){
+  const name=me?.name||me?.username||'';
+  return `<header class="app-header">
+    <h1>📦 RF Programación <span>MKT</span></h1>
+    <div class="hdr-user"><span>${esc(firstName(name))}</span><div class="avatar">${initials(name)}</div></div>
+  </header>`;
+}
+function navHTML(){
+  return `<nav class="app-nav">
+    <button class="nav-btn ${screen==='mis'||screen==='ver'?'active':''}" data-s="mis">📋 Mis Solicitudes</button>
+    <button class="nav-btn ${screen==='nueva'?'active':''}" data-s="nueva">➕ Nueva Solicitud</button>
+  </nav>`;
+}
+
+/* ── MIS SOLICITUDES ──────────────────────────────────────────────────────── */
+function misSolHTML(){
+  const estados=['Todas','Pendiente','Aprobada','Rechazada','Parcial'];
+  const counts={};
+  sols.forEach(s=>{const e=s.Estado||'Pendiente';counts[e]=(counts[e]||0)+1;});
+  const shown = fEstado==='Todas' ? sols : sols.filter(s=>(s.Estado||'Pendiente')===fEstado);
+
+  const tabs=estados.map(e=>{
+    const c=e==='Todas'?sols.length:(counts[e]||0);
+    return `<button class="ftab${fEstado===e?' on':''}" data-fe="${e}">${e}${c?' <small>('+c+')</small>':''}</button>`;
+  }).join('');
+
+  let body;
+  if(!shown.length){
+    body=`<div class="empty"><div class="empty-icon">📭</div><p>No hay solicitudes${fEstado!=='Todas'?' con estado "'+fEstado+'"':''}.</p></div>`;
+  } else {
+    const rows=shown.map(s=>{
+      const nl=lineas.filter(l=>String(l.SolicitudId)===String(s.id)||l.NroSolicitud===s.NroSolicitud).length;
+      return `<tr class="tbl-row" data-id="${esc(s.id)}">
+        <td><strong>${esc(s.NroSolicitud||s.id)}</strong></td>
+        <td>${fDT(s.FechaCreacion)}</td>
+        <td style="text-align:center;font-variant-numeric:tabular-nums">${nl}</td>
+        <td>${badge(s.Estado)}</td>
+        <td><button class="btn btn-sm btn-secondary btn-ver" data-id="${esc(s.id)}">Ver →</button></td>
+      </tr>`;
+    }).join('');
+    body=`<div class="tbl-wrap"><table>
+      <thead><tr><th>N° Solicitud</th><th>Creación</th><th style="text-align:center">Líneas</th><th>Estado</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  }
+
+  return `<div class="card">
+    <div class="card-hdr"><h2 class="card-title">Mis Solicitudes</h2>
+      <button class="btn btn-sm btn-secondary" id="btn-ref">🔄 Actualizar</button>
+    </div>
+    <div class="card-body"><div class="ftabs">${tabs}</div>${body}</div>
+  </div>`;
+}
+function bindMis(){
+  document.querySelectorAll('.ftab').forEach(b=>b.addEventListener('click',()=>{fEstado=b.dataset.fe;renderContent();}));
+  document.querySelectorAll('.btn-ver').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation(); viewId=b.dataset.id; screen='ver'; renderContent();
+  }));
+  document.querySelectorAll('.tbl-row').forEach(r=>r.addEventListener('click',()=>{
+    viewId=r.dataset.id; screen='ver'; renderContent();
+  }));
+  document.getElementById('btn-ref')?.addEventListener('click',loadData);
+}
+
+/* ── NUEVA SOLICITUD ──────────────────────────────────────────────────────── */
+function nuevaHTML(){
+  const grupos=formGrupos.map((g,gi)=>grupoHTML(g,gi)).join('');
+  return `<div class="card">
+    <div class="card-hdr"><h2 class="card-title">Nueva Solicitud de Recepción</h2></div>
+    <div class="card-body">
+      <div id="gcon">${grupos}</div>
+      <button class="btn btn-secondary" id="btn-ag">＋ Agregar Proveedor</button>
+      <div style="margin-top:22px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
+        <button class="btn btn-secondary" id="btn-cx">Cancelar</button>
+        <button class="btn btn-primary" id="btn-reg">✅ Registrar Solicitud</button>
+      </div>
+    </div>
+  </div>`;
+}
+function grupoHTML(g,gi){
+  const ls=g.lineas.map((l,li)=>lineaHTML(g,gi,l,li)).join('');
+  return `<div class="grupo-card">
+    <div class="grupo-hdr">
+      <span class="grupo-lbl">Proveedor ${gi+1}</span>
+      <div class="ac-wrap" style="flex:1;max-width:360px">
+        <input class="form-ctrl prov-i" id="prov-${gi}" data-gi="${gi}"
+          value="${esc(g.proveedor)}" placeholder="Buscar proveedor…">
+      </div>
+      ${formGrupos.length>1?`<button class="btn btn-ghost btn-sm btn-rg" data-gi="${gi}">✕ Quitar</button>`:''}
+    </div>
+    <div class="grupo-body">
+      <div class="lineas-list">${ls}</div>
+      <button class="btn btn-ghost btn-sm btn-al" data-gi="${gi}" style="margin-top:10px">＋ Agregar Línea</button>
+    </div>
+  </div>`;
+}
+function lineaHTML(g,gi,l,li){
+  return `<div class="linea-row">
+    <div class="linea-hdr">
+      <span class="linea-num">Línea ${li+1}</span>
+      ${g.lineas.length>1?`<button class="btn btn-ghost btn-icon btn-rl" data-gi="${gi}" data-li="${li}" title="Quitar">✕</button>`:''}
+    </div>
+    <div class="linea-fields">
+      <div class="form-group">
+        <label class="form-label">Marca<span class="req">*</span></label>
+        <div class="ac-wrap">
+          <input class="form-ctrl marca-i" id="m-${gi}-${li}" data-gi="${gi}" data-li="${li}"
+            value="${esc(l.marca)}" placeholder="Buscar marca…">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Material<span class="req">*</span></label>
+        <div class="ac-wrap">
+          <input class="form-ctrl mat-i" id="mt-${gi}-${li}" data-gi="${gi}" data-li="${li}"
+            value="${esc(l.material)}" placeholder="Buscar material…">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cantidad<span class="req">*</span></label>
+        <input class="form-ctrl cant-i" type="number" min="1" step="1"
+          id="c-${gi}-${li}" data-gi="${gi}" data-li="${li}"
+          value="${esc(l.cantidad)}" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha Solicitada<span class="req">*</span></label>
+        <input class="form-ctrl fecha-i" type="date"
+          id="f-${gi}-${li}" data-gi="${gi}" data-li="${li}" value="${esc(l.fecha)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hora (HH:MM)</label>
+        <input class="form-ctrl hora-i" type="text" maxlength="5" placeholder="08:00"
+          id="h-${gi}-${li}" data-gi="${gi}" data-li="${li}" value="${esc(l.hora)}">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Observación</label>
+        <textarea class="form-ctrl obs-i" rows="2" placeholder="Detalles adicionales (opcional)"
+          id="o-${gi}-${li}" data-gi="${gi}" data-li="${li}">${esc(l.obs)}</textarea>
+      </div>
+    </div>
+  </div>`;
+}
+function bindNueva(){
+  if(!catsReady) return;
+  // Proveedores
+  formGrupos.forEach((g,gi)=>{
+    const pi=document.getElementById(`prov-${gi}`);
+    if(pi){
+      new AC(pi, q=>fil(cats.proveedores,q), v=>{ formGrupos[gi].proveedor=v; });
+      pi.addEventListener('blur',()=>{ formGrupos[gi].proveedor=pi.value; });
+    }
+    g.lineas.forEach((l,li)=>{
+      const mi=document.getElementById(`m-${gi}-${li}`),
+            mti=document.getElementById(`mt-${gi}-${li}`),
+            ci=document.getElementById(`c-${gi}-${li}`),
+            fi=document.getElementById(`f-${gi}-${li}`),
+            hi=document.getElementById(`h-${gi}-${li}`),
+            oi=document.getElementById(`o-${gi}-${li}`);
+      if(mi){ new AC(mi,q=>fil(cats.marcas,q),v=>{ formGrupos[gi].lineas[li].marca=v; }); mi.addEventListener('blur',()=>{formGrupos[gi].lineas[li].marca=mi.value;}); }
+      if(mti){ new AC(mti,q=>fil(cats.materiales,q),v=>{ formGrupos[gi].lineas[li].material=v; }); mti.addEventListener('blur',()=>{formGrupos[gi].lineas[li].material=mti.value;}); }
+      if(ci) ci.addEventListener('input',()=>{ formGrupos[gi].lineas[li].cantidad=ci.value; });
+      if(fi) fi.addEventListener('change',()=>{ formGrupos[gi].lineas[li].fecha=fi.value; });
+      if(hi) hi.addEventListener('input',()=>{ formGrupos[gi].lineas[li].hora=hi.value; });
+      if(oi) oi.addEventListener('input',()=>{ formGrupos[gi].lineas[li].obs=oi.value; });
+    });
+  });
+  document.getElementById('btn-ag')?.addEventListener('click',addG);
+  document.querySelectorAll('.btn-rg').forEach(b=>b.addEventListener('click',()=>remG(+b.dataset.gi)));
+  document.querySelectorAll('.btn-al').forEach(b=>b.addEventListener('click',()=>addL(+b.dataset.gi)));
+  document.querySelectorAll('.btn-rl').forEach(b=>b.addEventListener('click',()=>remL(+b.dataset.gi,+b.dataset.li)));
+  document.getElementById('btn-reg')?.addEventListener('click',doSubmit);
+  document.getElementById('btn-cx')?.addEventListener('click',()=>{ screen='mis'; renderContent(); });
+}
+
+/* ── VER SOLICITUD ────────────────────────────────────────────────────────── */
+function verHTML(){
+  const sol=sols.find(s=>s.id===viewId);
+  if(!sol) return `<div class="alert a-err">Solicitud no encontrada.</div>
+    <button class="btn btn-secondary" id="btn-bk">← Volver</button>`;
+
+  const ls=lineas.filter(l=>String(l.SolicitudId)===String(sol.id)||l.NroSolicitud===sol.NroSolicitud);
+  // group by proveedor
+  const grps={};
+  ls.forEach(l=>{ const p=l.Proveedor||'(Sin proveedor)'; if(!grps[p])grps[p]=[]; grps[p].push(l); });
+
+  const grpsHTML=Object.entries(grps).map(([p,lls])=>{
+    const rows=lls.map(l=>`
+      <div class="ver-linea">
+        <div class="ver-cell"><span class="ver-clbl">Marca</span><span class="ver-cval">${esc(l.Marca||'—')}</span></div>
+        <div class="ver-cell"><span class="ver-clbl">Material</span><span class="ver-cval">${esc(l.Material||'—')}</span></div>
+        <div class="ver-cell"><span class="ver-clbl">Cantidad</span><span class="ver-cval">${l.Cantidad??'—'}</span></div>
+        <div class="ver-cell"><span class="ver-clbl">Fecha Sol.</span><span class="ver-cval">${fDate(l.FechaSolicitada)}</span></div>
+        <div class="ver-cell"><span class="ver-clbl">Hora</span><span class="ver-cval">${l.HoraSolicitada||'—'}</span></div>
+        <div class="ver-cell"><span class="ver-clbl">Estado</span><span class="ver-cval">${badge(l.EstadoLinea||'Pendiente')}</span></div>
+        ${l.ObservacionMKT?`<div class="ver-cell" style="grid-column:1/-1"><span class="ver-clbl">Obs. MKT</span><span class="ver-cval">${esc(l.ObservacionMKT)}</span></div>`:''}
+        ${(l.FechaAprobada)?`
+          <div class="ver-cell"><span class="ver-clbl">Fecha Aprobada</span><span class="ver-cval">${fDate(l.FechaAprobada)}</span></div>
+          <div class="ver-cell"><span class="ver-clbl">Hora Aprobada</span><span class="ver-cval">${l.HoraAprobada||'—'}</span></div>`:''}
+        ${l.ObservacionJefatura?`<div class="ver-cell" style="grid-column:1/-1"><span class="ver-clbl">Obs. Jefatura</span><span class="ver-cval">${esc(l.ObservacionJefatura)}</span></div>`:''}
+      </div>`).join('');
+    return `<div class="ver-grupo"><div class="ver-ghdr">🏭 ${esc(p)}</div><div>${rows}</div></div>`;
+  }).join('') || `<div class="empty"><p>Sin líneas cargadas.</p></div>`;
+
+  return `
+    <div style="margin-bottom:14px">
+      <button class="btn btn-secondary" id="btn-bk">← Volver a Mis Solicitudes</button>
+    </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-hdr">
+        <h2 class="card-title">${esc(sol.NroSolicitud||'Solicitud')}</h2>
+        ${badge(sol.Estado)}
+      </div>
+      <div class="card-body">
+        <div class="sol-grid">
+          <div class="sol-fld"><span class="sol-lbl">N° Solicitud</span><span class="sol-val">${esc(sol.NroSolicitud||'—')}</span></div>
+          <div class="sol-fld"><span class="sol-lbl">Fecha de Creación</span><span class="sol-val">${fDT(sol.FechaCreacion)}</span></div>
+          <div class="sol-fld"><span class="sol-lbl">Estado</span><span class="sol-val">${badge(sol.Estado)}</span></div>
+          <div class="sol-fld"><span class="sol-lbl">Total de Líneas</span><span class="sol-val">${ls.length}</span></div>
+        </div>
+        ${sol.Observacion?`<div class="sol-fld"><span class="sol-lbl">Observación</span><span class="sol-val">${esc(sol.Observacion)}</span></div>`:''}
+      </div>
+    </div>
+    <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-muted);margin:0 0 10px">
+      Líneas de la Solicitud
+    </p>
+    ${grpsHTML}`;
+}
+function bindVer(){
+  document.getElementById('btn-bk')?.addEventListener('click',()=>{ screen='mis'; renderContent(); });
+}
+
+/* ── INIT ─────────────────────────────────────────────────────────────────── */
+(async()=>{
+  try {
+    const ok=await initAuth();
+    if(!ok){ render(); return; }
+    busy=true; render();
+    await Promise.all([loadCats(), (async()=>{
+      try {
+        const [s,l]=await Promise.all([
+          gAll(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items?$expand=fields&$top=500&$orderby=fields/FechaCreacion%20desc`),
+          gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`)
+        ]);
+        sols=s.map(i=>({id:i.id,...i.fields}));
+        lineas=l.map(i=>({id:i.id,...i.fields}));
+      } catch(e){ console.error(e); }
+    })()]);
+    busy=false; render();
+  } catch(e) {
+    document.getElementById('app').innerHTML=`<div class="login-wrap"><div class="login-card">
+      <div style="font-size:32px">⚠️</div><h2>Error</h2><p>${esc(e.message)}</p>
+      <button class="btn btn-primary" onclick="location.reload()" style="width:100%;justify-content:center">Reintentar</button>
+    </div></div>`;
+  }
+})();
+</script>
+</body>
+</html>
+
+</body></html>
