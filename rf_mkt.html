@@ -248,7 +248,7 @@ const MSAL_CFG = {
 };
 const SITE = 'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906';
 const SCOPES = ['https://graph.microsoft.com/Sites.ReadWrite.All'];
-const EXCEL_PATH = 'MKT/Cat%C3%A1logos/MKT_Catalogo_Materiales.xlsx';
+const EXCEL_PATH = 'MKT/Catálogos/MKT_Catalogo_Materiales.xlsx';
 const BASE = 'https://graph.microsoft.com/v1.0';
 
 /* ── STATE ───────────────────────────────────────────────────────────────── */
@@ -296,11 +296,19 @@ async function gAll(url) {
 /* ── CATALOGS ─────────────────────────────────────────────────────────────── */
 async function loadCats() {
   try {
-    const wb = `${BASE}/sites/${SITE}/drive/root:/${EXCEL_PATH}:/workbook/worksheets`;
+    const encodedPath = EXCEL_PATH.split('/').map(encodeURIComponent).join('/');
+    const fileUrl = `${BASE}/sites/${SITE}/drive/root:/${encodedPath}`;
+    console.log('[CATALOGO] Buscando archivo:', fileUrl);
+    const fileInfo = await gGet(fileUrl);
+    console.log('[CATALOGO] Archivo encontrado:', fileInfo.name);
+    console.log('[CATALOGO] DriveId:', fileInfo.parentReference?.driveId);
+    console.log('[CATALOGO] ItemId:', fileInfo.id);
+    const wb = `${BASE}/drives/${fileInfo.parentReference.driveId}/items/${fileInfo.id}/workbook/worksheets`;
+    console.log('[CATALOGO] worksheets URL:', wb);
     const [rM,rMat,rP] = await Promise.all([
-      gGet(`${wb}/Marcas/usedRange?$select=values`),
-      gGet(`${wb}/Materiales/usedRange?$select=values`),
-      gGet(`${wb}/Proveedores/usedRange?$select=values`)
+      gGet(`${wb}/Marcas/usedRange?$select=values`).then(r=>{console.log('[CATALOGO] Hoja Marcas OK, filas:',r.values?.length);return r;}),
+      gGet(`${wb}/Materiales/usedRange?$select=values`).then(r=>{console.log('[CATALOGO] Hoja Materiales OK, filas:',r.values?.length);return r;}),
+      gGet(`${wb}/Proveedores/usedRange?$select=values`).then(r=>{console.log('[CATALOGO] Hoja Proveedores OK, filas:',r.values?.length);return r;})
     ]);
     const ex = (d,skip) => (d.values||[]).map(r=>String(r[0]||'').trim())
       .filter(v=>v&&v.toLowerCase()!==skip).sort();
@@ -357,7 +365,7 @@ async function loadData() {
   busy=true; renderContent();
   try {
     const [s,l] = await Promise.all([
-      gAll(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items?$expand=fields&$top=500&$orderby=fields/FechaCreacion%20desc`),
+      gAll(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items?$expand=fields&$top=500`),
       gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`)
     ]);
     sols  = s.map(i=>({id:i.id,...i.fields}));
@@ -754,7 +762,7 @@ async function postLogin() {
     await Promise.all([loadCats(), (async()=>{
       try {
         const [s,l] = await Promise.all([
-          gAll(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items?$expand=fields&$top=500&$orderby=fields/FechaCreacion%20desc`),
+          gAll(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items?$expand=fields&$top=500`),
           gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`)
         ]);
         sols   = s.map(i=>({id:i.id,...i.fields}));
