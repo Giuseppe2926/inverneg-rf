@@ -234,7 +234,7 @@ tr:last-child td{border-bottom:none}
 <body>
 <div id="app"><div class="loading" style="min-height:100vh"><div class="spin"></div>Iniciando…</div></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/dist/msal-browser.min.js"></script>
 <script>
 'use strict';
 
@@ -265,8 +265,12 @@ let formGrupos = [];
 
 /* ── MSAL ─────────────────────────────────────────────────────────────────── */
 async function initAuth() {
+  console.log('[MSAL] typeof msal       =', typeof msal);
+  console.log('[MSAL] window.msal       =', window.msal);
+  console.log('[MSAL] window.msalBrowser=', window.msalBrowser);
+  console.log('[MSAL] msal.PublicClientApplication =', msal?.PublicClientApplication);
   msalApp = new msal.PublicClientApplication(MSAL_CFG);
-  await msalApp.initialize();
+  // initialize() es API de v3; en v2.x no existe — omitir
   const r = await msalApp.handleRedirectPromise();
   if (r?.account) msalApp.setActiveAccount(r.account);
   const all = msalApp.getAllAccounts();
