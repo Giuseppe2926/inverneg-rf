@@ -253,7 +253,7 @@ const EXCEL_PATH = 'MKT/Cat%C3%A1logos/MKT_Catalogo_Materiales.xlsx';
 const BASE = 'https://graph.microsoft.com/v1.0';
 
 /* ── STATE ───────────────────────────────────────────────────────────────── */
-let msal, me;
+let msalApp, me;
 let cats = {marcas:[],materiales:[],proveedores:[]};
 let catsReady = false;
 let screen = 'mis'; // 'mis' | 'nueva' | 'ver'
@@ -265,23 +265,23 @@ let formGrupos = [];
 
 /* ── MSAL ─────────────────────────────────────────────────────────────────── */
 async function initAuth() {
-  msal = new msal.PublicClientApplication(MSAL_CFG);
-  await msal.initialize();
-  const r = await msal.handleRedirectPromise();
-  if (r?.account) msal.setActiveAccount(r.account);
-  const all = msal.getAllAccounts();
-  if (all.length) { msal.setActiveAccount(all[0]); me = all[0]; return true; }
+  msalApp = new msal.PublicClientApplication(MSAL_CFG);
+  await msalApp.initialize();
+  const r = await msalApp.handleRedirectPromise();
+  if (r?.account) msalApp.setActiveAccount(r.account);
+  const all = msalApp.getAllAccounts();
+  if (all.length) { msalApp.setActiveAccount(all[0]); me = all[0]; return true; }
   return false;
 }
-async function login() { await msal.loginRedirect({scopes:SCOPES}); }
+async function login() { await msalApp.loginRedirect({scopes:SCOPES}); }
 async function tok() {
-  const acc = msal.getActiveAccount();
+  const acc = msalApp.getActiveAccount();
   if (!acc) throw new Error('Sin sesión');
   try {
-    const r = await msal.acquireTokenSilent({scopes:SCOPES,account:acc});
+    const r = await msalApp.acquireTokenSilent({scopes:SCOPES,account:acc});
     return r.accessToken;
   } catch {
-    await msal.acquireTokenRedirect({scopes:SCOPES});
+    await msalApp.acquireTokenRedirect({scopes:SCOPES});
     throw new Error('redirect');
   }
 }
