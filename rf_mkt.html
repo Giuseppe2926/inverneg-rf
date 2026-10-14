@@ -212,6 +212,19 @@ tr:last-child td{border-bottom:none}
           letter-spacing:.05em;color:var(--fg-muted)}
 .ver-cval{font-size:13px;color:var(--fg)}
 .ver-cval.dim{color:var(--fg-muted);font-style:italic}
+.ver-cancel-form{grid-column:1/-1;background:var(--err-bg);border:1px solid var(--err-bd);
+                 border-radius:var(--r);padding:12px;margin-top:4px;display:none}
+.ver-cancel-form.open{display:block}
+.ver-cancel-form textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);
+  border-radius:var(--r);background:var(--bg-card);color:var(--fg);
+  font:inherit;font-size:13px;padding:8px 10px;resize:vertical;min-height:64px;
+  margin:8px 0}
+.ver-cancel-form textarea:focus{outline:none;border-color:var(--err)}
+.ver-linea-cancelada{opacity:.6}
+.btn-cancel-linea{font-size:12px;padding:3px 10px;border-radius:20px;border:1px solid var(--err);
+  background:transparent;color:var(--err);cursor:pointer;font-weight:600;transition:.15s}
+.btn-cancel-linea:hover{background:var(--err);color:#fff}
+.btn-cancel-linea:disabled{opacity:.4;cursor:not-allowed}
 
 /* ── LOGIN ────────────────────────────────────────────────────────────────── */
 .login-wrap{display:flex;flex-direction:column;align-items:center;
@@ -291,6 +304,12 @@ async function gAll(url) {
   let res=[], next=url;
   while(next){ const d=await gGet(next); res=res.concat(d.value||[]); next=d['@odata.nextLink']||null; }
   return res;
+}
+async function gPatch(url, body) {
+  const t = await tok();
+  const r = await fetch(url, {method:'PATCH',headers:{Authorization:`Bearer ${t}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if (!r.ok) { const e = await r.text(); throw new Error(`${r.status} ${e}`); }
+  return r.status === 204 ? null : r.json();
 }
 
 /* ── CATALOGS ─────────────────────────────────────────────────────────────── */
@@ -700,9 +719,34 @@ function verHTML(){
   const grps={};
   ls.forEach(l=>{ const p=l.Proveedor||'(Sin proveedor)'; if(!grps[p])grps[p]=[]; grps[p].push(l); });
 
+  const CANCELABLES = new Set(['Pendiente','Aprobada','Reprogramada','No Presentado']);
+
   const grpsHTML=Object.entries(grps).map(([p,lls])=>{
-    const rows=lls.map(l=>`
-      <div class="ver-linea">
+    const rows=lls.map(l=>{
+      const esCancelable = CANCELABLES.has(l.EstadoLinea||'Pendiente');
+      const esCancelada  = (l.EstadoLinea||'') === 'Cancelada';
+      const cancelBtn = esCancelable
+        ? `<div class="ver-cell" style="grid-column:1/-1;align-items:flex-end;flex-direction:row;gap:8px">
+             <button class="btn-cancel-linea" data-lid="${l.id}">✕ Cancelar línea</button>
+           </div>`
+        : '';
+      const cancelForm = esCancelable
+        ? `<div class="ver-cancel-form" id="cf-${l.id}">
+             <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:var(--err)">Cancelar esta línea</p>
+             <textarea id="cfm-${l.id}" placeholder="Motivo de cancelación (obligatorio)"></textarea>
+             <div style="display:flex;gap:8px">
+               <button class="btn btn-danger btn-sm" id="cfok-${l.id}" data-lid="${l.id}">Confirmar cancelación</button>
+               <button class="btn btn-secondary btn-sm" id="cfcx-${l.id}" data-lid="${l.id}">Cancelar</button>
+             </div>
+           </div>`
+        : '';
+      const cancelInfo = esCancelada
+        ? `<div class="ver-cell" style="grid-column:1/-1"><span class="ver-clbl">Motivo Cancelación</span><span class="ver-cval">${esc(l.MotivoCancelacion||'—')}</span></div>
+           <div class="ver-cell"><span class="ver-clbl">Cancelado por</span><span class="ver-cval">${esc(l.CanceladoPor||'—')}</span></div>
+           <div class="ver-cell"><span class="ver-clbl">Fecha Cancelación</span><span class="ver-cval">${fDT(l.FechaCancelacion)}</span></div>`
+        : '';
+      return `
+      <div class="ver-linea${esCancelada?' ver-linea-cancelada':''}">
         <div class="ver-cell"><span class="ver-clbl">Marca</span><span class="ver-cval">${esc(l.Marca||'—')}</span></div>
         <div class="ver-cell"><span class="ver-clbl">Material</span><span class="ver-cval">${esc(l.Material||'—')}</span></div>
         <div class="ver-cell"><span class="ver-clbl">Cantidad</span><span class="ver-cval">${l.Cantidad??'—'}</span></div>
@@ -714,7 +758,11 @@ function verHTML(){
           <div class="ver-cell"><span class="ver-clbl">Fecha Aprobada</span><span class="ver-cval">${fDate(l.FechaAprobada)}</span></div>
           <div class="ver-cell"><span class="ver-clbl">Hora Aprobada</span><span class="ver-cval">${l.HoraAprobada||'—'}</span></div>`:''}
         ${l.ObservacionJefatura?`<div class="ver-cell" style="grid-column:1/-1"><span class="ver-clbl">Obs. Jefatura</span><span class="ver-cval">${esc(l.ObservacionJefatura)}</span></div>`:''}
-      </div>`).join('');
+        ${cancelInfo}
+        ${cancelBtn}
+        ${cancelForm}
+      </div>`;
+    }).join('');
     return `<div class="ver-grupo"><div class="ver-ghdr">🏭 ${esc(p)}</div><div>${rows}</div></div>`;
   }).join('') || `<div class="empty"><p>Sin líneas cargadas.</p></div>`;
 
@@ -742,8 +790,71 @@ function verHTML(){
     </p>
     ${grpsHTML}`;
 }
+async function cancelLinea(lineaId, motivo) {
+  const now = new Date().toISOString();
+  const quien = me?.username || me?.name || me?.displayName || 'Desconocido';
+  await gPatch(
+    `${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lineaId}/fields`,
+    { EstadoLinea:'Cancelada', OrigenCancelacion:'Marketing',
+      MotivoCancelacion: motivo, CanceladoPor: quien, FechaCancelacion: now }
+  );
+  const sol = sols.find(s=>s.id===viewId);
+  await gPost(`${BASE}/sites/${SITE}/lists/MKT_Historial/items`, {
+    fields:{
+      SolicitudId: viewId,
+      NroSolicitud: sol?.NroSolicitud||'',
+      LineaId: lineaId,
+      Evento: 'Cancelacion',
+      OrigenCancelacion: 'Marketing',
+      MotivoCancelacion: motivo,
+      RealizadoPor: quien,
+      FechaEvento: now
+    }
+  });
+  // Update local state
+  const li = lineas.find(l=>l.id===lineaId);
+  if(li){ li.EstadoLinea='Cancelada'; li.OrigenCancelacion='Marketing';
+          li.MotivoCancelacion=motivo; li.CanceladoPor=quien; li.FechaCancelacion=now; }
+}
+
 function bindVer(){
   document.getElementById('btn-bk')?.addEventListener('click',()=>{ screen='mis'; renderContent(); });
+
+  // Cancel buttons — open inline form
+  document.querySelectorAll('.btn-cancel-linea').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const lid = btn.dataset.lid;
+      const form = document.getElementById(`cf-${lid}`);
+      if(form){ form.classList.toggle('open'); }
+    });
+  });
+
+  // Confirm cancel
+  document.querySelectorAll('[id^="cfok-"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const lid = btn.dataset.lid;
+      const ta  = document.getElementById(`cfm-${lid}`);
+      const motivo = ta?.value?.trim();
+      if(!motivo){ ta.style.borderColor='var(--err)'; ta.focus(); return; }
+      btn.disabled = true; btn.textContent = 'Cancelando…';
+      try {
+        await cancelLinea(lid, motivo);
+        renderContent(); // re-render with updated state
+      } catch(e) {
+        btn.disabled = false; btn.textContent = 'Confirmar cancelación';
+        const errDiv = document.getElementById(`cf-${lid}`);
+        if(errDiv){ const p=errDiv.querySelector('p'); if(p) p.textContent='Error: '+e.message; }
+      }
+    });
+  });
+
+  // Dismiss cancel form
+  document.querySelectorAll('[id^="cfcx-"]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const lid = btn.dataset.lid;
+      document.getElementById(`cf-${lid}`)?.classList.remove('open');
+    });
+  });
 }
 
 /* ── BOOT — mismo patrón que rf_recepcion / rf_perchado ──────────────────── */
