@@ -234,7 +234,34 @@ tr:last-child td{border-bottom:none}
 <body>
 <div id="app"><div class="loading" style="min-height:100vh"><div class="spin"></div>Iniciando…</div></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/dist/msal-browser.min.js"></script>
+<script>
+/* Carga MSAL con fallback automático entre CDNs */
+(function(){
+  function loadScript(src, cb, fallback){
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = cb;
+    s.onerror = function(){
+      console.warn('[MSAL] CDN falló:', src);
+      if(fallback){ loadScript(fallback, cb, null); }
+      else { document.getElementById('app').innerHTML =
+        '<div style="padding:40px;text-align:center;font-family:system-ui">' +
+        '<h2>Error de red</h2><p>No se pudo cargar la librería de autenticación.<br>' +
+        'Verifica tu conexión e intenta de nuevo.</p>' +
+        '<button onclick="location.reload()" style="padding:10px 24px;font-size:14px;cursor:pointer">Reintentar</button>' +
+        '</div>'; }
+    };
+    document.head.appendChild(s);
+  }
+  window.__msalLoaded = new Promise(function(resolve){
+    loadScript(
+      'https://unpkg.com/@azure/msal-browser@2.38.3/dist/msal-browser.min.js',
+      resolve,
+      'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/dist/msal-browser.min.js'
+    );
+  });
+})();
+</script>
 <script>
 'use strict';
 
@@ -265,6 +292,8 @@ let formGrupos = [];
 
 /* ── MSAL ─────────────────────────────────────────────────────────────────── */
 async function initAuth() {
+  // Esperar a que la librería termine de cargar (carga dinámica con fallback)
+  await window.__msalLoaded;
   console.log('[MSAL] typeof msal       =', typeof msal);
   console.log('[MSAL] window.msal       =', window.msal);
   console.log('[MSAL] window.msalBrowser=', window.msalBrowser);
