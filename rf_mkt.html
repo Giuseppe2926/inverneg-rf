@@ -799,16 +799,19 @@ async function cancelLinea(lineaId, motivo) {
       MotivoCancelacion: motivo, CanceladoPor: quien, FechaCancelacion: now }
   );
   const sol = sols.find(s=>s.id===viewId);
+  const estadoAnterior = lineas.find(l=>l.id===lineaId)?.EstadoLinea || 'Pendiente';
   await gPost(`${BASE}/sites/${SITE}/lists/MKT_Historial/items`, {
     fields:{
       SolicitudId: viewId,
       NroSolicitud: sol?.NroSolicitud||'',
       LineaId: lineaId,
-      Evento: 'Cancelacion',
-      OrigenCancelacion: 'Marketing',
-      MotivoCancelacion: motivo,
-      RealizadoPor: quien,
-      FechaEvento: now
+      Campo: 'EstadoLinea',
+      ValorAnterior: estadoAnterior,
+      ValorNuevo: 'Cancelada',
+      Modulo: 'Marketing',
+      UsuarioAccion: quien,
+      Timestamp: now,
+      Observacion: motivo
     }
   });
   // Update local state
