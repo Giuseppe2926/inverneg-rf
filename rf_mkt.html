@@ -851,7 +851,7 @@ function bindVer(){
       const lid = btn.dataset.lid;
       const ta  = document.getElementById(`cfm-${lid}`);
       const motivo = ta?.value?.trim();
-      if(!motivo){ ta.style.borderColor='var(--err)'; ta.focus(); return; }
+      if(!motivo){ if(ta){ ta.style.borderColor='var(--err)'; ta.focus(); } return; }
       btn.disabled = true; btn.textContent = 'Cancelando…';
       try {
         await cancelLinea(lid, motivo);
