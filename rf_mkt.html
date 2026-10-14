@@ -234,7 +234,6 @@ tr:last-child td{border-bottom:none}
 <body>
 <div id="app"><div class="loading" style="min-height:100vh"><div class="spin"></div>Iniciando…</div></div>
 
-<script src="https://unpkg.com/@azure/msal-browser@2.38.3/dist/msal-browser.min.js"></script>
 <script>
 'use strict';
 
@@ -264,30 +263,15 @@ let busy = false;
 let formGrupos = [];
 
 /* ── MSAL ─────────────────────────────────────────────────────────────────── */
-async function initAuth() {
-  console.log('[MSAL] typeof msal       =', typeof msal);
-  console.log('[MSAL] window.msal       =', window.msal);
-  console.log('[MSAL] window.msalBrowser=', window.msalBrowser);
-  console.log('[MSAL] msal.PublicClientApplication =', msal?.PublicClientApplication);
-  msalApp = new msal.PublicClientApplication(MSAL_CFG);
-  // initialize() es API de v3; en v2.x no existe — omitir
-  const r = await msalApp.handleRedirectPromise();
-  if (r?.account) msalApp.setActiveAccount(r.account);
-  const all = msalApp.getAllAccounts();
-  if (all.length) { msalApp.setActiveAccount(all[0]); me = all[0]; return true; }
-  return false;
-}
-async function login() { await msalApp.loginRedirect({scopes:SCOPES}); }
+// tok() y login() se usan desde gGet/gPost — msalApp se inicializa en bootMsal()
+function login() { msalApp.loginRedirect({scopes:SCOPES}); }
 async function tok() {
+  if (!msalApp) throw new Error('MSAL no inicializado');
   const acc = msalApp.getActiveAccount();
   if (!acc) throw new Error('Sin sesión');
-  try {
-    const r = await msalApp.acquireTokenSilent({scopes:SCOPES,account:acc});
-    return r.accessToken;
-  } catch {
-    await msalApp.acquireTokenRedirect({scopes:SCOPES});
-    throw new Error('redirect');
-  }
+  return msalApp.acquireTokenSilent({scopes:SCOPES, account:acc})
+    .catch(function(){ return msalApp.acquireTokenRedirect({scopes:SCOPES}); })
+    .then(function(r){ return r ? r.accessToken : Promise.reject(new Error('redirect')); });
 }
 
 /* ── GRAPH HELPERS ────────────────────────────────────────────────────────── */
@@ -753,29 +737,68 @@ function bindVer(){
   document.getElementById('btn-bk')?.addEventListener('click',()=>{ screen='mis'; renderContent(); });
 }
 
-/* ── INIT ─────────────────────────────────────────────────────────────────── */
-(async()=>{
+/* ── BOOT — mismo patrón que rf_recepcion / rf_perchado ──────────────────── */
+function showLoginPage() {
+  document.getElementById('app').innerHTML =
+    '<div class="login-wrap"><div class="login-card">' +
+    '<div style="font-size:40px;margin-bottom:8px">📦</div>' +
+    '<h2 style="margin:0 0 6px">RF Programación MKT</h2>' +
+    '<p style="color:var(--fg-muted);margin:0 0 20px;font-size:13px">Inicia sesión con tu cuenta Microsoft</p>' +
+    '<button class="btn btn-primary" style="width:100%;justify-content:center" onclick="login()">🔐 Iniciar sesión</button>' +
+    '</div></div>';
+}
+
+async function postLogin() {
+  busy = true; render();
   try {
-    const ok=await initAuth();
-    if(!ok){ render(); return; }
-    busy=true; render();
     await Promise.all([loadCats(), (async()=>{
       try {
-        const [s,l]=await Promise.all([
+        const [s,l] = await Promise.all([
           gAll(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items?$expand=fields&$top=500&$orderby=fields/FechaCreacion%20desc`),
           gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`)
         ]);
-        sols=s.map(i=>({id:i.id,...i.fields}));
-        lineas=l.map(i=>({id:i.id,...i.fields}));
-      } catch(e){ console.error(e); }
+        sols   = s.map(i=>({id:i.id,...i.fields}));
+        lineas = l.map(i=>({id:i.id,...i.fields}));
+      } catch(e){ console.error('[DATA]', e); }
     })()]);
-    busy=false; render();
-  } catch(e) {
-    document.getElementById('app').innerHTML=`<div class="login-wrap"><div class="login-card">
-      <div style="font-size:32px">⚠️</div><h2>Error</h2><p>${esc(e.message)}</p>
-      <button class="btn btn-primary" onclick="location.reload()" style="width:100%;justify-content:center">Reintentar</button>
-    </div></div>`;
-  }
+  } catch(e){ console.error('[CATS]', e); }
+  busy = false; render();
+}
+
+(function bootMsal(){
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
+  s.onload = function() {
+    msalApp = new msal.PublicClientApplication(MSAL_CFG);
+    msalApp.handleRedirectPromise().then(function(res){
+      if (res && res.account) {
+        me = res.account;
+        msalApp.setActiveAccount(me);
+        postLogin();
+      } else {
+        var all = msalApp.getAllAccounts();
+        if (all.length > 0) {
+          me = all[0];
+          msalApp.setActiveAccount(me);
+          postLogin();
+        } else {
+          showLoginPage();
+        }
+      }
+    }).catch(function(e){
+      console.error('[MSAL]', e);
+      showLoginPage();
+    });
+  };
+  s.onerror = function(){
+    document.getElementById('app').innerHTML =
+      '<div class="login-wrap"><div class="login-card">' +
+      '<div style="font-size:32px">⚠️</div><h2>Error de red</h2>' +
+      '<p>No se pudo cargar la librería de autenticación.<br>Verifica tu conexión e intenta de nuevo.</p>' +
+      '<button class="btn btn-primary" onclick="location.reload()" style="width:100%;justify-content:center">Reintentar</button>' +
+      '</div></div>';
+  };
+  document.head.appendChild(s);
 })();
 </script>
 </body>
