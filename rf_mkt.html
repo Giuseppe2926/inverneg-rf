@@ -277,6 +277,7 @@ let msalApp, me;
 let cats = {marcas:[],materiales:[],proveedores:[]};
 let catsReady = false;
 const CANCELABLES = new Set(['Pendiente','Aprobada','Reprogramada','No Presentado']);
+const OP_EJECUTADO_MKT = new Set(['Recibido OK','Recibido con Novedades','Parcialmente Recibida','Rechazado por Operación']);
 let screen = 'mis'; // 'mis' | 'nueva' | 'ver'
 let fEstado = 'Todas';
 let sols = [], lineas = [];
@@ -738,7 +739,7 @@ function verHTML(){
 
   const grpsHTML=Object.entries(grps).map(([p,lls])=>{
     const rows=lls.map(l=>{
-      const esCancelable = CANCELABLES.has(l.EstadoLinea||'Pendiente');
+      const esCancelable = CANCELABLES.has(l.EstadoLinea||'Pendiente') && !OP_EJECUTADO_MKT.has(l.EstadoRecepcion);
       const esCancelada  = (l.EstadoLinea||'') === 'Cancelada';
       const cancelBtn = esCancelable
         ? `<div class="ver-cell" style="grid-column:1/-1;align-items:flex-end;flex-direction:row;gap:8px">
@@ -824,7 +825,7 @@ function verHTML(){
         </div>
         ${sol.Observacion?`<div class="sol-fld"><span class="sol-lbl">Observación</span><span class="sol-val">${esc(sol.Observacion)}</span></div>`:''}
       </div>
-      ${(()=>{ const hasCancelable=ls.some(l=>CANCELABLES.has(l.EstadoLinea||'Pendiente')); return hasCancelable?`
+      ${(()=>{ const hasCancelable=ls.some(l=>CANCELABLES.has(l.EstadoLinea||'Pendiente')&&!OP_EJECUTADO_MKT.has(l.EstadoRecepcion)); return hasCancelable?`
       <div style="padding:0 16px 16px">
         <button class="btn btn-danger btn-sm" id="btn-cancel-sol" style="gap:6px">🚫 Cancelar Solicitud</button>
       </div>
@@ -931,6 +932,7 @@ function bindVer(){
     const cancelables = lineas.filter(l=>
       (String(l.SolicitudId)===String(viewId) || l.NroSolicitud===sols.find(s=>s.id===viewId)?.NroSolicitud)
       && CANCELABLES.has(l.EstadoLinea||'Pendiente')
+      && !OP_EJECUTADO_MKT.has(l.EstadoRecepcion)
     );
     try {
       for(const l of cancelables){ await cancelLinea(l.id, motivo); }
