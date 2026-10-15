@@ -132,8 +132,12 @@ body{margin:0;font-family:'Inter',system-ui,sans-serif;font-size:14px;
 
 /* ── VER LINEA ────────────────────────────────────────────────────────────── */
 .ver-grupo{border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:18px;overflow:hidden}
-.ver-ghdr{background:var(--gray);padding:10px 16px;font-size:13px;font-weight:600;
-          border-bottom:1px solid var(--border)}
+.ver-ghdr{background:var(--primary);color:var(--primary-fg);padding:10px 16px;font-size:13px;font-weight:700;
+          border-bottom:1px solid var(--border);text-transform:capitalize}
+.ver-subgrupo{border-top:1px solid var(--border)}
+.ver-subgrupo+.ver-subgrupo{border-top:1px solid var(--border)}
+.ver-subghdr{background:var(--gray);padding:8px 16px;font-size:12px;font-weight:600;
+             border-bottom:1px solid var(--border);color:var(--fg-muted)}
 .ver-linea{padding:14px 16px;border-bottom:1px solid var(--border)}
 .ver-linea:last-child{border-bottom:none}
 .ver-linea-done{opacity:.55}
@@ -430,17 +434,34 @@ function revisarHTML() {
   if(!sol) return `<div class="alert a-err">Solicitud no encontrada.</div>
     <button class="btn btn-secondary" id="btn-bk">← Volver</button>`;
 
-  _cargaRendered = {}; // resetear por cada render de solicitud
   const ls = lineasDeSol(sol);
-  const grps = {};
-  ls.forEach(l=>{ const p=l.Proveedor||'(Sin proveedor)'; if(!grps[p])grps[p]=[]; grps[p].push(l); });
+  // Agrupar primero por FechaSolicitada, luego por Proveedor
+  const byFecha = {};
+  ls.forEach(l=>{
+    const f = toISODate(l.FechaSolicitada) || '(Sin fecha)';
+    if(!byFecha[f]) byFecha[f] = {};
+    const p = l.Proveedor || '(Sin proveedor)';
+    if(!byFecha[f][p]) byFecha[f][p] = [];
+    byFecha[f][p].push(l);
+  });
 
-  const grpsHTML = Object.entries(grps).map(([p,lls])=>{
+  const grpsHTML = Object.keys(byFecha).sort().map(isoFecha=>{
+    const fechaLabel = isoFecha==='(Sin fecha)' ? isoFecha
+      : new Date(isoFecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    const c = isoFecha!=='(Sin fecha)' ? cargaDia(isoFecha) : null;
+    const cargaBar = c ? `<div class="carga-bar" style="margin:8px 16px 4px">
+      <span class="carga-dot">${c.dot}</span>
+      <span class="carga-val">${c.nivel}</span>
+      <span class="carga-sep">·</span>
+      <span class="carga-detail">${c.nLineas} recepcion${c.nLineas!==1?'es':''} programada${c.nLineas!==1?'s':''}</span>
+      <span class="carga-sep">·</span>
+      <span class="carga-detail">${c.nUnidades.toLocaleString('es-AR')} unidades</span>
+    </div>` : '';
+
+    const provHTML = Object.entries(byFecha[isoFecha]).map(([p,lls])=>{
     const rows = lls.map(l=>{
       const gestionable = JEFATURA_ACCIONES.has(l.EstadoLinea||'Pendiente');
       const done        = !gestionable;
-      const fecha       = l.FechaAprobada || l.FechaSolicitada;
-      const carga       = gestionable ? cargaHTMLOnce(l.FechaSolicitada) : '';
 
       const cancelInfo  = l.EstadoLinea==='Cancelada'
         ? `<div class="ver-cell" style="grid-column:1/-1">
@@ -455,7 +476,6 @@ function revisarHTML() {
 
       const actPanel = gestionable ? `
         <div class="act-panel">
-          ${carga}
           <div class="act-btns">
             <button class="btn btn-ok btn-sm act-btn" data-lid="${l.id}" data-accion="aprobar">✓ Aprobar</button>
             <button class="btn btn-warn btn-sm act-btn" data-lid="${l.id}" data-accion="reprogramar">📅 Reprogramar</button>
@@ -498,7 +518,9 @@ function revisarHTML() {
         ${actPanel}
       </div>`;
     }).join('');
-    return `<div class="ver-grupo"><div class="ver-ghdr">🏭 ${esc(p)}</div><div>${rows}</div></div>`;
+      return `<div class="ver-subgrupo"><div class="ver-subghdr">🏭 ${esc(p)}</div><div>${rows}</div></div>`;
+    }).join('');
+    return `<div class="ver-grupo"><div class="ver-ghdr">📅 ${fechaLabel}</div>${cargaBar}<div>${provHTML}</div></div>`;
   }).join('') || `<div class="empty"><p>Sin líneas cargadas.</p></div>`;
 
   return `
