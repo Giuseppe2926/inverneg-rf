@@ -312,8 +312,9 @@ function lineasDeSol(sol) {
 }
 
 function solsPorPeriodo(periodo) {
-  const ids = new Set(lineasPorPeriodo(periodo).map(l=>l.SolicitudId));
-  return sols.filter(s=>ids.has(s.id));
+  // SolicitudId viene como número desde SharePoint; s.id es string → normalizar ambos
+  const ids = new Set(lineasPorPeriodo(periodo).map(l=>String(l.SolicitudId)));
+  return sols.filter(s=>ids.has(String(s.id)));
 }
 
 /* ── RENDER ───────────────────────────────────────────────────────────────── */
