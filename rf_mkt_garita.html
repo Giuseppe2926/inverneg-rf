@@ -422,10 +422,10 @@ function renderLogin(app){
 async function loadData(){
   busy=true; render();
   try{
-    // Only load Aprobada + Reprogramada lines
-    const filter=encodeURIComponent("fields/EstadoLinea eq 'Aprobada' or fields/EstadoLinea eq 'Reprogramada'");
-    const items=await gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$filter=${filter}&$top=500`);
-    lineas=items.map(i=>({id:i.id,...i.fields}));
+    // Load all lines, filter client-side (EstadoLinea not indexed in SharePoint)
+    const items=await gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`);
+    const all=items.map(i=>({id:i.id,...i.fields}));
+    lineas=all.filter(l=>l.EstadoLinea==='Aprobada'||l.EstadoLinea==='Reprogramada');
     lastLoad=new Date().toISOString();
   } catch(e){
     console.warn('[DATA]',e.message);
