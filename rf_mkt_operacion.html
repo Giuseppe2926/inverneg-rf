@@ -740,7 +740,7 @@ async function ejecutarRecepcion(btn, lid, estadoNuevo, camposExtra, labelOrigin
 }
 
 /* ── HELPERS ──────────────────────────────────────────────────────────────── */
-function quien_es() { return me?.username||me?.name||me?.displayName||'Desconocido'; }
+function quien_es() { return me?.name||me?.displayName||me?.username||'Desconocido'; }
 
 function patchLocal(lid,fields) {
   const l=lineas.find(x=>x.id===lid);
