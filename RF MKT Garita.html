@@ -1,0 +1,463 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RF MKT Garita</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── TOKENS ──────────────────────────────────────────────────────────────── */
+:root {
+  --bg:#fdf8f0; --bg-card:#ffffff; --bg-muted:#faf5eb;
+  --fg:#1c1209; --fg-muted:#78614a; --fg-subtle:#a68c6d;
+  --border:#e8dcc8; --border-focus:#b45309;
+  --primary:#b45309; --primary-h:#92400e; --primary-fg:#fff;
+  --ok:#16a34a; --ok-bg:#f0fdf4; --ok-bd:#bbf7d0;
+  --warn:#d97706; --warn-bg:#fffbeb; --warn-bd:#fde68a;
+  --err:#dc2626; --err-bg:#fef2f2; --err-bd:#fecaca;
+  --info:#b45309; --info-bg:#fff7ed; --info-bd:#fed7aa;
+  --gray:#f5ebe0;
+  --r:8px; --r-lg:12px;
+  --sh:0 1px 3px rgba(0,0,0,.08);
+  --sh-md:0 4px 12px rgba(0,0,0,.1);
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#1a1000; --bg-card:#241800; --bg-muted:#1c1100;
+    --fg:#fdf8f0; --fg-muted:#c9a96e; --fg-subtle:#8c6d40;
+    --border:#3d2c10; --border-focus:#d97706;
+    --primary:#d97706; --primary-h:#b45309;
+    --ok-bg:#052e16; --ok-bd:#14532d;
+    --warn-bg:#1c0f00; --warn-bd:#78350f;
+    --err-bg:#1c0a0a; --err-bd:#7f1d1d;
+    --info-bg:#1c0f00; --info-bd:#78350f;
+    --gray:#241800;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1a1000; --bg-card:#241800; --bg-muted:#1c1100;
+  --fg:#fdf8f0; --fg-muted:#c9a96e; --fg-subtle:#8c6d40;
+  --border:#3d2c10; --border-focus:#d97706;
+  --primary:#d97706; --primary-h:#b45309;
+  --ok-bg:#052e16; --ok-bd:#14532d;
+  --warn-bg:#1c0f00; --warn-bd:#78350f;
+  --err-bg:#1c0a0a; --err-bd:#7f1d1d;
+  --info-bg:#1c0f00; --info-bd:#78350f;
+  --gray:#241800;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;font-family:'Inter',system-ui,sans-serif;font-size:14px;
+     background:var(--bg);color:var(--fg);
+     padding-inline:16px;padding-block:16px}
+
+/* ── HEADER ───────────────────────────────────────────────────────────────── */
+.app-hdr{display:flex;align-items:center;gap:10px;margin-bottom:20px;
+         padding-bottom:14px;border-bottom:1px solid var(--border)}
+.app-hdr h1{margin:0;font-size:17px;font-weight:700;flex:1}
+.app-hdr .user{font-size:12px;color:var(--fg-muted);max-width:160px;
+               overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.garita-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
+  border-radius:20px;background:var(--info-bg);color:var(--primary);
+  border:1px solid var(--info-bd);font-size:11px;font-weight:700;white-space:nowrap}
+
+/* ── BUTTONS ──────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;
+     border-radius:var(--r);border:none;font:inherit;font-size:13px;
+     font-weight:500;cursor:pointer;transition:.15s}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--primary);color:var(--primary-fg)}
+.btn-primary:hover:not(:disabled){background:var(--primary-h)}
+.btn-secondary{background:var(--bg-muted);color:var(--fg);border:1px solid var(--border)}
+.btn-secondary:hover:not(:disabled){background:var(--gray)}
+.btn-sm{padding:4px 10px;font-size:12px}
+
+/* ── BADGES ───────────────────────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;
+       font-size:11px;font-weight:600;white-space:nowrap}
+.b-aprobada{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+.b-reprogramada{background:var(--info-bg);color:var(--primary);border:1px solid var(--info-bd)}
+.b-recibidook{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+.b-novedades{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
+.b-parcialrec{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
+.b-rechazadoop{background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
+.b-nopresentado{background:var(--gray);color:var(--fg-muted);border:1px solid var(--border)}
+.b-pendiente{background:var(--gray);color:var(--fg-muted);border:1px solid var(--border)}
+
+/* ── MISC ─────────────────────────────────────────────────────────────────── */
+.spin{display:inline-block;width:18px;height:18px;border:2px solid var(--border);
+      border-top-color:var(--primary);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+.login-wrap{display:flex;flex-direction:column;align-items:center;
+            justify-content:center;min-height:100vh;padding:24px;text-align:center}
+.login-card{background:var(--bg-card);border:1px solid var(--border);
+            border-radius:var(--r-lg);padding:40px;max-width:380px;width:100%;
+            box-shadow:var(--sh-md)}
+.login-card h2{font-size:20px;font-weight:700;margin:0 0 6px}
+.alert{padding:11px 14px;border-radius:var(--r);font-size:13px;margin-bottom:14px}
+.a-err{background:var(--err-bg);border:1px solid var(--err-bd);color:var(--err)}
+.a-info{background:var(--info-bg);border:1px solid var(--info-bd);color:var(--primary)}
+
+/* ── CALENDARIO ───────────────────────────────────────────────────────────── */
+.cal-wrap{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:780px){.cal-wrap.panel-open{grid-template-columns:1fr 360px;align-items:start}}
+.cal-card-c{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh)}
+.cal-hdr-c{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border)}
+.cal-month-lbl{font-size:15px;font-weight:700;text-transform:capitalize}
+.cal-nav-c{display:flex;gap:4px;align-items:center}
+.btn-cal-t{padding:4px 10px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:var(--r);background:var(--bg-card);color:var(--fg-muted);cursor:pointer;font-family:inherit}
+.btn-cal-t:hover{background:var(--gray)}
+.btn-cal-n{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:var(--r);background:var(--bg-card);color:var(--fg-muted);font-size:14px;cursor:pointer;font-family:inherit}
+.btn-cal-n:hover{background:var(--gray)}
+.cal-grid-c{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal-dow-c{padding:7px 4px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-subtle);background:var(--gray);border-bottom:1px solid var(--border)}
+.cal-day-c{min-height:90px;padding:6px;cursor:pointer;border-right:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:2px;transition:background .1s}
+.cal-day-c:nth-child(7n){border-right:none}
+.cal-day-c:hover{background:var(--bg-muted)}
+.cal-day-c.c-other{opacity:.3;pointer-events:none}
+.cal-day-c.c-today .cal-dn-c{background:var(--primary);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.cal-day-c.c-sel{background:var(--info-bg);outline:2px solid var(--primary);outline-offset:-2px}
+.cal-dn-c{font-size:11px;font-weight:600;color:var(--fg);width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cal-day-c.c-other .cal-dn-c{color:var(--fg-subtle)}
+.c-info{display:flex;flex-direction:column;gap:2px;margin-top:1px}
+.c-load-row{display:flex;align-items:center;gap:4px}
+.c-load-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.c-load-txt{font-size:10px;font-weight:600;line-height:1}
+.c-units{font-size:10px;color:var(--fg-subtle);line-height:1}
+.c-exec-row{display:flex;flex-wrap:wrap;gap:2px;margin-top:2px}
+.c-exec-ico{font-size:10px;line-height:1.4;white-space:nowrap}
+.clv-ok   .c-load-dot{background:#16a34a}.clv-ok   .c-load-txt{color:#16a34a}
+.clv-warn .c-load-dot{background:#d97706}.clv-warn .c-load-txt{color:#d97706}
+.clv-alrt .c-load-dot{background:#ea580c}.clv-alrt .c-load-txt{color:#ea580c}
+.clv-crit .c-load-dot{background:#dc2626}.clv-crit .c-load-txt{color:#dc2626}
+.cal-legend-c{display:flex;gap:14px;flex-wrap:wrap;padding:9px 14px;border-top:1px solid var(--border);background:var(--gray)}
+.cal-leg-it{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--fg-muted)}
+.cal-leg-d{width:7px;height:7px;border-radius:50%}
+.cal-dp-c{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh-md)}
+.cal-dp-hdr-c{padding:13px 16px;background:var(--info-bg);border-bottom:1px solid var(--info-bd);display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.cal-dp-date{font-size:13px;font-weight:700;color:var(--primary);text-transform:capitalize;line-height:1.3}
+.cal-dp-meta{font-size:11px;color:var(--fg-muted);margin-top:3px}
+.cal-dp-cls{width:26px;height:26px;flex-shrink:0;border-radius:var(--r);border:1px solid var(--info-bd);background:transparent;color:var(--primary);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:inherit}
+.cal-dp-cls:hover{background:var(--info-bd)}
+.cal-dp-body{max-height:460px;overflow-y:auto}
+.cal-dp-empty-c{padding:30px 16px;text-align:center;color:var(--fg-muted);font-size:13px}
+.cal-line-c{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:3px}
+.cal-line-c:last-child{border-bottom:none}
+.cal-lt{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.cal-lprov{font-size:13px;font-weight:600;color:var(--fg)}
+.cal-lhora{font-size:12px;color:var(--primary);white-space:nowrap;font-weight:600}
+.cal-lmat{font-size:12px;color:var(--fg-muted)}
+.cal-lmid{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:3px}
+@media(max-width:600px){.cal-day-c{min-height:64px;padding:4px}.c-units,.c-exec-row{display:none}}
+.refresh-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.refresh-meta{font-size:12px;color:var(--fg-muted)}
+</style>
+</head>
+<body>
+<div id="app"><div class="login-wrap"><div class="spin"></div></div></div>
+
+<script>
+'use strict';
+
+/* ── CONFIG ──────────────────────────────────────────────────────────────── */
+const MSAL_CFG = {
+  auth:{
+    clientId:'ec976114-e146-4ce4-850c-5d978e12acfd',
+    authority:'https://login.microsoftonline.com/5e008bd3-17b6-4f83-8d23-019691a40609',
+    redirectUri: location.origin + location.pathname
+  },
+  cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:false}
+};
+const SITE   = 'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906';
+const SCOPES = ['https://graph.microsoft.com/Sites.ReadWrite.All'];
+const BASE   = 'https://graph.microsoft.com/v1.0';
+
+/* ── STATE ───────────────────────────────────────────────────────────────── */
+let msalApp, me;
+let lineas = [];
+let busy   = false;
+let lastLoad = null;
+let calYr = new Date().getFullYear(), calMo = new Date().getMonth(), calSel = null;
+const CAL_TOD = new Date().toISOString().split('T')[0];
+
+/* ── GRAPH ───────────────────────────────────────────────────────────────── */
+function login(){ msalApp.loginRedirect({scopes:SCOPES}); }
+async function tok(){
+  if(!msalApp) throw new Error('MSAL no inicializado');
+  const acc=msalApp.getActiveAccount(); if(!acc) throw new Error('Sin sesión');
+  return msalApp.acquireTokenSilent({scopes:SCOPES,account:acc})
+    .catch(()=>msalApp.acquireTokenRedirect({scopes:SCOPES}))
+    .then(r=>r?r.accessToken:Promise.reject(new Error('redirect')));
+}
+async function gGet(url){
+  const t=await tok(); const r=await fetch(url,{headers:{Authorization:`Bearer ${t}`}});
+  if(!r.ok){const e=await r.text();throw new Error(`${r.status} ${e}`);}
+  return r.json();
+}
+async function gAll(url){
+  let res=[],next=url;
+  while(next){const d=await gGet(next);res=res.concat(d.value||[]);next=d['@odata.nextLink']||null;}
+  return res;
+}
+
+/* ── UTILS ───────────────────────────────────────────────────────────────── */
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function badge(e){
+  const m={Aprobada:'aprobada',Reprogramada:'reprogramada',
+    'Recibido OK':'recibidook','Recibido con Novedades':'novedades',
+    'Parcialmente Recibida':'parcialrec','Rechazado por Operación':'rechazadoop',
+    'No Presentado':'nopresentado'};
+  return `<span class="badge b-${m[e]||'pendiente'}">${esc(e||'—')}</span>`;
+}
+function fmtTime(s){
+  if(!s)return'—'; const p=String(s).split(':'); return p.length>=2?`${p[0]}:${p[1]}`:s;
+}
+
+/* ── CALENDARIO ──────────────────────────────────────────────────────────── */
+const CAL_MON=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const CAL_DOW=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const EXEC_MAP=[
+  {ico:'✅',key:'Recibido OK'},{ico:'⚠️',key:'Recibido con Novedades'},
+  {ico:'📦',key:'Parcialmente Recibida'},{ico:'🚫',key:'No Presentado'},
+  {ico:'❌',key:'Rechazado por Operación'}
+];
+
+function lnDia(iso){
+  return lineas.filter(l=>{
+    const fa=(l.FechaAprobada||'').split('T')[0];
+    const fs=(l.FechaSolicitada||'').split('T')[0];
+    return (fa||fs)===iso;
+  });
+}
+function loadLv(n){if(!n)return'';if(n<=3)return'clv-ok';if(n<=5)return'clv-warn';if(n<=7)return'clv-alrt';return'clv-crit';}
+function totalUn(ls){return ls.reduce((a,l)=>a+(Number(l.Cantidad)||0),0);}
+
+function calHTML(){
+  return `<div class="cal-wrap" id="calWrap">
+    <div class="cal-card-c">
+      <div class="cal-hdr-c">
+        <span class="cal-month-lbl" id="calLbl">—</span>
+        <div class="cal-nav-c">
+          <button class="btn-cal-t" id="btnHoy">Hoy</button>
+          <button class="btn-cal-n" id="btnPrev">‹</button>
+          <button class="btn-cal-n" id="btnNext">›</button>
+        </div>
+      </div>
+      <div class="cal-grid-c" id="calGrid"></div>
+      <div class="cal-legend-c">
+        <div class="cal-leg-it"><div class="cal-leg-d" style="background:#16a34a"></div>1–3 rec</div>
+        <div class="cal-leg-it"><div class="cal-leg-d" style="background:#d97706"></div>4–5 rec</div>
+        <div class="cal-leg-it"><div class="cal-leg-d" style="background:#ea580c"></div>6–7 rec</div>
+        <div class="cal-leg-it"><div class="cal-leg-d" style="background:#dc2626"></div>8+ rec</div>
+      </div>
+    </div>
+    <div class="cal-dp-c" id="calDp" hidden>
+      <div class="cal-dp-hdr-c">
+        <div><div class="cal-dp-date" id="calDpDate">—</div><div class="cal-dp-meta" id="calDpMeta">—</div></div>
+        <button class="cal-dp-cls" id="calDpClose">✕</button>
+      </div>
+      <div class="cal-dp-body" id="calDpBody"></div>
+    </div>
+  </div>`;
+}
+
+function buildGrid(){
+  const yr=calYr, mo=calMo;
+  document.getElementById('calLbl').textContent=`${CAL_MON[mo]} ${yr}`;
+  const grid=document.getElementById('calGrid');
+  const first=new Date(yr,mo,1).getDay();
+  const inMon=new Date(yr,mo+1,0).getDate();
+  const inPrev=new Date(yr,mo,0).getDate();
+  let h=CAL_DOW.map(d=>`<div class="cal-dow-c">${d}</div>`).join('');
+  let cells='';
+  for(let i=0;i<first;i++){
+    const d=inPrev-first+1+i;
+    const iso=`${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    cells+=makeCell(iso,d,true);
+  }
+  for(let d=1;d<=inMon;d++){
+    const iso=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    cells+=makeCell(iso,d,false);
+  }
+  const tail=(first+inMon)%7; const nx=tail?7-tail:0;
+  for(let i=1;i<=nx;i++){
+    const iso=`${yr}-${String(mo+2).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+    cells+=makeCell(iso,i,true);
+  }
+  grid.innerHTML=h+cells;
+  grid.querySelectorAll('.cal-day-c:not(.c-other)').forEach(el=>{
+    el.addEventListener('click',()=>{
+      grid.querySelectorAll('.cal-day-c').forEach(d=>d.classList.remove('c-sel'));
+      el.classList.add('c-sel'); calSel=el.dataset.iso; renderDetail(calSel);
+    });
+  });
+  if(calSel){const el=grid.querySelector(`[data-iso="${calSel}"]`);if(el)el.classList.add('c-sel');}
+}
+
+function makeCell(iso,n,other){
+  const ls=lnDia(iso); const cnt=ls.length; const un=totalUn(ls);
+  const lv=loadLv(cnt);
+  let cls='cal-day-c';
+  if(other) cls+=' c-other';
+  if(iso===CAL_TOD) cls+=' c-today';
+  if(iso===calSel)  cls+=' c-sel';
+  if(lv)            cls+=' '+lv;
+  const exec={};
+  ls.forEach(l=>{if(l.EstadoRecepcion)exec[l.EstadoRecepcion]=(exec[l.EstadoRecepcion]||0)+1;});
+  const execH=EXEC_MAP.filter(x=>exec[x.key]).map(x=>`<span class="c-exec-ico">${x.ico}${exec[x.key]}</span>`).join('');
+  return `<div class="${cls}" data-iso="${iso}">
+    <span class="cal-dn-c">${n}</span>
+    ${cnt?`<div class="c-info">
+      <div class="c-load-row"><div class="c-load-dot"></div><span class="c-load-txt">${cnt} rec</span></div>
+      <div class="c-units">${un.toLocaleString('es-EC')} un</div>
+      ${execH?`<div class="c-exec-row">${execH}</div>`:''}
+    </div>`:''}
+  </div>`;
+}
+
+function renderDetail(iso){
+  const dp=document.getElementById('calDp');
+  const wrap=document.getElementById('calWrap');
+  dp.hidden=false; wrap.classList.add('panel-open');
+  const ls=lnDia(iso);
+  const d=new Date(iso+'T12:00:00');
+  const ds=d.toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  document.getElementById('calDpDate').textContent=ds.charAt(0).toUpperCase()+ds.slice(1);
+  document.getElementById('calDpMeta').textContent=
+    `${ls.length} recepción${ls.length!==1?'es':''} · ${totalUn(ls).toLocaleString('es-EC')} unidades · Solo lectura`;
+  const body=document.getElementById('calDpBody');
+  if(!ls.length){
+    body.innerHTML=`<div class="cal-dp-empty-c"><div style="font-size:28px;margin-bottom:8px">🚧</div>Sin recepciones programadas para este día.</div>`;
+    return;
+  }
+  // Group by proveedor for garita
+  const byProv={};
+  ls.forEach(l=>{const p=l.Proveedor||'—'; if(!byProv[p])byProv[p]=[]; byProv[p].push(l);});
+  body.innerHTML=Object.entries(byProv).map(([prov,items])=>`
+    <div style="padding:8px 16px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-subtle)">🏭 ${esc(prov)}</div>
+    ${items.map(l=>`<div class="cal-line-c">
+      <div class="cal-lt">
+        <span class="cal-lprov">${esc(l.Material||'—')}</span>
+        <span class="cal-lhora">${fmtTime(l.HoraAprobada||l.HoraSolicitada)}</span>
+      </div>
+      <div class="cal-lmid">
+        <span style="font-size:11px;color:var(--fg-subtle)">${(Number(l.Cantidad)||0).toLocaleString('es-EC')} un</span>
+        ${badge(l.EstadoLinea)}
+        ${l.EstadoRecepcion?badge(l.EstadoRecepcion):''}
+      </div>
+    </div>`).join('')}
+  `).join('');
+}
+
+function bindCal(){
+  buildGrid();
+  // Auto-open today if it has recepciones
+  if(!calSel){
+    const todayLs=lnDia(CAL_TOD);
+    if(todayLs.length){ calSel=CAL_TOD; buildGrid(); renderDetail(CAL_TOD); }
+  } else { renderDetail(calSel); }
+  document.getElementById('btnPrev')?.addEventListener('click',()=>{
+    calMo--; if(calMo<0){calMo=11;calYr--;} buildGrid();
+  });
+  document.getElementById('btnNext')?.addEventListener('click',()=>{
+    calMo++; if(calMo>11){calMo=0;calYr++;} buildGrid();
+  });
+  document.getElementById('btnHoy')?.addEventListener('click',()=>{
+    calYr=new Date().getFullYear(); calMo=new Date().getMonth();
+    calSel=CAL_TOD; buildGrid(); renderDetail(CAL_TOD);
+  });
+  document.getElementById('calDpClose')?.addEventListener('click',()=>{
+    document.getElementById('calDp').hidden=true;
+    document.getElementById('calWrap').classList.remove('panel-open');
+    document.querySelectorAll('.cal-day-c').forEach(d=>d.classList.remove('c-sel'));
+    calSel=null;
+  });
+}
+
+/* ── RENDER ──────────────────────────────────────────────────────────────── */
+function render(){
+  const app=document.getElementById('app');
+  if(!me){ renderLogin(app); return; }
+  if(busy){
+    app.innerHTML=`<div class="app-hdr">
+      <span style="font-size:22px">🚧</span>
+      <h1>RF MKT · Garita</h1>
+    </div>
+    <div style="text-align:center;padding:40px 0"><span class="spin"></span><p style="color:var(--fg-muted);font-size:13px;margin-top:10px">Cargando recepciones…</p></div>`;
+    return;
+  }
+  const now=lastLoad?new Date(lastLoad).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'—';
+  app.innerHTML=`
+    <div class="app-hdr">
+      <span style="font-size:22px">🚧</span>
+      <h1>RF MKT · Garita</h1>
+      <span class="garita-badge">Solo lectura</span>
+      <span class="user">${esc(me?.name||me?.username||'')}</span>
+    </div>
+    <div class="refresh-bar">
+      <span class="refresh-meta">Actualizado ${now} · ${lineas.length} recepción${lineas.length!==1?'es':''} programadas</span>
+      <button class="btn btn-secondary btn-sm" id="btnRef">🔄 Actualizar</button>
+    </div>
+    <div id="ac"></div>
+    ${calHTML()}`;
+  document.getElementById('btnRef')?.addEventListener('click', loadData);
+  bindCal();
+}
+
+function renderLogin(app){
+  app.innerHTML=`<div class="login-wrap"><div class="login-card">
+    <div style="font-size:40px;margin-bottom:10px">🚧</div>
+    <h2>RF MKT · Garita</h2>
+    <p style="color:var(--fg-muted);font-size:13px;margin:0 0 20px">Calendario de recepciones — Solo lectura</p>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" id="btnLogin">Iniciar sesión con Microsoft</button>
+  </div></div>`;
+  document.getElementById('btnLogin')?.addEventListener('click', login);
+}
+
+/* ── DATA ────────────────────────────────────────────────────────────────── */
+async function loadData(){
+  busy=true; render();
+  try{
+    // Only load Aprobada + Reprogramada lines
+    const filter=encodeURIComponent("fields/EstadoLinea eq 'Aprobada' or fields/EstadoLinea eq 'Reprogramada'");
+    const items=await gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$filter=${filter}&$top=500`);
+    lineas=items.map(i=>({id:i.id,...i.fields}));
+    lastLoad=new Date().toISOString();
+  } catch(e){
+    console.warn('[DATA]',e.message);
+    const ac=document.getElementById('ac');
+    if(ac) ac.innerHTML=`<div class="alert a-err">Error al cargar datos: ${e.message}</div>`;
+  }
+  busy=false; render();
+}
+
+/* ── BOOT ────────────────────────────────────────────────────────────────── */
+(function bootMsal(){
+  const s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
+  s.onload=function(){
+    msalApp=new msal.PublicClientApplication(MSAL_CFG);
+    msalApp.handleRedirectPromise().then(function(res){
+      if(res&&res.account){ me=res.account; msalApp.setActiveAccount(me); loadData(); }
+      else{
+        const all=msalApp.getAllAccounts();
+        if(all.length>0){ me=all[0]; msalApp.setActiveAccount(me); loadData(); }
+        else{ render(); }
+      }
+    }).catch(function(e){ console.error('[MSAL]',e); render(); });
+  };
+  s.onerror=function(){
+    document.getElementById('app').innerHTML=
+      '<div class="login-wrap"><div class="login-card"><p style="color:var(--err)">No se pudo cargar la librería de autenticación.</p></div></div>';
+  };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
+
+</body></html>
