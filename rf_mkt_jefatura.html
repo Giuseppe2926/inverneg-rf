@@ -331,21 +331,26 @@ const FILTROS_JEF = ['Pendientes','Aprobadas','Reprogramadas','Rechazadas','Canc
 function solsPorFiltro(filtro) {
   switch(filtro) {
     case 'Pendientes':
+      // Tiene al menos una línea que Jefatura aún puede gestionar
       return sols.filter(s=>{
         const ls = lineasDeSol(s);
         return ls.some(l=> JEFATURA_ACCIONES.has(l.EstadoLinea||'Pendiente'));
       });
     case 'Aprobadas':
-      return sols.filter(s=> (s.Estado||'Pendiente') === 'Aprobada');
+      return sols.filter(s=> calcEstado(s) === 'Aprobada');
     case 'Reprogramadas':
+      // Al menos una línea reprogramada (sin importar el estado global)
       return sols.filter(s=>{
         const ls = lineasDeSol(s);
         return ls.some(l=> l.EstadoLinea === 'Reprogramada');
       });
     case 'Rechazadas':
-      return sols.filter(s=> (s.Estado||'Pendiente') === 'Rechazada');
+      return sols.filter(s=> calcEstado(s) === 'Rechazada');
     case 'Canceladas':
-      return sols.filter(s=> (s.Estado||'Pendiente') === 'Cancelada');
+      return sols.filter(s=>{
+        const ls = lineasDeSol(s);
+        return ls.length > 0 && ls.every(l=> l.EstadoLinea==='Cancelada');
+      });
     default: // Todas
       return sols;
   }
@@ -376,7 +381,7 @@ function pendientesHTML() {
         <div class="sol-meta">${fDT(s.FechaCreacion)} · ${esc(provs)}</div>
       </div>
       ${pendChip}
-      ${badge(s.Estado||'Pendiente')}
+      ${badge(calcEstado(s))}
       <span style="color:var(--fg-muted);font-size:18px">›</span>
     </div>`;
   }).join('');
@@ -480,7 +485,7 @@ function revisarHTML() {
     <div class="card" style="margin-bottom:18px">
       <div class="card-hdr">
         <h2 class="card-title">${esc(sol.NroSolicitud||'Solicitud')}</h2>
-        ${badge(sol.Estado)}
+        ${badge(calcEstado(sol))}
       </div>
       <div class="card-body">
         <div class="sol-grid">
@@ -714,46 +719,33 @@ function patchLocal(lid, fields) {
   if(l) Object.assign(l, fields);
 }
 
-/* Recalcula MKT_Solicitudes.Estado según el estado consolidado de sus líneas
-   y hace PATCH si cambió. Llamar después de cada patchLocal(). */
+/* Calcula el estado consolidado de una solicitud a partir de sus líneas.
+   Reglas:
+     - Todas Pendiente          → 'Pendiente'
+     - Hay al menos una Pendiente (y al menos una decidida) → 'Parcial'
+     - Todas decididas, con al menos una Aprobada/Reprogramada → 'Aprobada'
+     - Todas decididas, ninguna Aprobada/Reprogramada → 'Rechazada'
+*/
+function calcEstado(sol) {
+  const ls = lineasDeSol(sol);
+  if(!ls.length) return sol.Estado || 'Pendiente';
+  const estados = ls.map(l=> l.EstadoLinea || 'Pendiente');
+  if(estados.every(e=> e === 'Pendiente'))               return 'Pendiente';
+  if(estados.some(e=> e === 'Pendiente'))                return 'Parcial'; // mezcla con pendiente
+  if(estados.some(e=> e==='Aprobada'||e==='Reprogramada')) return 'Aprobada';
+  return 'Rechazada'; // todas Rechazada/Cancelada
+}
+
+/* Persiste el estado calculado en MKT_Solicitudes si cambió */
 async function recalcularEstadoSolicitud(solId) {
   const sol = sols.find(s=>s.id===solId);
   if(!sol) return;
-
-  const ls = lineasDeSol(sol);
-  if(!ls.length) return;
-
-  const estados = ls.map(l=> l.EstadoLinea || 'Pendiente');
-
-  // Estados que cuentan como "terminados" (no pendientes de decisión)
-  const terminados = new Set(['Aprobada','Reprogramada','Rechazada','Cancelada',
-    'Recibido OK','Recibido con Novedades','Parcialmente Recibida',
-    'Rechazado por Operación','No Presentado']);
-
-  const todosPendientes    = estados.every(e=> e === 'Pendiente');
-  const todosMismoFinal    = estados.every(e=> e === estados[0]);
-  const hayAprobReprog     = estados.some(e=> e==='Aprobada' || e==='Reprogramada');
-  const hayRechCan         = estados.some(e=> e==='Rechazada' || e==='Cancelada');
-  const todosRechCan       = estados.every(e=> e==='Rechazada' || e==='Cancelada');
-  const todosAprobReprog   = estados.every(e=> e==='Aprobada' || e==='Reprogramada');
-
-  let nuevoEstado;
-  if(todosPendientes) {
-    nuevoEstado = 'Pendiente';
-  } else if(todosAprobReprog) {
-    nuevoEstado = 'Aprobada';
-  } else if(todosRechCan) {
-    nuevoEstado = 'Rechazada';
-  } else {
-    nuevoEstado = 'Parcial';
-  }
-
+  const nuevoEstado = calcEstado(sol);
   if(nuevoEstado === sol.Estado) return; // sin cambio
-
   await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items/${solId}/fields`,{
     Estado: nuevoEstado
   });
-  sol.Estado = nuevoEstado; // actualizar local
+  sol.Estado = nuevoEstado;
 }
 
 async function historial(lineaId, campo, valorAnterior, valorNuevo, usuario, now, obs) {
