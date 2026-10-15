@@ -1,1 +1,856 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RF MKT Jefatura</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── TOKENS ──────────────────────────────────────────────────────────────── */
+:root {
+  --bg:#f1f5f9; --bg-card:#ffffff; --bg-muted:#f8fafc;
+  --fg:#0f172a; --fg-muted:#64748b; --fg-subtle:#94a3b8;
+  --border:#e2e8f0; --border-focus:#7c3aed;
+  --primary:#7c3aed; --primary-h:#6d28d9; --primary-fg:#fff;
+  --ok:#16a34a; --ok-bg:#f0fdf4; --ok-bd:#bbf7d0;
+  --warn:#d97706; --warn-bg:#fffbeb; --warn-bd:#fde68a;
+  --err:#dc2626; --err-bg:#fef2f2; --err-bd:#fecaca;
+  --info:#7c3aed; --info-bg:#f5f3ff; --info-bd:#ddd6fe;
+  --gray:#f1f5f9;
+  --r:8px; --r-lg:12px;
+  --sh:0 1px 3px rgba(0,0,0,.08);
+  --sh-md:0 4px 12px rgba(0,0,0,.1);
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f172a; --bg-card:#1e293b; --bg-muted:#162032;
+    --fg:#f1f5f9; --fg-muted:#94a3b8; --fg-subtle:#64748b;
+    --border:#334155; --border-focus:#8b5cf6;
+    --primary:#8b5cf6; --primary-h:#7c3aed;
+    --ok-bg:#052e16; --ok-bd:#14532d;
+    --warn-bg:#1c1400; --warn-bd:#78350f;
+    --err-bg:#1c0a0a; --err-bd:#7f1d1d;
+    --info-bg:#1e1533; --info-bd:#3b2d6a;
+    --gray:#1e293b;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f172a; --bg-card:#1e293b; --bg-muted:#162032;
+  --fg:#f1f5f9; --fg-muted:#94a3b8; --fg-subtle:#64748b;
+  --border:#334155; --border-focus:#8b5cf6;
+  --primary:#8b5cf6; --primary-h:#7c3aed;
+  --ok-bg:#052e16; --ok-bd:#14532d;
+  --warn-bg:#1c1400; --warn-bd:#78350f;
+  --err-bg:#1c0a0a; --err-bd:#7f1d1d;
+  --info-bg:#1e1533; --info-bd:#3b2d6a;
+  --gray:#1e293b;
+  color-scheme:dark;
+}
 
+/* ── RESET & BASE ─────────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;font-family:'Inter',system-ui,sans-serif;font-size:14px;
+     background:var(--bg);color:var(--fg);
+     padding-inline:16px;padding-block:16px}
+
+/* ── LAYOUT ───────────────────────────────────────────────────────────────── */
+.app-hdr{display:flex;align-items:center;gap:10px;margin-bottom:20px;
+         padding-bottom:14px;border-bottom:1px solid var(--border)}
+.app-hdr h1{margin:0;font-size:17px;font-weight:700;flex:1}
+.app-hdr .user{font-size:12px;color:var(--fg-muted);max-width:160px;
+               overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── BUTTONS ──────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;
+     border-radius:var(--r);border:none;font:inherit;font-size:13px;
+     font-weight:500;cursor:pointer;transition:.15s;text-decoration:none}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--primary);color:var(--primary-fg)}
+.btn-primary:hover:not(:disabled){background:var(--primary-h)}
+.btn-secondary{background:var(--bg-muted);color:var(--fg);
+               border:1px solid var(--border)}
+.btn-secondary:hover:not(:disabled){background:var(--gray)}
+.btn-ok{background:var(--ok);color:#fff}
+.btn-ok:hover:not(:disabled){background:#15803d}
+.btn-warn{background:var(--warn);color:#fff}
+.btn-warn:hover:not(:disabled){background:#b45309}
+.btn-err{background:var(--err);color:#fff}
+.btn-err:hover:not(:disabled){background:#b91c1c}
+.btn-ghost{background:transparent;color:var(--fg-muted);border:none;padding:4px 8px}
+.btn-ghost:hover:not(:disabled){color:var(--fg)}
+.btn-sm{padding:4px 10px;font-size:12px}
+
+/* ── ALERTS ───────────────────────────────────────────────────────────────── */
+.alert{padding:11px 14px;border-radius:var(--r);font-size:13px;margin-bottom:14px}
+.a-ok{background:var(--ok-bg);border:1px solid var(--ok-bd);color:var(--ok)}
+.a-err{background:var(--err-bg);border:1px solid var(--err-bd);color:var(--err)}
+.a-warn{background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--warn)}
+.a-info{background:var(--info-bg);border:1px solid var(--info-bd);color:var(--info)}
+
+/* ── CARD ─────────────────────────────────────────────────────────────────── */
+.card{background:var(--bg-card);border:1px solid var(--border);
+      border-radius:var(--r-lg);box-shadow:var(--sh);margin-bottom:14px}
+.card-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;
+          border-bottom:1px solid var(--border);flex-wrap:wrap}
+.card-title{font-size:15px;font-weight:700;margin:0;flex:1}
+.card-body{padding:14px 16px}
+
+/* ── BADGES ───────────────────────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;
+       font-size:11px;font-weight:600;white-space:nowrap}
+.b-pendiente{background:var(--gray);color:var(--fg-muted);border:1px solid var(--border)}
+.b-aprobada{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+.b-reprogramada{background:var(--info-bg);color:var(--info);border:1px solid var(--info-bd)}
+.b-rechazada{background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
+.b-parcial{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
+.b-cancelada{background:var(--gray);color:var(--fg-subtle);border:1px solid var(--border)}
+.b-recibido{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
+.b-novedades{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
+
+/* ── SOLICITUDES LIST ─────────────────────────────────────────────────────── */
+.sol-row{display:flex;align-items:center;gap:10px;padding:12px 16px;
+         border-bottom:1px solid var(--border);cursor:pointer;
+         transition:background .12s;flex-wrap:wrap}
+.sol-row:last-child{border-bottom:none}
+.sol-row:hover{background:var(--bg-muted)}
+.sol-info{flex:1;min-width:0}
+.sol-nro{font-weight:600;font-size:14px}
+.sol-meta{font-size:12px;color:var(--fg-muted);margin-top:2px}
+.sol-pending-count{font-size:11px;font-weight:700;
+                   background:var(--warn-bg);color:var(--warn);
+                   border:1px solid var(--warn-bd);
+                   padding:2px 7px;border-radius:20px;white-space:nowrap}
+
+/* ── VER LINEA ────────────────────────────────────────────────────────────── */
+.ver-grupo{border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:18px;overflow:hidden}
+.ver-ghdr{background:var(--gray);padding:10px 16px;font-size:13px;font-weight:600;
+          border-bottom:1px solid var(--border)}
+.ver-linea{padding:14px 16px;border-bottom:1px solid var(--border)}
+.ver-linea:last-child{border-bottom:none}
+.ver-linea-done{opacity:.55}
+.ver-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px}
+.ver-cell{display:flex;flex-direction:column;gap:2px}
+.ver-clbl{font-size:10px;font-weight:600;text-transform:uppercase;
+          letter-spacing:.05em;color:var(--fg-muted)}
+.ver-cval{font-size:13px;color:var(--fg)}
+
+/* ── ACTION PANEL ─────────────────────────────────────────────────────────── */
+.act-panel{margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+.act-btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.act-form{background:var(--bg-muted);border:1px solid var(--border);
+          border-radius:var(--r);padding:12px;display:none;margin-top:8px}
+.act-form.open{display:block}
+.act-form-title{font-size:12px;font-weight:700;text-transform:uppercase;
+                letter-spacing:.05em;margin:0 0 10px;color:var(--fg-muted)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.form-row.single{grid-template-columns:1fr}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-label{font-size:11px;font-weight:600;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.04em}
+.form-ctrl{border:1px solid var(--border);border-radius:var(--r);
+           background:var(--bg-card);color:var(--fg);font:inherit;font-size:13px;
+           padding:7px 10px;transition:.15s}
+.form-ctrl:focus{outline:none;border-color:var(--border-focus)}
+.form-ctrl.err{border-color:var(--err)}
+textarea.form-ctrl{resize:vertical;min-height:56px}
+.form-actions{display:flex;gap:8px;margin-top:10px}
+
+/* ── CARGA DEL DÍA ────────────────────────────────────────────────────────── */
+.carga-bar{display:flex;align-items:center;gap:10px;padding:8px 12px;
+           border-radius:var(--r);border:1px solid var(--border);
+           background:var(--bg-muted);margin-bottom:12px;flex-wrap:wrap}
+.carga-label{font-size:11px;font-weight:700;text-transform:uppercase;
+             letter-spacing:.05em;color:var(--fg-muted)}
+.carga-dot{font-size:16px;line-height:1}
+.carga-val{font-size:13px;font-weight:600}
+.carga-detail{font-size:12px;color:var(--fg-muted)}
+.carga-sep{color:var(--border);margin:0 2px}
+
+/* ── FILTER TABS ──────────────────────────────────────────────────────────── */
+.jef-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+.jef-tab{padding:5px 12px;border-radius:20px;border:1px solid var(--border);
+         background:var(--bg-card);color:var(--fg-muted);font:inherit;font-size:12px;
+         font-weight:500;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:5px}
+.jef-tab:hover{background:var(--gray);color:var(--fg)}
+.jef-tab.tab-active{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+.tab-cnt{font-size:11px;font-weight:700;opacity:.8}
+
+/* ── MISC ─────────────────────────────────────────────────────────────────── */
+.section-title{font-size:12px;font-weight:700;text-transform:uppercase;
+               letter-spacing:.06em;color:var(--fg-muted);margin:0 0 10px}
+.empty{text-align:center;padding:40px 20px;color:var(--fg-muted)}
+.empty p{margin:0}
+.spin{display:inline-block;width:18px;height:18px;border:2px solid var(--border);
+      border-top-color:var(--primary);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+.login-wrap{display:flex;flex-direction:column;align-items:center;
+            justify-content:center;min-height:100vh;padding:24px;text-align:center}
+.login-card{background:var(--bg-card);border:1px solid var(--border);
+            border-radius:var(--r-lg);padding:40px;max-width:380px;width:100%;
+            box-shadow:var(--sh-md)}
+.login-card h2{font-size:20px;font-weight:700;margin:0 0 6px}
+.sol-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.sol-fld{display:flex;flex-direction:column;gap:2px}
+.sol-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted)}
+.sol-val{font-size:13px}
+</style>
+</head>
+<body>
+<div id="app"><div style="text-align:center;padding:60px 20px"><span class="spin"></span></div></div>
+
+<script>
+/* ── CONFIG ───────────────────────────────────────────────────────────────── */
+const MSAL_CFG = {
+  auth:{
+    clientId:'ec976114-e146-4ce4-850c-5d978e12acfd',
+    authority:'https://login.microsoftonline.com/5e008bd3-17b6-4f83-8d23-019691a40609',
+    redirectUri: location.origin + location.pathname
+  },
+  cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:false}
+};
+const SITE  = 'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906';
+const SCOPES = ['https://graph.microsoft.com/Sites.ReadWrite.All'];
+const BASE   = 'https://graph.microsoft.com/v1.0';
+
+/* ── STATE ────────────────────────────────────────────────────────────────── */
+const JEFATURA_ACCIONES = new Set(['Pendiente']); // líneas que jefatura puede gestionar
+let msalApp, me;
+let screen  = 'pendientes'; // 'pendientes' | 'revisar'
+let fEstado = 'Pendientes'; // filtro activo en pantalla pendientes
+let sols    = [], lineas = [];
+let viewId  = null;
+let busy    = false;
+let activeAction = {}; // {lineaId: 'aprobar'|'reprogramar'|'rechazar'|'cancelar'}
+
+/* ── GRAPH ────────────────────────────────────────────────────────────────── */
+async function gGet(url) {
+  const t = await tok();
+  const r = await fetch(url, {headers:{Authorization:`Bearer ${t}`}});
+  if (!r.ok) { const e = await r.text(); throw new Error(`${r.status} ${e}`); }
+  return r.json();
+}
+async function gPost(url, body) {
+  const t = await tok();
+  const r = await fetch(url, {method:'POST',headers:{Authorization:`Bearer ${t}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if (!r.ok) { const e = await r.text(); throw new Error(`${r.status} ${e}`); }
+  return r.json();
+}
+async function gPatch(url, body) {
+  const t = await tok();
+  const r = await fetch(url, {method:'PATCH',headers:{Authorization:`Bearer ${t}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if (!r.ok) { const e = await r.text(); throw new Error(`${r.status} ${e}`); }
+  return r.status === 204 ? null : r.json();
+}
+async function gAll(url) {
+  let res=[], next=url;
+  while(next){ const d=await gGet(next); res=res.concat(d.value||[]); next=d['@odata.nextLink']||null; }
+  return res;
+}
+
+/* ── UTILS ────────────────────────────────────────────────────────────────── */
+const esc   = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fDate = s => { if(!s)return'—'; try{return new Date(s).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});}catch{return s;} };
+const fDT   = s => { if(!s)return'—'; try{return new Date(s).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch{return s;} };
+const toISODate = s => { if(!s) return null; try{ const d=new Date(s); return d.toISOString().split('T')[0]; }catch{return null;} };
+
+function badge(e) {
+  const m = {
+    Pendiente:'pendiente', Aprobada:'aprobada', Reprogramada:'reprogramada',
+    Rechazada:'rechazada', Cancelada:'cancelada', Parcial:'parcial',
+    'Recibido OK':'recibido', 'Recibido con Novedades':'novedades',
+    'Parcialmente Recibida':'parcial', 'Rechazado por Operación':'rechazada',
+    'No Presentado':'rechazada'
+  };
+  return `<span class="badge b-${m[e]||'pendiente'}">${esc(e||'Pendiente')}</span>`;
+}
+
+/* ── CARGA DEL DÍA ────────────────────────────────────────────────────────── */
+function cargaDia(fecha) {
+  // Cuenta líneas aprobadas/reprogramadas para esa fecha
+  const isoFecha = toISODate(fecha);
+  if(!isoFecha) return null;
+  const lsDelDia = lineas.filter(l=>{
+    const fAprobada = toISODate(l.FechaAprobada);
+    const fSol      = toISODate(l.FechaSolicitada);
+    const fRef      = fAprobada || fSol;
+    const estadoOk  = ['Aprobada','Reprogramada'].includes(l.EstadoLinea);
+    return estadoOk && fRef === isoFecha;
+  });
+  const nLineas   = lsDelDia.length;
+  const nUnidades = lsDelDia.reduce((s,l)=> s + (Number(l.Cantidad)||0), 0);
+  let dot, nivel;
+  if(nLineas <= 3)      { dot='🟢'; nivel='Capacidad libre'; }
+  else if(nLineas <= 5) { dot='🟡'; nivel='Capacidad media'; }
+  else if(nLineas <= 7) { dot='🟠'; nivel='Capacidad alta'; }
+  else                  { dot='🔴'; nivel='Capacidad máxima'; }
+  return { dot, nivel, nLineas, nUnidades, isoFecha };
+}
+
+// Mapa de fechas ya renderizadas en la vista actual (se resetea en revisarHTML)
+let _cargaRendered = {};
+function cargaHTMLOnce(fecha) {
+  const isoFecha = toISODate(fecha);
+  if(!isoFecha) return '';
+  if(_cargaRendered[isoFecha]) return ''; // ya mostrado para esta fecha
+  _cargaRendered[isoFecha] = true;
+  const c = cargaDia(fecha);
+  if(!c) return '';
+  const fechaLabel = new Date(isoFecha+'T12:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  return `<div class="carga-bar">
+    <span class="carga-label">${fechaLabel}</span>
+    <span class="carga-dot">${c.dot}</span>
+    <span class="carga-val">${c.nivel}</span>
+    <span class="carga-sep">·</span>
+    <span class="carga-detail">${c.nLineas} recepcion${c.nLineas!==1?'es':''} programada${c.nLineas!==1?'s':''}</span>
+    <span class="carga-sep">·</span>
+    <span class="carga-detail">${c.nUnidades.toLocaleString('es-AR')} unidades</span>
+  </div>`;
+}
+
+/* ── RENDER ───────────────────────────────────────────────────────────────── */
+function render() {
+  const app = document.getElementById('app');
+  if(busy) { app.innerHTML = '<div style="text-align:center;padding:60px 20px"><span class="spin"></span><p style="color:var(--fg-muted);margin-top:12px;font-size:13px">Cargando…</p></div>'; return; }
+  app.innerHTML = `
+    <div class="app-hdr">
+      <span style="font-size:22px">📋</span>
+      <h1>RF MKT · Jefatura</h1>
+      <span class="user">${esc(me?.name||me?.username||'')}</span>
+    </div>
+    <div id="ac"></div>
+    ${screen==='pendientes' ? pendientesHTML() : revisarHTML()}`;
+  if(screen==='pendientes') bindPendientes();
+  else bindRevisar();
+}
+
+/* ── PANTALLA: SOLICITUDES ────────────────────────────────────────────────── */
+const FILTROS_JEF = ['Pendientes','Aprobadas','Reprogramadas','Rechazadas','Canceladas','Todas'];
+
+function solsPorFiltro(filtro) {
+  switch(filtro) {
+    case 'Pendientes':
+      // Tiene al menos una línea que Jefatura aún puede gestionar
+      return sols.filter(s=>{
+        const ls = lineasDeSol(s);
+        return ls.some(l=> JEFATURA_ACCIONES.has(l.EstadoLinea||'Pendiente'));
+      });
+    case 'Aprobadas':
+      return sols.filter(s=> calcEstado(s) === 'Aprobada');
+    case 'Reprogramadas':
+      // Al menos una línea reprogramada (sin importar el estado global)
+      return sols.filter(s=>{
+        const ls = lineasDeSol(s);
+        return ls.some(l=> l.EstadoLinea === 'Reprogramada');
+      });
+    case 'Rechazadas':
+      return sols.filter(s=> calcEstado(s) === 'Rechazada');
+    case 'Canceladas':
+      return sols.filter(s=>{
+        const ls = lineasDeSol(s);
+        return ls.length > 0 && ls.every(l=> l.EstadoLinea==='Cancelada');
+      });
+    default: // Todas
+      return sols;
+  }
+}
+
+function pendientesHTML() {
+  const filtradas = solsPorFiltro(fEstado);
+
+  const tabsHTML = FILTROS_JEF.map(f=>{
+    const count = solsPorFiltro(f).length;
+    const active = f === fEstado ? ' tab-active' : '';
+    return `<button class="jef-tab${active}" data-filtro="${f}">${f} <span class="tab-cnt">${count}</span></button>`;
+  }).join('');
+
+  const emptyMsg = fEstado === 'Pendientes'
+    ? 'No hay solicitudes pendientes de revisión.'
+    : `No hay solicitudes en estado ${fEstado.toLowerCase()}.`;
+
+  const rows = filtradas.map(s=>{
+    const ls = lineasDeSol(s);
+    const nPend = ls.filter(l=> JEFATURA_ACCIONES.has(l.EstadoLinea||'Pendiente')).length;
+    const provs = [...new Set(ls.map(l=>l.Proveedor).filter(Boolean))].join(', ') || '—';
+    const pendChip = nPend > 0
+      ? `<span class="sol-pending-count">${nPend} pendiente${nPend!==1?'s':''}</span>` : '';
+    return `<div class="sol-row" data-id="${esc(s.id)}">
+      <div class="sol-info">
+        <div class="sol-nro">${esc(s.NroSolicitud||'(Sin número)')}</div>
+        <div class="sol-meta">${fDT(s.FechaCreacion)} · ${esc(provs)}</div>
+      </div>
+      ${pendChip}
+      ${badge(calcEstado(s))}
+      <span style="color:var(--fg-muted);font-size:18px">›</span>
+    </div>`;
+  }).join('');
+
+  const listHTML = filtradas.length
+    ? `<div class="card" style="padding:0;overflow:hidden">${rows}</div>`
+    : `<div class="empty"><p>${emptyMsg}</p></div>`;
+
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <p class="section-title" style="margin:0">Solicitudes · ${fEstado} (${filtradas.length})</p>
+      <button class="btn btn-secondary btn-sm" id="btn-ref">🔄 Actualizar</button>
+    </div>
+    <div class="jef-tabs">${tabsHTML}</div>
+    ${listHTML}`;
+}
+
+function bindPendientes() {
+  document.querySelectorAll('.sol-row').forEach(row=>{
+    row.addEventListener('click',()=>{ viewId=row.dataset.id; screen='revisar'; activeAction={}; render(); });
+  });
+  document.getElementById('btn-ref')?.addEventListener('click', reloadData);
+  document.querySelectorAll('.jef-tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{ fEstado=btn.dataset.filtro; render(); });
+  });
+}
+
+/* ── PANTALLA: REVISAR SOLICITUD ──────────────────────────────────────────── */
+function lineasDeSol(sol) {
+  return lineas.filter(l=> String(l.SolicitudId)===String(sol.id) || l.NroSolicitud===sol.NroSolicitud);
+}
+
+function revisarHTML() {
+  const sol = sols.find(s=>s.id===viewId);
+  if(!sol) return `<div class="alert a-err">Solicitud no encontrada.</div>
+    <button class="btn btn-secondary" id="btn-bk">← Volver</button>`;
+
+  _cargaRendered = {}; // resetear por cada render de solicitud
+  const ls = lineasDeSol(sol);
+  const grps = {};
+  ls.forEach(l=>{ const p=l.Proveedor||'(Sin proveedor)'; if(!grps[p])grps[p]=[]; grps[p].push(l); });
+
+  const grpsHTML = Object.entries(grps).map(([p,lls])=>{
+    const rows = lls.map(l=>{
+      const gestionable = JEFATURA_ACCIONES.has(l.EstadoLinea||'Pendiente');
+      const done        = !gestionable;
+      const fecha       = l.FechaAprobada || l.FechaSolicitada;
+      const carga       = gestionable ? cargaHTMLOnce(l.FechaSolicitada) : '';
+
+      const cancelInfo  = l.EstadoLinea==='Cancelada'
+        ? `<div class="ver-cell" style="grid-column:1/-1">
+             <span class="ver-clbl">Motivo Cancelación</span>
+             <span class="ver-cval">${esc(l.MotivoCancelacion||'—')} <span style="color:var(--fg-subtle);font-size:11px">(${esc(l.OrigenCancelacion||'')} · ${esc(l.CanceladoPor||'')})</span></span>
+           </div>` : '';
+      const obsJef = l.ObservacionJefatura
+        ? `<div class="ver-cell" style="grid-column:1/-1">
+             <span class="ver-clbl">Obs. Jefatura</span>
+             <span class="ver-cval">${esc(l.ObservacionJefatura)}</span>
+           </div>` : '';
+
+      const actPanel = gestionable ? `
+        <div class="act-panel">
+          ${carga}
+          <div class="act-btns">
+            <button class="btn btn-ok btn-sm act-btn" data-lid="${l.id}" data-accion="aprobar">✓ Aprobar</button>
+            <button class="btn btn-warn btn-sm act-btn" data-lid="${l.id}" data-accion="reprogramar">📅 Reprogramar</button>
+            <button class="btn btn-err btn-sm act-btn" data-lid="${l.id}" data-accion="rechazar">✗ Rechazar</button>
+            <button class="btn btn-ghost btn-sm act-btn" data-lid="${l.id}" data-accion="cancelar" style="border:1px solid var(--border)">🚫 Cancelar</button>
+          </div>
+          ${aprobarFormHTML(l)}
+          ${reprogramarFormHTML(l)}
+          ${rechazarFormHTML(l)}
+          ${cancelarFormHTML(l)}
+        </div>` : '';
+
+      return `
+      <div class="ver-linea${done?' ver-linea-done':''}">
+        <div class="ver-grid">
+          <div class="ver-cell"><span class="ver-clbl">Marca</span><span class="ver-cval">${esc(l.Marca||'—')}</span></div>
+          <div class="ver-cell"><span class="ver-clbl">Material</span><span class="ver-cval">${esc(l.Material||'—')}</span></div>
+          <div class="ver-cell"><span class="ver-clbl">Cantidad</span><span class="ver-cval">${l.Cantidad??'—'}</span></div>
+          <div class="ver-cell"><span class="ver-clbl">Fecha Sol.</span><span class="ver-cval">${fDate(l.FechaSolicitada)}</span></div>
+          <div class="ver-cell"><span class="ver-clbl">Hora</span><span class="ver-cval">${l.HoraSolicitada||'—'}</span></div>
+          <div class="ver-cell"><span class="ver-clbl">Estado</span><span class="ver-cval">${badge(l.EstadoLinea||'Pendiente')}</span></div>
+          ${l.ObservacionMKT?`<div class="ver-cell" style="grid-column:1/-1"><span class="ver-clbl">Obs. MKT</span><span class="ver-cval">${esc(l.ObservacionMKT)}</span></div>`:''}
+          ${(l.FechaAprobada)?`
+            <div class="ver-cell"><span class="ver-clbl">Fecha Aprobada</span><span class="ver-cval">${fDate(l.FechaAprobada)}</span></div>
+            <div class="ver-cell"><span class="ver-clbl">Hora Aprobada</span><span class="ver-cval">${l.HoraAprobada||'—'}</span></div>`:''}
+          ${cancelInfo}${obsJef}
+        </div>
+        ${actPanel}
+      </div>`;
+    }).join('');
+    return `<div class="ver-grupo"><div class="ver-ghdr">🏭 ${esc(p)}</div><div>${rows}</div></div>`;
+  }).join('') || `<div class="empty"><p>Sin líneas cargadas.</p></div>`;
+
+  return `
+    <div style="margin-bottom:14px">
+      <button class="btn btn-secondary" id="btn-bk">← Volver</button>
+    </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-hdr">
+        <h2 class="card-title">${esc(sol.NroSolicitud||'Solicitud')}</h2>
+        ${badge(calcEstado(sol))}
+      </div>
+      <div class="card-body">
+        <div class="sol-grid">
+          <div class="sol-fld"><span class="sol-lbl">N° Solicitud</span><span class="sol-val">${esc(sol.NroSolicitud||'—')}</span></div>
+          <div class="sol-fld"><span class="sol-lbl">Fecha Creación</span><span class="sol-val">${fDT(sol.FechaCreacion)}</span></div>
+          <div class="sol-fld"><span class="sol-lbl">Estado</span><span class="sol-val">${badge(sol.Estado)}</span></div>
+          <div class="sol-fld"><span class="sol-lbl">Total Líneas</span><span class="sol-val">${ls.length}</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="section-title">Líneas de la Solicitud</p>
+    ${grpsHTML}`;
+}
+
+/* ── FORMULARIOS DE ACCIÓN ─────────────────────────────────────────────────── */
+function aprobarFormHTML(l) {
+  const defFecha = l.FechaSolicitada ? toISODate(l.FechaSolicitada) : '';
+  const defHora  = l.HoraSolicitada || '';
+  return `<div class="act-form" id="af-aprobar-${l.id}">
+    <p class="act-form-title">✓ Aprobar línea</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Fecha de Recepción *</label>
+        <input type="date" class="form-ctrl" id="af-fecha-${l.id}" value="${esc(defFecha)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hora</label>
+        <input type="time" class="form-ctrl" id="af-hora-${l.id}" value="${esc(defHora)}">
+      </div>
+    </div>
+    <div class="form-group form-row single">
+      <label class="form-label">Observación (opcional)</label>
+      <textarea class="form-ctrl" id="af-obs-${l.id}" rows="2"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ok btn-sm" id="af-ok-${l.id}" data-lid="${l.id}">Confirmar aprobación</button>
+      <button class="btn btn-secondary btn-sm af-cx" data-lid="${l.id}" data-accion="aprobar">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+function reprogramarFormHTML(l) {
+  return `<div class="act-form" id="af-reprogramar-${l.id}">
+    <p class="act-form-title">📅 Reprogramar línea</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nueva Fecha *</label>
+        <input type="date" class="form-ctrl" id="rf-fecha-${l.id}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nueva Hora (opcional)</label>
+        <input type="time" class="form-ctrl" id="rf-hora-${l.id}">
+      </div>
+    </div>
+    <div class="form-group form-row single">
+      <label class="form-label">Observación (opcional)</label>
+      <textarea class="form-ctrl" id="rf-obs-${l.id}" rows="2"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-warn btn-sm" id="rf-ok-${l.id}" data-lid="${l.id}">Confirmar reprogramación</button>
+      <button class="btn btn-secondary btn-sm af-cx" data-lid="${l.id}" data-accion="reprogramar">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+function rechazarFormHTML(l) {
+  return `<div class="act-form" id="af-rechazar-${l.id}">
+    <p class="act-form-title">✗ Rechazar línea</p>
+    <div class="form-group form-row single">
+      <label class="form-label">Observación / Motivo *</label>
+      <textarea class="form-ctrl" id="rj-obs-${l.id}" rows="2" placeholder="Motivo del rechazo (obligatorio)"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-err btn-sm" id="rj-ok-${l.id}" data-lid="${l.id}">Confirmar rechazo</button>
+      <button class="btn btn-secondary btn-sm af-cx" data-lid="${l.id}" data-accion="rechazar">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+function cancelarFormHTML(l) {
+  return `<div class="act-form" id="af-cancelar-${l.id}">
+    <p class="act-form-title">🚫 Cancelar línea (Jefatura)</p>
+    <div class="form-group form-row single">
+      <label class="form-label">Motivo de Cancelación *</label>
+      <textarea class="form-ctrl" id="cx-mot-${l.id}" rows="2" placeholder="Motivo (obligatorio)"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-err btn-sm" id="cx-ok-${l.id}" data-lid="${l.id}">Confirmar cancelación</button>
+      <button class="btn btn-secondary btn-sm af-cx" data-lid="${l.id}" data-accion="cancelar">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+/* ── BIND REVISAR ─────────────────────────────────────────────────────────── */
+function bindRevisar() {
+  document.getElementById('btn-bk')?.addEventListener('click',()=>{ screen='pendientes'; render(); });
+
+  // Abrir/cerrar formularios de acción
+  document.querySelectorAll('.act-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const lid    = btn.dataset.lid;
+      const accion = btn.dataset.accion;
+      const formId = `af-${accion}-${lid}`;
+      // Cerrar todos los formularios de esta línea
+      ['aprobar','reprogramar','rechazar','cancelar'].forEach(a=>{
+        const f = document.getElementById(`af-${a}-${lid}`);
+        if(f) f.classList.remove('open');
+      });
+      const form = document.getElementById(formId);
+      if(form) form.classList.toggle('open');
+    });
+  });
+
+  // Cancelar (cerrar) formularios
+  document.querySelectorAll('.af-cx').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const f = document.getElementById(`af-${btn.dataset.accion}-${btn.dataset.lid}`);
+      if(f) f.classList.remove('open');
+    });
+  });
+
+  // Confirmar APROBAR
+  document.querySelectorAll('[id^="af-ok-"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const lid   = btn.dataset.lid;
+      const fecha = document.getElementById(`af-fecha-${lid}`)?.value;
+      const hora  = document.getElementById(`af-hora-${lid}`)?.value || null;
+      const obs   = document.getElementById(`af-obs-${lid}`)?.value?.trim() || null;
+      const fEl   = document.getElementById(`af-fecha-${lid}`);
+      if(!fecha){ if(fEl){ fEl.classList.add('err'); fEl.focus(); } return; }
+      if(fEl) fEl.classList.remove('err');
+      btn.disabled=true; btn.textContent='Guardando…';
+      try {
+        const estadoAnterior = lineas.find(l=>l.id===lid)?.EstadoLinea||'Pendiente';
+        const now = new Date().toISOString();
+        const quien = quien_es();
+        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
+          EstadoLinea:'Aprobada', FechaAprobada: fecha,
+          HoraAprobada: hora||'', ObservacionJefatura: obs||'', DecididoPor: quien, FechaDecision: now
+        });
+        await historial(lid, 'EstadoLinea', estadoAnterior, 'Aprobada', quien, now, obs||'Aprobada por Jefatura');
+        patchLocal(lid,{EstadoLinea:'Aprobada',FechaAprobada:fecha,HoraAprobada:hora||'',ObservacionJefatura:obs||''});
+        await recalcularEstadoSolicitud(viewId);
+        render();
+      } catch(e) { btn.disabled=false; btn.textContent='Confirmar aprobación'; showAlert('err','Error: '+e.message); }
+    });
+  });
+
+  // Confirmar REPROGRAMAR
+  document.querySelectorAll('[id^="rf-ok-"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const lid   = btn.dataset.lid;
+      const fecha = document.getElementById(`rf-fecha-${lid}`)?.value;
+      const hora  = document.getElementById(`rf-hora-${lid}`)?.value || '';
+      const obs   = document.getElementById(`rf-obs-${lid}`)?.value?.trim() || '';
+      const fEl   = document.getElementById(`rf-fecha-${lid}`);
+      if(!fecha){ if(fEl){ fEl.classList.add('err'); fEl.focus(); } return; }
+      if(fEl) fEl.classList.remove('err');
+      btn.disabled=true; btn.textContent='Guardando…';
+      try {
+        const estadoAnterior = lineas.find(l=>l.id===lid)?.EstadoLinea||'Pendiente';
+        const now = new Date().toISOString();
+        const quien = quien_es();
+        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
+          EstadoLinea:'Reprogramada', FechaAprobada: fecha,
+          HoraAprobada: hora, ObservacionJefatura: obs, DecididoPor: quien, FechaDecision: now
+        });
+        await historial(lid, 'EstadoLinea', estadoAnterior, 'Reprogramada', quien, now, obs||'Reprogramada por Jefatura');
+        patchLocal(lid,{EstadoLinea:'Reprogramada',FechaAprobada:fecha,HoraAprobada:hora,ObservacionJefatura:obs});
+        await recalcularEstadoSolicitud(viewId);
+        render();
+      } catch(e) { btn.disabled=false; btn.textContent='Confirmar reprogramación'; showAlert('err','Error: '+e.message); }
+    });
+  });
+
+  // Confirmar RECHAZAR
+  document.querySelectorAll('[id^="rj-ok-"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const lid = btn.dataset.lid;
+      const obs = document.getElementById(`rj-obs-${lid}`)?.value?.trim();
+      const oEl = document.getElementById(`rj-obs-${lid}`);
+      if(!obs){ if(oEl){ oEl.classList.add('err'); oEl.focus(); } return; }
+      if(oEl) oEl.classList.remove('err');
+      btn.disabled=true; btn.textContent='Guardando…';
+      try {
+        const estadoAnterior = lineas.find(l=>l.id===lid)?.EstadoLinea||'Pendiente';
+        const now = new Date().toISOString();
+        const quien = quien_es();
+        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
+          EstadoLinea:'Rechazada', ObservacionJefatura: obs, DecididoPor: quien, FechaDecision: now
+        });
+        await historial(lid, 'EstadoLinea', estadoAnterior, 'Rechazada', quien, now, obs);
+        patchLocal(lid,{EstadoLinea:'Rechazada',ObservacionJefatura:obs});
+        await recalcularEstadoSolicitud(viewId);
+        render();
+      } catch(e) { btn.disabled=false; btn.textContent='Confirmar rechazo'; showAlert('err','Error: '+e.message); }
+    });
+  });
+
+  // Confirmar CANCELAR
+  document.querySelectorAll('[id^="cx-ok-"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const lid    = btn.dataset.lid;
+      const motivo = document.getElementById(`cx-mot-${lid}`)?.value?.trim();
+      const mEl    = document.getElementById(`cx-mot-${lid}`);
+      if(!motivo){ if(mEl){ mEl.classList.add('err'); mEl.focus(); } return; }
+      if(mEl) mEl.classList.remove('err');
+      btn.disabled=true; btn.textContent='Guardando…';
+      try {
+        const estadoAnterior = lineas.find(l=>l.id===lid)?.EstadoLinea||'Pendiente';
+        const now = new Date().toISOString();
+        const quien = quien_es();
+        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
+          EstadoLinea:'Cancelada', OrigenCancelacion:'Jefatura',
+          MotivoCancelacion: motivo, CanceladoPor: quien, FechaCancelacion: now
+        });
+        await historial(lid, 'EstadoLinea', estadoAnterior, 'Cancelada', quien, now, motivo);
+        patchLocal(lid,{EstadoLinea:'Cancelada',OrigenCancelacion:'Jefatura',MotivoCancelacion:motivo,CanceladoPor:quien,FechaCancelacion:now});
+        await recalcularEstadoSolicitud(viewId);
+        render();
+      } catch(e) { btn.disabled=false; btn.textContent='Confirmar cancelación'; showAlert('err','Error: '+e.message); }
+    });
+  });
+}
+
+/* ── HELPERS ──────────────────────────────────────────────────────────────── */
+function quien_es() { return me?.username || me?.name || me?.displayName || 'Desconocido'; }
+
+function patchLocal(lid, fields) {
+  const l = lineas.find(x=>x.id===lid);
+  if(l) Object.assign(l, fields);
+}
+
+/* Calcula el estado consolidado de una solicitud a partir de sus líneas.
+   Reglas:
+     - Todas Pendiente          → 'Pendiente'
+     - Hay al menos una Pendiente (y al menos una decidida) → 'Parcial'
+     - Todas decididas, con al menos una Aprobada/Reprogramada → 'Aprobada'
+     - Todas decididas, ninguna Aprobada/Reprogramada → 'Rechazada'
+*/
+function calcEstado(sol) {
+  const ls = lineasDeSol(sol);
+  if(!ls.length) return sol.Estado || 'Pendiente';
+  const estados = ls.map(l=> l.EstadoLinea || 'Pendiente');
+  if(estados.every(e=> e === 'Pendiente'))               return 'Pendiente';
+  if(estados.some(e=> e === 'Pendiente'))                return 'Parcial'; // mezcla con pendiente
+  if(estados.some(e=> e==='Aprobada'||e==='Reprogramada')) return 'Aprobada';
+  return 'Rechazada'; // todas Rechazada/Cancelada
+}
+
+/* Persiste el estado calculado en MKT_Solicitudes si cambió */
+async function recalcularEstadoSolicitud(solId) {
+  const sol = sols.find(s=>s.id===solId);
+  if(!sol) return;
+  const nuevoEstado = calcEstado(sol);
+  if(nuevoEstado === sol.Estado) return; // sin cambio
+  await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items/${solId}/fields`,{
+    Estado: nuevoEstado
+  });
+  sol.Estado = nuevoEstado;
+}
+
+async function historial(lineaId, campo, valorAnterior, valorNuevo, usuario, now, obs) {
+  const sol = sols.find(s=>s.id===viewId);
+  await gPost(`${BASE}/sites/${SITE}/lists/MKT_Historial/items`,{
+    fields:{
+      SolicitudId: viewId,
+      NroSolicitud: sol?.NroSolicitud||'',
+      LineaId: lineaId,
+      Campo: campo,
+      ValorAnterior: valorAnterior,
+      ValorNuevo: valorNuevo,
+      Modulo: 'Jefatura',
+      UsuarioAccion: usuario,
+      Timestamp: now,
+      Observacion: obs||''
+    }
+  });
+}
+
+let alertTimer;
+function showAlert(type, msg) {
+  const el = document.getElementById('ac'); if(!el) return;
+  el.innerHTML = `<div class="alert a-${type}">${msg}</div>`;
+  clearTimeout(alertTimer);
+  if(type==='ok') alertTimer = setTimeout(()=>{ el.innerHTML=''; }, 5000);
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function reloadData() {
+  busy = true; render();
+  try {
+    const [s,l] = await Promise.all([
+      gAll(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items?$expand=fields&$top=500`),
+      gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`)
+    ]);
+    sols   = s.map(i=>({id:i.id,...i.fields}));
+    lineas = l.map(i=>({id:i.id,...i.fields}));
+  } catch(e) { console.warn('[DATA]', e.message); }
+  busy = false; render();
+}
+
+/* ── AUTH ─────────────────────────────────────────────────────────────────── */
+function login() { msalApp.loginRedirect({scopes:SCOPES}); }
+
+async function tok() {
+  if (!msalApp) throw new Error('MSAL no inicializado');
+  const acc = msalApp.getActiveAccount();
+  if (!acc) throw new Error('Sin sesión');
+  return msalApp.acquireTokenSilent({scopes:SCOPES, account:acc})
+    .catch(function(){ return msalApp.acquireTokenRedirect({scopes:SCOPES}); })
+    .then(function(r){ return r ? r.accessToken : Promise.reject(new Error('redirect')); });
+}
+
+function showLoginPage() {
+  document.getElementById('app').innerHTML =
+    '<div class="login-wrap"><div class="login-card">' +
+    '<div style="font-size:40px;margin-bottom:8px">📋</div>' +
+    '<h2 style="margin:0 0 6px">RF MKT · Jefatura</h2>' +
+    '<p style="color:var(--fg-muted);margin:0 0 20px;font-size:13px">Inicia sesión con tu cuenta Microsoft</p>' +
+    '<button class="btn btn-primary" style="width:100%;justify-content:center" onclick="login()">🔐 Iniciar sesión</button>' +
+    '</div></div>';
+}
+
+async function postLogin() {
+  busy = true; render();
+  try {
+    const [s,l] = await Promise.all([
+      gAll(`${BASE}/sites/${SITE}/lists/MKT_Solicitudes/items?$expand=fields&$top=500`),
+      gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`)
+    ]);
+    sols   = s.map(i=>({id:i.id,...i.fields}));
+    lineas = l.map(i=>({id:i.id,...i.fields}));
+  } catch(e) {
+    console.warn('[DATA]', e.message);
+  }
+  busy = false; render();
+}
+
+/* ── BOOT ─────────────────────────────────────────────────────────────────── */
+(function bootMsal(){
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
+  s.onload = function() {
+    msalApp = new msal.PublicClientApplication(MSAL_CFG);
+    msalApp.handleRedirectPromise().then(function(res){
+      if (res && res.account) {
+        me = res.account; msalApp.setActiveAccount(me); postLogin();
+      } else {
+        var all = msalApp.getAllAccounts();
+        if (all.length > 0) { me = all[0]; msalApp.setActiveAccount(me); postLogin(); }
+        else { showLoginPage(); }
+      }
+    }).catch(function(e){ console.error('[MSAL]', e); showLoginPage(); });
+  };
+  s.onerror = function(){
+    document.getElementById('app').innerHTML =
+      '<div class="login-wrap"><div class="login-card">' +
+      '<p style="color:var(--err)">No se pudo cargar la librería de autenticación. Verifica tu conexión.</p>' +
+      '</div></div>';
+  };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
+
+</body></html>
