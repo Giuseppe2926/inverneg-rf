@@ -462,11 +462,23 @@ function cargarHorasPedido(pedido){
 }
 function cargarRecepcionesPedido(pedido){
   if(!DB.listIds.recepciones) return Promise.resolve([]);
-  return gGet(urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=2000').then(function(d){
-    return (d.value||[]).map(function(i){return i.fields||{};}).filter(function(f){
-      return normStr(f.Pedido||'')===normStr(pedido);
+  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+  var todos=[];
+  function paginar(u){
+    return gGet(u).then(function(d){
+      (d.value||[]).forEach(function(i){
+        var f=i.fields||{};
+        if(normStr(f.Pedido||'')===normStr(pedido)) todos.push(f);
+      });
+      var next=d['@odata.nextLink']||d['odata.nextLink']||null;
+      if(next) return paginar(next);
+      return todos;
     });
-  }).catch(function(){return[];});
+  }
+  return paginar(url).catch(function(e){
+    console.error('[REC] Error cargando recepciones:',e.message);
+    return todos;
+  });
 }
 
 /* ── PANTALLA PRINCIPAL ──────────────────────── */
