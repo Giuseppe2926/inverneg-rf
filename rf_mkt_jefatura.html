@@ -278,11 +278,18 @@ function cargaDia(fecha) {
   return { dot, nivel, nLineas, nUnidades, isoFecha };
 }
 
-function cargaHTML(fecha) {
+// Mapa de fechas ya renderizadas en la vista actual (se resetea en revisarHTML)
+let _cargaRendered = {};
+function cargaHTMLOnce(fecha) {
+  const isoFecha = toISODate(fecha);
+  if(!isoFecha) return '';
+  if(_cargaRendered[isoFecha]) return ''; // ya mostrado para esta fecha
+  _cargaRendered[isoFecha] = true;
   const c = cargaDia(fecha);
   if(!c) return '';
+  const fechaLabel = new Date(isoFecha+'T12:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
   return `<div class="carga-bar">
-    <span class="carga-label">Carga del día</span>
+    <span class="carga-label">${fechaLabel}</span>
     <span class="carga-dot">${c.dot}</span>
     <span class="carga-val">${c.nivel}</span>
     <span class="carga-sep">·</span>
@@ -361,6 +368,7 @@ function revisarHTML() {
   if(!sol) return `<div class="alert a-err">Solicitud no encontrada.</div>
     <button class="btn btn-secondary" id="btn-bk">← Volver</button>`;
 
+  _cargaRendered = {}; // resetear por cada render de solicitud
   const ls = lineasDeSol(sol);
   const grps = {};
   ls.forEach(l=>{ const p=l.Proveedor||'(Sin proveedor)'; if(!grps[p])grps[p]=[]; grps[p].push(l); });
@@ -370,7 +378,7 @@ function revisarHTML() {
       const gestionable = JEFATURA_ACCIONES.has(l.EstadoLinea||'Pendiente');
       const done        = !gestionable;
       const fecha       = l.FechaAprobada || l.FechaSolicitada;
-      const carga       = gestionable ? cargaHTML(l.FechaSolicitada) : '';
+      const carga       = gestionable ? cargaHTMLOnce(l.FechaSolicitada) : '';
 
       const cancelInfo  = l.EstadoLinea==='Cancelada'
         ? `<div class="ver-cell" style="grid-column:1/-1">
@@ -565,7 +573,7 @@ function bindRevisar() {
         const quien = quien_es();
         await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
           EstadoLinea:'Aprobada', FechaAprobada: fecha,
-          HoraAprobada: hora||'', ObservacionJefatura: obs||'', AprobadoPor: quien
+          HoraAprobada: hora||'', ObservacionJefatura: obs||'', DecididoPor: quien, FechaDecision: now
         });
         await historial(lid, 'EstadoLinea', estadoAnterior, 'Aprobada', quien, now, obs||'Aprobada por Jefatura');
         patchLocal(lid,{EstadoLinea:'Aprobada',FechaAprobada:fecha,HoraAprobada:hora||'',ObservacionJefatura:obs||''});
@@ -591,7 +599,7 @@ function bindRevisar() {
         const quien = quien_es();
         await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
           EstadoLinea:'Reprogramada', FechaAprobada: fecha,
-          HoraAprobada: hora, ObservacionJefatura: obs, ReprogramadoPor: quien
+          HoraAprobada: hora, ObservacionJefatura: obs, DecididoPor: quien, FechaDecision: now
         });
         await historial(lid, 'EstadoLinea', estadoAnterior, 'Reprogramada', quien, now, obs||'Reprogramada por Jefatura');
         patchLocal(lid,{EstadoLinea:'Reprogramada',FechaAprobada:fecha,HoraAprobada:hora,ObservacionJefatura:obs});
@@ -614,7 +622,7 @@ function bindRevisar() {
         const now = new Date().toISOString();
         const quien = quien_es();
         await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
-          EstadoLinea:'Rechazada', ObservacionJefatura: obs, RechazadoPor: quien, FechaRechazo: now
+          EstadoLinea:'Rechazada', ObservacionJefatura: obs, DecididoPor: quien, FechaDecision: now
         });
         await historial(lid, 'EstadoLinea', estadoAnterior, 'Rechazada', quien, now, obs);
         patchLocal(lid,{EstadoLinea:'Rechazada',ObservacionJefatura:obs});
