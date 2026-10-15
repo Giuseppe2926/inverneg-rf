@@ -920,10 +920,11 @@ async function reprogramarNP(lineaId, nuevaFecha, nuevaHora) {
       FechaSolicitada:   nuevaFecha,
       HoraSolicitada:    nuevaHora || '',
       // Limpiar aprobación previa — Jefatura debe revisar de nuevo
-      FechaAprobada:     '',
+      // Date fields → null; text/choice fields → ''
+      FechaAprobada:     null,
       HoraAprobada:      '',
       DecididoPor:       '',
-      FechaDecision:     '',
+      FechaDecision:     null,
       ObservacionJefatura: ''
     }
   );
