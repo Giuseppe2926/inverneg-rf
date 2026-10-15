@@ -233,6 +233,19 @@ tr:last-child td{border-bottom:none}
   background:transparent;color:var(--err);cursor:pointer;font-weight:600;transition:.15s}
 .btn-cancel-linea:hover{background:var(--err);color:#fff}
 .btn-cancel-linea:disabled{opacity:.4;cursor:not-allowed}
+.btn-reprog-linea{font-size:12px;padding:3px 10px;border-radius:20px;border:1px solid var(--primary);
+  background:transparent;color:var(--primary);cursor:pointer;font-weight:600;transition:.15s}
+.btn-reprog-linea:hover{background:var(--primary);color:#fff}
+.btn-reprog-linea:disabled{opacity:.4;cursor:not-allowed}
+.ver-reprog-form{display:none;margin-top:8px;padding:12px;background:var(--gray);
+  border-radius:var(--r);border:1px solid var(--border)}
+.ver-reprog-form.open{display:block}
+.ver-reprog-form label{font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--fg-subtle);display:block;margin-bottom:3px}
+.ver-reprog-form input{width:100%;box-sizing:border-box;border:1px solid var(--border);
+  border-radius:var(--r);background:var(--bg-card);color:var(--fg);
+  font:inherit;font-size:13px;padding:6px 10px;margin-bottom:8px}
+.ver-reprog-form input:focus{outline:none;border-color:var(--primary)}
 
 /* ── LOGIN ────────────────────────────────────────────────────────────────── */
 .login-wrap{display:flex;flex-direction:column;align-items:center;
@@ -800,6 +813,22 @@ function verHTML(){
         <div class="ver-cell"><span class="ver-clbl">Fecha Ejecución</span><span class="ver-cval">${fDate(l.FechaEjecucionReal)}</span></div>
         ${l.EsAnticipada?`<div class="ver-cell" style="grid-column:1/-1"><span class="badge b-novedades">⚡ Recepción anticipada</span></div>`:''}
         ` : ''}
+        ${l.EstadoRecepcion === 'No Presentado' ? `
+        <div class="ver-cell" style="grid-column:1/-1;align-items:flex-end;flex-direction:row;gap:8px">
+          <button class="btn-reprog-linea" data-lid="${l.id}">📅 Reprogramar</button>
+        </div>
+        <div class="ver-reprog-form" id="rpf-${l.id}">
+          <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:var(--primary)">Reprogramar línea</p>
+          <label for="rpfd-${l.id}">Nueva fecha <span style="color:var(--err)">*</span></label>
+          <input type="date" id="rpfd-${l.id}" required>
+          <label for="rpfh-${l.id}">Nueva hora (opcional)</label>
+          <input type="time" id="rpfh-${l.id}">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" id="rpfok-${l.id}" data-lid="${l.id}">Confirmar reprogramación</button>
+            <button class="btn btn-secondary btn-sm" id="rpfcx-${l.id}" data-lid="${l.id}">Cancelar</button>
+          </div>
+          <p id="rpferr-${l.id}" style="margin:6px 0 0;font-size:12px;color:var(--err)"></p>
+        </div>` : ''}
         ${cancelBtn}
         ${cancelForm}
       </div>`;
@@ -875,6 +904,60 @@ async function cancelLinea(lineaId, motivo) {
           li.MotivoCancelacion=motivo; li.CanceladoPor=quien; li.FechaCancelacion=now; }
 }
 
+async function reprogramarNP(lineaId, nuevaFecha, nuevaHora) {
+  const now = new Date().toISOString();
+  const quien = me?.username || me?.name || me?.displayName || 'Desconocido';
+  const linea = lineas.find(l=>l.id===lineaId);
+  const sol   = sols.find(s=>s.id===viewId);
+  const estadoLineaAnterior = linea?.EstadoLinea || 'Pendiente';
+  const estadoRecepAnterior = linea?.EstadoRecepcion || 'No Presentado';
+
+  await gPatch(
+    `${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lineaId}/fields`,
+    {
+      EstadoLinea:       'Pendiente',
+      EstadoRecepcion:   '',
+      FechaSolicitada:   nuevaFecha,
+      HoraSolicitada:    nuevaHora || '',
+      // Limpiar aprobación previa — Jefatura debe revisar de nuevo
+      FechaAprobada:     '',
+      HoraAprobada:      '',
+      DecididoPor:       '',
+      FechaDecision:     '',
+      ObservacionJefatura: ''
+    }
+  );
+
+  // Registrar en MKT_Historial — evento de reprogramación
+  await gPost(`${BASE}/sites/${SITE}/lists/MKT_Historial/items`, {
+    fields: {
+      SolicitudId:   viewId,
+      NroSolicitud:  sol?.NroSolicitud || '',
+      LineaId:       lineaId,
+      Campo:         'EstadoRecepcion → EstadoLinea',
+      ValorAnterior: `${estadoRecepAnterior} / ${estadoLineaAnterior}`,
+      ValorNuevo:    `'' / Pendiente (Reprogramada al ${nuevaFecha}${nuevaHora?' '+nuevaHora:''})`,
+      Modulo:        'Marketing',
+      UsuarioAccion: quien,
+      Timestamp:     now,
+      Observacion:   `Reprogramación desde No Presentado → nueva fecha ${nuevaFecha}${nuevaHora?' hora '+nuevaHora:''}`
+    }
+  });
+
+  // Actualizar estado local
+  if(linea){
+    linea.EstadoLinea       = 'Pendiente';
+    linea.EstadoRecepcion   = '';
+    linea.FechaSolicitada   = nuevaFecha;
+    linea.HoraSolicitada    = nuevaHora || '';
+    linea.FechaAprobada     = '';
+    linea.HoraAprobada      = '';
+    linea.DecididoPor       = '';
+    linea.FechaDecision     = '';
+    linea.ObservacionJefatura = '';
+  }
+}
+
 function bindVer(){
   document.getElementById('btn-bk')?.addEventListener('click',()=>{ screen='mis'; renderContent(); });
 
@@ -911,6 +994,47 @@ function bindVer(){
     btn.addEventListener('click',()=>{
       const lid = btn.dataset.lid;
       document.getElementById(`cf-${lid}`)?.classList.remove('open');
+    });
+  });
+
+  // Reprogramar — abrir/cerrar form
+  document.querySelectorAll('.btn-reprog-linea').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const lid = btn.dataset.lid;
+      const form = document.getElementById(`rpf-${lid}`);
+      if(form){ form.classList.toggle('open'); }
+    });
+  });
+
+  // Confirmar reprogramación
+  document.querySelectorAll('[id^="rpfok-"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const lid   = btn.dataset.lid;
+      const fecha = document.getElementById(`rpfd-${lid}`)?.value?.trim();
+      const hora  = document.getElementById(`rpfh-${lid}`)?.value?.trim();
+      const errEl = document.getElementById(`rpferr-${lid}`);
+      if(!fecha){
+        if(errEl) errEl.textContent = 'La fecha es obligatoria.';
+        document.getElementById(`rpfd-${lid}`)?.focus();
+        return;
+      }
+      if(errEl) errEl.textContent = '';
+      btn.disabled = true; btn.textContent = 'Guardando…';
+      try {
+        await reprogramarNP(lid, fecha, hora);
+        renderContent();
+      } catch(e) {
+        btn.disabled = false; btn.textContent = 'Confirmar reprogramación';
+        if(errEl) errEl.textContent = 'Error: ' + e.message;
+      }
+    });
+  });
+
+  // Dismiss reprogramar form
+  document.querySelectorAll('[id^="rpfcx-"]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const lid = btn.dataset.lid;
+      document.getElementById(`rpf-${lid}`)?.classList.remove('open');
     });
   });
 
