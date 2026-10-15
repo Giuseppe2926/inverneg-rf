@@ -221,6 +221,8 @@ tr:last-child td{border-bottom:none}
   margin:8px 0}
 .ver-cancel-form textarea:focus{outline:none;border-color:var(--err)}
 .ver-linea-cancelada{opacity:.6}
+.ver-estado-row{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ver-decidido{font-size:11px;color:var(--fg-muted)}
 .btn-cancel-linea{font-size:12px;padding:3px 10px;border-radius:20px;border:1px solid var(--err);
   background:transparent;color:var(--err);cursor:pointer;font-weight:600;transition:.15s}
 .btn-cancel-linea:hover{background:var(--err);color:#fff}
@@ -744,14 +746,27 @@ function verHTML(){
            <div class="ver-cell"><span class="ver-clbl">Cancelado por</span><span class="ver-cval">${esc(l.CanceladoPor||'—')}</span></div>
            <div class="ver-cell"><span class="ver-clbl">Fecha Cancelación</span><span class="ver-cval">${fDT(l.FechaCancelacion)}</span></div>`
         : '';
+      const estadoIcono = (e=>{
+        const m = {
+          'Aprobada':'✅','Reprogramada':'📅','Rechazada':'❌','Cancelada':'🚫',
+          'Recibido OK':'✅','Recibido con Novedades':'⚠️',
+          'Parcialmente Recibida':'⚠️','Rechazado por Operación':'❌',
+          'No Presentado':'⚠️','Pendiente':'⏳'
+        };
+        return m[e] || '⏳';
+      })(l.EstadoLinea||'Pendiente');
       return `
       <div class="ver-linea${esCancelada?' ver-linea-cancelada':''}">
+        <div class="ver-cell" style="grid-column:1/-1">
+          <span class="ver-estado-row">${estadoIcono} ${badge(l.EstadoLinea||'Pendiente')}
+            ${l.DecididoPor?`<span class="ver-decidido">por ${esc(l.DecididoPor)} · ${fDate(l.FechaDecision)}</span>`:''}
+          </span>
+        </div>
         <div class="ver-cell"><span class="ver-clbl">Marca</span><span class="ver-cval">${esc(l.Marca||'—')}</span></div>
         <div class="ver-cell"><span class="ver-clbl">Material</span><span class="ver-cval">${esc(l.Material||'—')}</span></div>
         <div class="ver-cell"><span class="ver-clbl">Cantidad</span><span class="ver-cval">${l.Cantidad??'—'}</span></div>
         <div class="ver-cell"><span class="ver-clbl">Fecha Sol.</span><span class="ver-cval">${fDate(l.FechaSolicitada)}</span></div>
         <div class="ver-cell"><span class="ver-clbl">Hora</span><span class="ver-cval">${l.HoraSolicitada||'—'}</span></div>
-        <div class="ver-cell"><span class="ver-clbl">Estado</span><span class="ver-cval">${badge(l.EstadoLinea||'Pendiente')}</span></div>
         ${l.ObservacionMKT?`<div class="ver-cell" style="grid-column:1/-1"><span class="ver-clbl">Obs. MKT</span><span class="ver-cval">${esc(l.ObservacionMKT)}</span></div>`:''}
         ${(l.FechaAprobada)?`
           <div class="ver-cell"><span class="ver-clbl">Fecha Aprobada</span><span class="ver-cval">${fDate(l.FechaAprobada)}</span></div>
