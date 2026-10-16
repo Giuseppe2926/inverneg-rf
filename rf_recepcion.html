@@ -757,67 +757,78 @@ function cargarAsignacionesSP(){
     console.warn('[ASIG] Lista asignaciones no disponible');
     return Promise.resolve([]);
   }
-  return gGet(urlLista(DB.listIds.asignaciones)+'/items?$expand=fields&$top=500')
-    .then(function(d){
-      var items=(d.value||[]).map(function(i){var f=i.fields||{};f._spId=i.id;return f;});
-      console.log('[ASIG] Total ítems en SP:',items.length);
-      // Log primeros 10 para ver campos reales
-      items.slice(0,10).forEach(function(f,i){
-        console.log('[ASIG] Item '+i+': Pedido="'+(f.Pedido||f.Title||'?')+
-          '" TipoAsig="'+(f.TipoAsignacion||'?')+
-          '" Operario="'+(f.Operario||'?')+
-          '" Status="'+(f.Status||f.Status0||'?')+
-          '" Keys='+JSON.stringify(Object.keys(f).filter(function(k){return !k.startsWith('@');})));
+  var url=urlLista(DB.listIds.asignaciones)+'/items?$expand=fields&$top=500';
+  var todos=[];
+  var logged=false;
+  function paginar(u){
+    return gGet(u).then(function(d){
+      (d.value||[]).forEach(function(i){
+        var f=i.fields||{};f._spId=i.id;
+        todos.push(f);
       });
-      return items;
-    })
-    .catch(function(e){console.error('[ASIG] Error:',e.message);return[];});
+      if(!logged&&todos.length>0){
+        logged=true;
+        console.log('[ASIG] Total ítems en SP (hasta ahora):',todos.length);
+        todos.slice(0,10).forEach(function(f,i){
+          console.log('[ASIG] Item '+i+': Pedido="'+(f.Pedido||f.Title||'?')+
+            '" TipoAsig="'+(f.TipoAsignacion||'?')+
+            '" Operario="'+(f.Operario||'?')+
+            '" Status="'+(f.Status||f.Status0||'?')+
+            '" Keys='+JSON.stringify(Object.keys(f).filter(function(k){return !k.startsWith('@');})));
+        });
+      }
+      var next=d['@odata.nextLink']||d['odata.nextLink']||null;
+      if(next) return paginar(next);
+      console.log('[ASIG] Total ítems cargados:',todos.length);
+      return todos;
+    });
+  }
+  return paginar(url).catch(function(e){console.error('[ASIG] Error:',e.message);return todos;});
 }
 function cargarEventosSP(pedido){
   if(!DB.listIds.eventos) return Promise.resolve([]);
-  return gGet(urlLista(DB.listIds.eventos)+'/items?$expand=fields&$top=500')
-    .then(function(d){
-      return(d.value||[])
-        .map(function(i){return i.fields;})
-        .filter(function(f){return f.Pedido===pedido;});
-    }).catch(function(){return[];});
+  var url=urlLista(DB.listIds.eventos)+'/items?$expand=fields&$top=500';
+  var todos=[];
+  function paginar(u){
+    return gGet(u).then(function(d){
+      (d.value||[]).forEach(function(i){
+        var f=i.fields;
+        if(f&&f.Pedido===pedido) todos.push(f);
+      });
+      var next=d['@odata.nextLink']||d['odata.nextLink']||null;
+      if(next) return paginar(next);
+      return todos;
+    });
+  }
+  return paginar(url).catch(function(){return todos;});
 }
 function cargarSKUsSP(pedido,contenedor){
   if(!DB.listIds.recepciones){
     console.warn('[CORREGIR] Lista recepciones no disponible');
     return Promise.resolve([]);
   }
-  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=2000';
   console.log('[CORREGIR] Pedido seleccionado:',pedido);
-  console.log('[CORREGIR] URL consulta SP:',url);
-  return gGet(url).then(function(d){
-    var total=(d.value||[]).length;
-    console.log('[CORREGIR] Registros recibidos de SharePoint:',total);
-    if(total>0){
-      var f0=d.value[0].fields||{};
-      console.log('[CORREGIR] Muestra ítem[0]: Pedido="'+f0.Pedido+'" Cont="'+f0.Contenedor+
-        '" SKU="'+f0.CodProducto+'" Cant='+f0.Cantidad);
-      // Log pedidos distintos en SP para detectar diferencias de formato
-      var peds=[...new Set((d.value||[]).map(function(i){return(i.fields||{}).Pedido||'(vacío)';}))];
-      console.log('[CORREGIR] Pedidos distintos en LRecepciones:',peds.join(' | '));
-    }
-    var filtrados=(d.value||[])
-      .map(function(i){return i.fields||{};})
-      .filter(function(f){
-        // Usar normStr para evitar errores por trim/case/espacios
+  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+  var todos=[];
+  function paginar(u){
+    return gGet(u).then(function(d){
+      (d.value||[]).forEach(function(i){
+        var f=i.fields||{};
         var matchPed=normStr(f.Pedido||'')===normStr(pedido);
         var matchCont=!contenedor||normStr(f.Contenedor||'')===normStr(contenedor);
-        return matchPed&&matchCont;
+        if(matchPed&&matchCont) todos.push(f);
       });
-    console.log('[CORREGIR] Registros después del filtro pedido"'+pedido+'"'+(contenedor?' cont"'+contenedor+'"':'')+':',filtrados.length);
-    if(filtrados.length>0){
-      console.log('[CORREGIR] Primer registro filtrado: SKU="'+filtrados[0].CodProducto+
-        '" Cant='+filtrados[0].Cantidad+' Estado="'+filtrados[0].Estado+'"');
-    }
-    return filtrados;
-  }).catch(function(e){
+      var next=d['@odata.nextLink']||d['odata.nextLink']||null;
+      if(next) return paginar(next);
+      console.log('[CORREGIR] Registros filtrados pedido"'+pedido+'"'+(contenedor?' cont"'+contenedor+'"':'')+':',todos.length);
+      if(todos.length>0)
+        console.log('[CORREGIR] Primer registro: SKU="'+todos[0].CodProducto+'" Cant='+todos[0].Cantidad+' Estado="'+todos[0].Estado+'"');
+      return todos;
+    });
+  }
+  return paginar(url).catch(function(e){
     console.error('[CORREGIR] Error cargando SP:',e.message);
-    return[];
+    return todos;
   });
 }
 
@@ -2476,25 +2487,35 @@ function confCorreccion(){
 // Trae todos y filtra en JS por Pedido + Contenedor
 function buscarItemHorasSP(pedido, contenedor){
   if(!DB.listIds.horas){console.warn('[LHORAS] Lista horas no disponible');return Promise.resolve(null);}
-  return gGet(urlLista(DB.listIds.horas)+'/items?$expand=fields&$top=500')
-    .then(function(d){
+  var url=urlLista(DB.listIds.horas)+'/items?$expand=fields&$top=500';
+  var found=null;
+  function paginar(u){
+    return gGet(u).then(function(d){
       var items=d.value||[];
-      console.log('[LHORAS] Items en lista:',items.length,'Buscando Pedido="'+pedido+'" Cont="'+contenedor+'"');
-      var found=items.find(function(i){
-        var f=i.fields||{};
-        return normStr(f.Pedido||'')===normStr(pedido)&&
-               normStr(f.Contenedor||'')===normStr(contenedor);
-      });
-      if(found){
-        console.log('[LHORAS] Encontrado: id='+found.id+' Llegada="'+(found.fields.HoraLlegada||'')+'"');
-        var f=found.fields;
-        f._spId=found.id;
-        return f;
+      if(!found){
+        var match=items.find(function(i){
+          var f=i.fields||{};
+          return normStr(f.Pedido||'')===normStr(pedido)&&
+                 normStr(f.Contenedor||'')===normStr(contenedor);
+        });
+        if(match){
+          found=match;
+          console.log('[LHORAS] Encontrado: id='+found.id+' Llegada="'+(found.fields.HoraLlegada||'')+'"');
+          return found; // encontrado, no seguir paginando
+        }
       }
-      console.log('[LHORAS] No existe aún para este contenedor');
-      return null;
-    })
-    .catch(function(e){console.error('[LHORAS] buscar error:',e.message);return null;});
+      var next=d['@odata.nextLink']||d['odata.nextLink']||null;
+      if(next&&!found) return paginar(next);
+      if(!found) console.log('[LHORAS] No existe aún para este contenedor ('+pedido+'/'+contenedor+')');
+      return found;
+    });
+  }
+  return paginar(url).then(function(item){
+    if(!item) return null;
+    var f=item.fields;
+    f._spId=item.id;
+    return f;
+  }).catch(function(e){console.error('[LHORAS] buscar error:',e.message);return null;});
 }
 
 function escribirHoras(datos){
