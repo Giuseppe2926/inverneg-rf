@@ -214,6 +214,24 @@ textarea.form-ctrl{resize:vertical;min-height:56px}
 .jef-nav-btn:hover{background:var(--gray);color:var(--fg)}
 .jef-nav-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 
+/* ── PERFIL SWITCH ────────────────────────────────────────────────────────── */
+.perfil-sw{display:inline-flex;border:1px solid var(--border);border-radius:20px;
+           overflow:hidden;background:var(--bg-muted);padding:2px;gap:2px}
+.perfil-opt{padding:3px 11px;font-size:11px;font-weight:600;cursor:pointer;
+            border:none;background:transparent;color:var(--fg-muted);font-family:inherit;
+            transition:.15s;white-space:nowrap;border-radius:20px;line-height:1.4}
+.perfil-opt:hover{color:var(--fg)}
+.perfil-opt.perfil-active{background:var(--primary);color:#fff}
+.perfil-opt.perfil-active-sup{background:#0369a1;color:#fff}
+.perfil-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;
+              border-radius:20px;font-size:10px;font-weight:700;
+              background:var(--info-bg);color:var(--info);border:1px solid var(--info-bd)}
+.perfil-badge.pb-sup{background:#e0f2fe;color:#0369a1;border-color:#bae6fd}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .perfil-badge.pb-sup{background:#0c2a3d;color:#38bdf8;border-color:#0369a1}
+}
+:root[data-theme="dark"] .perfil-badge.pb-sup{background:#0c2a3d;color:#38bdf8;border-color:#0369a1}
+
 /* ── CALENDARIO ───────────────────────────────────────────────────────────── */
 .cal-wrap{display:grid;grid-template-columns:1fr;gap:14px}
 @media(min-width:780px){.cal-wrap.panel-open{grid-template-columns:1fr 360px;align-items:start}}
@@ -301,6 +319,7 @@ let sols    = [], lineas = [];
 let viewId  = null;
 let busy    = false;
 let activeAction = {}; // {lineaId: 'aprobar'|'reprogramar'|'rechazar'|'cancelar'}
+let perfil = 'Jefatura'; // 'Jefatura' | 'Supervisión'
 
 /* ── GRAPH ────────────────────────────────────────────────────────────────── */
 async function gGet(url) {
@@ -400,7 +419,13 @@ function render() {
     <div class="app-hdr">
       <span style="font-size:22px">📋</span>
       <h1>RF MKT · Jefatura</h1>
-      <span class="user">${esc(me?.name||me?.username||'')}</span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <div class="perfil-sw" id="perfilSw">
+          <button class="perfil-opt${perfil==='Jefatura'?' perfil-active':''}" data-perfil="Jefatura">👤 Jefatura</button>
+          <button class="perfil-opt${perfil==='Supervisión'?' perfil-active perfil-active-sup':''}" data-perfil="Supervisión">🔑 Supervisión</button>
+        </div>
+        <span class="user">${esc(me?.name||me?.username||'')}</span>
+      </div>
     </div>
     <nav class="jef-nav">
       <button class="jef-nav-btn${screen==='pendientes'||screen==='revisar'?' active':''}" data-sc="pendientes">📋 Solicitudes</button>
@@ -411,6 +436,9 @@ function render() {
   document.querySelectorAll('.jef-nav-btn').forEach(b=>b.addEventListener('click',()=>{
     screen=b.dataset.sc; if(screen==='pendientes') activeAction={};
     render();
+  }));
+  document.querySelectorAll('.perfil-opt').forEach(b=>b.addEventListener('click',()=>{
+    perfil=b.dataset.perfil; render();
   }));
   if(screen==='pendientes') bindPendientes();
   else if(screen==='revisar') bindRevisar();
@@ -755,6 +783,9 @@ function revisarHTML() {
           ${(l.FechaAprobada)?`
             <div class="ver-cell"><span class="ver-clbl">Fecha Aprobada</span><span class="ver-cval">${fDate(l.FechaAprobada)}</span></div>
             <div class="ver-cell"><span class="ver-clbl">Hora Aprobada</span><span class="ver-cval">${l.HoraAprobada||'—'}</span></div>`:''}
+          ${(l.DecididoPor)?`
+            <div class="ver-cell"><span class="ver-clbl">Decidido por</span><span class="ver-cval" style="font-size:12px">${esc(l.DecididoPor)}</span></div>
+            <div class="ver-cell"><span class="ver-clbl">Fecha Decisión</span><span class="ver-cval">${fDT(l.FechaDecision)}</span></div>`:''}
           ${cancelInfo}${obsJef}
           ${l.EstadoRecepcion ? `
           <div class="ver-cell" style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
@@ -1011,7 +1042,10 @@ function bindRevisar() {
 }
 
 /* ── HELPERS ──────────────────────────────────────────────────────────────── */
-function quien_es() { return me?.username || me?.name || me?.displayName || 'Desconocido'; }
+function quien_es() {
+  const nombre = me?.name || me?.username || me?.displayName || 'Desconocido';
+  return `${nombre} (${perfil})`;
+}
 
 function patchLocal(lid, fields) {
   const l = lineas.find(x=>x.id===lid);
