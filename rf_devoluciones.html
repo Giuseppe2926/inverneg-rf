@@ -645,12 +645,21 @@ window.nuevaDevolucion  = nuevaDevolucion;
 function __msalError() {
   document.body.innerHTML = '<div style="color:#ef4444;padding:40px;font-family:sans-serif;"><h2>Error de carga</h2><p>No se pudo cargar la librería de autenticación Microsoft (MSAL).<br>Verifica tu conexión a internet y recarga la página.</p></div>';
 }
+function __msalFallback() {
+  // Si jsDelivr falla, intentar con la CDN oficial de Microsoft
+  if (typeof msal !== 'undefined') { __initApp(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js';
+  s.onload = function() { __initApp(); };
+  s.onerror = function() { __msalError(); };
+  document.body.appendChild(s);
+}
 </script>
-<!-- MSAL al final del body, se ejecuta __initApp cuando termina de cargar -->
+<!-- MSAL: jsDelivr primario, alcdn.msauth.net como fallback -->
 <script
   src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"
   onload="__initApp()"
-  onerror="__msalError()">
+  onerror="__msalFallback()">
 </script>
 </body>
 </html>
