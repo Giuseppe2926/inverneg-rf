@@ -641,11 +641,16 @@ window.nuevaDevolucion  = nuevaDevolucion;
 } // fin __initApp
 </script>
 
-<!-- MSAL cargado al final del body para garantizar que el DOM y el script estén listos -->
+<script>
+function __msalError() {
+  document.body.innerHTML = '<div style="color:#ef4444;padding:40px;font-family:sans-serif;"><h2>Error de carga</h2><p>No se pudo cargar la librería de autenticación Microsoft (MSAL).<br>Verifica tu conexión a internet y recarga la página.</p></div>';
+}
+</script>
+<!-- MSAL al final del body, se ejecuta __initApp cuando termina de cargar -->
 <script
   src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library-browser/2.38.3/msal-browser.min.js"
   onload="__initApp()"
-  onerror="document.body.innerHTML='<div style='color:#ef4444;padding:40px;font-family:sans-serif;'><h2>Error de carga</h2><p>No se pudo cargar la librería de autenticación Microsoft (MSAL). Verifica tu conexión a internet y recarga la página.</p></div>'">
+  onerror="__msalError()">
 </script>
 </body>
 </html>
