@@ -416,6 +416,41 @@
 // ============================================================
 // 1. UTILIDADES PURAS
 // ============================================================
+function generarSesionAV(operador, listId, callback) {
+  // Genera ID tipo AV-20261020-CORDERO-001
+  // Consulta SP para saber cuántas sesiones AV tiene el operador hoy y calcula el siguiente
+  var d = new Date();
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+  var hoy = d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate()); // "20261020"
+  var opSlug = operador.split(' ')[0].toUpperCase(); // Primer apellido/nombre
+  var prefijo = 'AV-'+hoy+'-'+opSlug+'-';
+
+  if (!listId) {
+    // Sin listId, generar con timestamp como fallback
+    callback(prefijo+'001');
+    return;
+  }
+
+  // Buscar sesiones AV de este operador hoy en SP
+  var filtro = encodeURIComponent("fields/Operador eq '"+operador+"' and fields/Tipo eq 'ACT_VARIA' and fields/Fecha eq '"+d.toISOString().substring(0,10)+"'");
+  var url = urlLista(listId)+'/items?$filter='+filtro+'&$expand=fields($select=Sesi_x00f3_n)&$top=500';
+
+  graphGet(url).then(function(data){
+    var items = data.value || [];
+    // Recopilar IDs AV únicos de hoy para este operador
+    var idsAV = {};
+    items.forEach(function(item){
+      var s = (item.fields && item.fields['Sesi_x00f3_n']) || '';
+      if (s.indexOf('AV-') === 0) idsAV[s] = true;
+    });
+    var siguiente = Object.keys(idsAV).length + 1;
+    callback(prefijo + String(siguiente).padStart(3,'0'));
+  }).catch(function(){
+    // Si falla la consulta, usar timestamp como fallback
+    callback(prefijo+'001');
+  });
+}
+
 function generarSesion() {
   var d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
   return 'SES-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+
@@ -1373,7 +1408,7 @@ function parsearRegistroActVaria(item, op) {
     tsLocal = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+
               ' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
   }
-  return { actividad: item.fields.Actividad||'', evento: item.fields.Evento||'', ts: tsLocal };
+  return { actividad: item.fields.Actividad||'', evento: item.fields.Evento||'', ts: tsLocal, sesionAV: item.fields['Sesi_x00f3_n']||'' };
 }
 
 function refrescarActividadVaria() {
@@ -1411,23 +1446,34 @@ function refrescarActividadVaria() {
       mapaActs[r.actividad].push(r);
     });
 
-    // Para cada actividad, procesar ciclos INICIO->FIN en secuencia por timestamp
-    // Un INICIO sin FIN posterior = actividad pendiente
+    // Para cada actividad, procesar ciclos INICIO->FIN
+    // Si el registro tiene sesionAV (AV-...), el emparejamiento se hace por ID de sesión
+    // Si no tiene sesionAV (registros viejos), se empareja por timestamp
     var activa = null;
     Object.keys(mapaActs).forEach(function(nombre) {
       var evts = mapaActs[nombre]; // ya ordenados por ts
       var pendiente = null;
       evts.forEach(function(r) {
-        if (r.evento === 'Iniciada' || r.evento === 'INICIO') {
+        var esInicio = r.evento === 'Iniciada' || r.evento === 'INICIO';
+        var esFin    = r.evento === 'Finalizada' || r.evento === 'FIN';
+        if (esInicio) {
           pendiente = r; // abre ciclo
-        } else if ((r.evento === 'Finalizada' || r.evento === 'FIN') && pendiente) {
-          // Solo cerrar si este FIN es posterior al INICIO
-          if (r.ts > pendiente.ts) {
-            pendiente = null; // ciclo cerrado
+        } else if (esFin && pendiente) {
+          // Si ambos tienen sesionAV, verificar que coincidan
+          if (pendiente.sesionAV && r.sesionAV) {
+            if (r.sesionAV === pendiente.sesionAV) {
+              pendiente = null; // ciclo cerrado por ID de sesión AV
+            }
+            // si tienen distinto sesionAV, no cerrar (son pares distintos)
+          } else {
+            // Registros viejos sin sesionAV: cerrar por timestamp
+            if (r.ts > pendiente.ts) {
+              pendiente = null;
+            }
           }
         }
       });
-      // Si quedo un INICIO sin FIN posterior, es la actividad activa
+      // Si quedó un INICIO sin FIN correspondiente, es la actividad pendiente
       if (pendiente) {
         activa = {
           id:    'act_sp_' + nombre.replace(/\s+/g, '_').toLowerCase(),
@@ -1435,6 +1481,7 @@ function refrescarActividadVaria() {
           icon:  '!',
           inicio: pendiente.ts ? pendiente.ts.substring(11,16) : '--',
           ts:    pendiente.ts,
+          sesionAV: pendiente.sesionAV||'',
         };
       }
     });
@@ -1513,10 +1560,14 @@ function iniciarActividadVaria() {
     return;
   }
   var t=ahora();
-  activasVarias[op]={ id:av.id, lbl:av.lbl, icon:av.icon||'⚡', inicio:t.hora, ts:t.ts };
-  logearActVaria('Iniciada',av.lbl,t,null);
-  toast(av.lbl+' iniciada ✓','ok');
-  mostrarVariaActiva();
+  var listId=DB.listIds['varias'];
+  // Generar ID de sesión AV único (AV-20261020-CORDERO-001)
+  generarSesionAV(op, listId, function(sesionAV){
+    activasVarias[op]={ id:av.id, lbl:av.lbl, icon:av.icon||'⚡', inicio:t.hora, ts:t.ts, sesionAV:sesionAV };
+    logearActVaria('Iniciada',av.lbl,t,null,sesionAV);
+    toast(av.lbl+' iniciada ✓','ok');
+    mostrarVariaActiva();
+  });
 }
 function mostrarVariaActiva() {
   var op=estado.operadorActual, activa=activasVarias[op];
@@ -1537,17 +1588,18 @@ function finActividadVaria() {
   var btnFin = document.getElementById('btn-va-fin');
   if (btnFin) { btnFin.disabled = true; btnFin.style.display = 'none'; }
   var t=ahora(), dur=Math.round((new Date(t.ts.replace(' ','T'))-new Date(activa.ts.replace(' ','T')))/60000);
+  var sesionAV=activa.sesionAV||'';
   // Borrar de memoria ANTES de loguear para evitar re-entradas
   delete activasVarias[op];
-  logearActVaria('Finalizada',activa.lbl,t,dur);
+  logearActVaria('Finalizada',activa.lbl,t,dur,sesionAV);
   document.getElementById('va-fin').textContent       =t.hora;
   document.getElementById('va-fin-row').style.display ='flex';
   toast(activa.lbl+' finalizada · '+dur+' min','ok');
   setTimeout(function(){ mostrar('s-tipo'); },1800);
 }
-function logearActVaria(evento,actividadLbl,t,duracion) {
+function logearActVaria(evento,actividadLbl,t,duracion,sesionAV) {
   escribirActVaria({
-    Fecha:t.fecha, Hora:t.hora, Sesion:estado.sesionId,
+    Fecha:t.fecha, Hora:t.hora, Sesion:sesionAV||estado.sesionId,
     Tipo:'ACT_VARIA', Actividad:actividadLbl, Evento:evento,
     Operador:estado.operadorActual, Timestamp:t.ts,
     Duracion_min:duracion!==null?duracion:0,
