@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>RF Devoluciones — Inverneg</title>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+
 <style>
 /* ── TOKENS ─────────────────────────────────────────────── */
 :root{
@@ -277,6 +277,8 @@ input[type="number"].form-input::-webkit-outer-spin-button{-webkit-appearance:no
 <div id="toast"></div>
 
 <script>
+// Inicializar app cuando MSAL esté listo
+function __initApp() {
 (function(){
 'use strict';
 
@@ -369,7 +371,8 @@ function graphPost(url, body) {
 }
 
 // ── INICIALIZACIÓN ────────────────────────────────────────────
-window.addEventListener('load', function(){
+// auto-ejecutar al cargar MSAL
+  (function(){
   msalApp.handleRedirectPromise().then(function(resp){
     if(resp && resp.account) {
       DB.account = resp.account;
@@ -387,7 +390,7 @@ window.addEventListener('load', function(){
     console.error('MSAL error:', e);
     mostrar('s-login');
   });
-});
+  })(); // auto-init
 
 function arrancar() {
   mostrar('s-loading');
@@ -635,6 +638,14 @@ window.limpiarFormulario= limpiarFormulario;
 window.nuevaDevolucion  = nuevaDevolucion;
 
 })();
+} // fin __initApp
+</script>
+
+<!-- MSAL cargado al final del body para garantizar que el DOM y el script estén listos -->
+<script
+  src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library-browser/2.38.3/msal-browser.min.js"
+  onload="__initApp()"
+  onerror="document.body.innerHTML='<div style='color:#ef4444;padding:40px;font-family:sans-serif;'><h2>Error de carga</h2><p>No se pudo cargar la librería de autenticación Microsoft (MSAL). Verifica tu conexión a internet y recarga la página.</p></div>'">
 </script>
 </body>
 </html>
