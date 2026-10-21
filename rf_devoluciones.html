@@ -299,8 +299,7 @@ var msalApp = new msal.PublicClientApplication({
   cache:{ cacheLocation:'sessionStorage', storeAuthStateInCookie:false }
 });
 
-var SCOPES = ['https://graph.microsoft.com/Files.Read',
-              'https://graph.microsoft.com/Sites.ReadWrite.All'];
+var SCOPES = ['Files.ReadWrite', 'Sites.ReadWrite.All'];
 
 // ── ESTADO ──────────────────────────────────────────────────
 var DB = {
