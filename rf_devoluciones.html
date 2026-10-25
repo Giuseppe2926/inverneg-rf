@@ -290,7 +290,7 @@ var GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
 // Nombre de la lista y del archivo Excel
 var LISTA_DEV  = 'DEV_Devoluciones';
-var EXCEL_PATH = '/sites/inverneg/Documents/Documentos de Trabajo/05. Devoluciones/Base Devoluciones.xlsx';
+var EXCEL_PATH = 'Documentos de Trabajo CND/05. Devoluciones/Base Devoluciones.xlsx';
 
 // ── MSAL ────────────────────────────────────────────────────
 var msalApp = new msal.PublicClientApplication({
@@ -432,7 +432,7 @@ function urlLista(){ return '/sites/'+SITE_ID+'/lists/'+DB.listId; }
 function cargarExcel() {
   // Obtener el driveItem del archivo Excel
   var encodedPath = encodeURIComponent(EXCEL_PATH);
-  return graphGet('/sites/'+SITE_ID+'/drive/root:'+EXCEL_PATH)
+  return graphGet('/sites/'+SITE_ID+'/drive/root:/'+EXCEL_PATH)
     .then(function(item){
       var driveId = item.parentReference && item.parentReference.driveId;
       var itemId  = item.id;
