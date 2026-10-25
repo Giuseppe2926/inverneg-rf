@@ -436,12 +436,14 @@ function cargarExcel() {
     .then(function(item){
       var driveId = item.parentReference && item.parentReference.driveId;
       var itemId  = item.id;
-      // Leer las 3 hojas en paralelo
-      return Promise.all([
-        leerHoja(driveId, itemId, 'Personal'),
-        leerHoja(driveId, itemId, 'Cliente'),
-        leerHoja(driveId, itemId, 'Transporte'),
-      ]);
+      // Diagnóstico: listar hojas reales antes de leer
+      return diagnosticarHojas(driveId, itemId).then(function(){
+        return Promise.all([
+          leerHoja(driveId, itemId, 'Personal'),
+          leerHoja(driveId, itemId, 'Cliente'),
+          leerHoja(driveId, itemId, 'Transporte'),
+        ]);
+      });
     })
     .then(function(results){
       // Personal: col A = nombre, col B = código usuario
@@ -477,8 +479,18 @@ function cargarExcel() {
 }
 
 function leerHoja(driveId, itemId, hoja) {
-  var url = '/drives/'+driveId+'/items/'+itemId+'/workbook/worksheets/\''+encodeURIComponent(hoja)+'\'/usedRange?$select=values';
+  // Nota: el nombre de la hoja va entre comillas simples en la URL de Graph
+  var url = '/drives/'+driveId+'/items/'+itemId+"/workbook/worksheets('"+encodeURIComponent(hoja)+"')/usedRange?$select=values";
   return graphGet(url);
+}
+
+function diagnosticarHojas(driveId, itemId) {
+  return graphGet('/drives/'+driveId+'/items/'+itemId+'/workbook/worksheets')
+    .then(function(data){
+      var nombres = (data.value||[]).map(function(h){ return h.name; });
+      console.log('[DEV] Hojas encontradas en Excel:', JSON.stringify(nombres));
+      return nombres;
+    });
 }
 
 // ── PREPARAR FORMULARIO ───────────────────────────────────────
