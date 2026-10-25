@@ -591,16 +591,16 @@ function guardarDevolucion() {
   var codigoReg = matchReg ? matchReg.usuario : regx;
 
   var fields = {
-    'Title':           factura,
-    'FECHA_x0020_DE_x0020_RECIBIDO': fechaRec,
-    'USUARIO':         codigoUsu,
-    'CLIENTE':         cliente,
-    'FACTURA':         factura,
-    'TRANSPORTE':      transporte,
-    'IDRA':            idra ? parseFloat(idra) : null,
-    'FECHA_x0020_DE_x0020_REGISTRO': fechaReg,
-    'REGISTRADO_x0020_X':            codigoReg,
-    'NOVEDADES':       novedades,
+    'Title':            factura,
+    'FECHADERECIBIDO':  fechaRec,
+    'USUARIO':          codigoUsu,
+    'CLIENTE':          cliente,
+    'FACTURA':          factura,
+    'TRANSPORTE':       transporte,
+    'IDRA':             idra ? parseFloat(idra) : null,
+    'FECHADEREGISTRO':  fechaReg,
+    'REGISTRADOX':      codigoReg,
+    'NOVEDADES':        novedades,
   };
 
   // Limpiar nulls
