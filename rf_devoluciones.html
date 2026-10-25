@@ -415,9 +415,11 @@ function setLoading(txt){ document.getElementById('loading-txt').textContent = t
 function cargarListId() {
   var cached = sessionStorage.getItem('dev_listId');
   if(cached){ DB.listId = cached; return Promise.resolve(); }
-  return graphGet('/sites/'+SITE_ID+'/lists?$filter=name eq \''+LISTA_DEV+'\'&$select=id,name')
+  return graphGet('/sites/'+SITE_ID+'/lists?$select=id,name,displayName')
     .then(function(data){
-      var lst = (data.value||[]).find(function(l){ return l.name===LISTA_DEV || l.displayName===LISTA_DEV; });
+      var lst = (data.value||[]).find(function(l){
+        return l.name===LISTA_DEV || l.displayName===LISTA_DEV;
+      });
       if(!lst) throw new Error('No se encontró la lista '+LISTA_DEV);
       DB.listId = lst.id;
       sessionStorage.setItem('dev_listId', lst.id);
