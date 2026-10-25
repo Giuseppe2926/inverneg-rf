@@ -417,38 +417,14 @@
 // 1. UTILIDADES PURAS
 // ============================================================
 function generarSesionAV(operador, listId, callback) {
-  // Genera ID tipo AV-20261020-CORDERO-001
-  // Consulta SP para saber cuántas sesiones AV tiene el operador hoy y calcula el siguiente
+  // Genera ID tipo AV-20261020-143052-CORDERO
+  // Usa timestamp local — no consulta SP (Graph $filter en listas no es confiable)
   var d = new Date();
   var pad = function(n){ return String(n).padStart(2,'0'); };
-  var hoy = d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate()); // "20261020"
-  var opSlug = operador.split(' ')[0].toUpperCase(); // Primer apellido/nombre
-  var prefijo = 'AV-'+hoy+'-'+opSlug+'-';
-
-  if (!listId) {
-    // Sin listId, generar con timestamp como fallback
-    callback(prefijo+'001');
-    return;
-  }
-
-  // Buscar sesiones AV de este operador hoy en SP
-  var filtro = encodeURIComponent("fields/Operador eq '"+operador+"' and fields/Tipo eq 'ACT_VARIA' and fields/Fecha eq '"+d.toISOString().substring(0,10)+"'");
-  var url = urlLista(listId)+'/items?$filter='+filtro+'&$expand=fields($select=Sesi_x00f3_n)&$top=500';
-
-  graphGet(url).then(function(data){
-    var items = data.value || [];
-    // Recopilar IDs AV únicos de hoy para este operador
-    var idsAV = {};
-    items.forEach(function(item){
-      var s = (item.fields && item.fields['Sesi_x00f3_n']) || '';
-      if (s.indexOf('AV-') === 0) idsAV[s] = true;
-    });
-    var siguiente = Object.keys(idsAV).length + 1;
-    callback(prefijo + String(siguiente).padStart(3,'0'));
-  }).catch(function(){
-    // Si falla la consulta, usar timestamp como fallback
-    callback(prefijo+'001');
-  });
+  var hoy  = d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());
+  var hora = pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
+  var opSlug = operador.split(' ')[0].toUpperCase();
+  callback('AV-'+hoy+'-'+hora+'-'+opSlug);
 }
 
 function generarSesion() {
@@ -888,22 +864,40 @@ function escribirEnExcel(fila) {
 }
 
 // Escribir registro en RF_Actividades_Varias
-function escribirActVaria(fila) {
+function escribirActVaria(fila, onExito, onError) {
   var listId = DB.listIds['varias'];
-  if (!listId) { console.warn('Lista varias no disponible'); return; }
+  if (!listId) {
+    var msg = 'Lista RF_Actividades_Varias no encontrada en SharePoint';
+    console.error('[ActVaria]', msg);
+    toast('⚠️ '+msg, 'err', 6000);
+    if (onError) onError(new Error(msg));
+    return;
+  }
   var url = urlLista(listId)+'/items';
+  // Solo campos que existen en RF_Actividades_Varias
   var fields = {
-    Actividad:            fila.Actividad     || '',
-    Evento:               fila.Evento        || '',
-    Operador:             fila.Operador      || '',
-    Sesi_x00f3_n:         fila.Sesion        || '',
-    TimestampEvento:      fila.Timestamp     || '',
-    Duraci_x00f3_nMin:    fila.Duracion_min  !==undefined ? fila.Duracion_min : 0,
+    Actividad:         fila.Actividad    || '',
+    Evento:            fila.Evento       || '',
+    Operador:          fila.Operador     || '',
+    Sesi_x00f3_n:      fila.Sesion       || '',
+    TimestampEvento:   fila.Timestamp    || '',
+    Duraci_x00f3_nMin: fila.Duracion_min !== undefined && fila.Duracion_min !== null
+                         ? Number(fila.Duracion_min) : 0,
   };
-  console.log('[POST] RF_Actividades_Varias — campos:', JSON.stringify(fields));
-  graphPost(url, { fields:fields })
-    .then(function(){ console.log('[OK] RF_Actividades_Varias guardada'); })
-    .catch(function(e){ console.error('[ERROR] RF_Actividades_Varias:', e.message); toast('Error al guardar actividad','err',4000); });
+  console.log('[POST] RF_Actividades_Varias — URL:', url);
+  console.log('[POST] RF_Actividades_Varias — fields:', JSON.stringify(fields));
+  graphPost(url, { fields: fields })
+    .then(function(res){
+      console.log('[OK] RF_Actividades_Varias guardada — id:', res && res.id);
+      if (onExito) onExito(res);
+    })
+    .catch(function(e){
+      // Mostrar error completo al usuario para diagnóstico
+      var msg = e.message || 'Error desconocido';
+      console.error('[ERROR] RF_Actividades_Varias POST falló:', msg);
+      toast('❌ No se guardó la actividad: '+msg, 'err', 8000);
+      if (onError) onError(e);
+    });
 }
 
 // Actualizar estado de orden en RF_Estado_OT
@@ -1559,14 +1553,30 @@ function iniciarActividadVaria() {
     mostrarVariaActiva();
     return;
   }
+  // Deshabilitar botón para evitar doble tap
+  var btnIni = document.querySelector('#s-varias-confirmar .btn-teal');
+  if (btnIni) { btnIni.disabled = true; btnIni.textContent = '⏳ Guardando...'; }
+
   var t=ahora();
   var listId=DB.listIds['varias'];
-  // Generar ID de sesión AV único (AV-20261020-CORDERO-001)
   generarSesionAV(op, listId, function(sesionAV){
-    activasVarias[op]={ id:av.id, lbl:av.lbl, icon:av.icon||'⚡', inicio:t.hora, ts:t.ts, sesionAV:sesionAV };
-    logearActVaria('Iniciada',av.lbl,t,null,sesionAV);
-    toast(av.lbl+' iniciada ✓','ok');
-    mostrarVariaActiva();
+    var fila = {
+      Fecha:t.fecha, Hora:t.hora, Sesion:sesionAV,
+      Tipo:'ACT_VARIA', Actividad:av.lbl, Evento:'Iniciada',
+      Operador:op, Timestamp:t.ts, Duracion_min:null,
+      Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
+      Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(),
+    };
+    escribirActVaria(fila,
+      function(){ // éxito
+        activasVarias[op]={ id:av.id, lbl:av.lbl, icon:av.icon||'⚡', inicio:t.hora, ts:t.ts, sesionAV:sesionAV };
+        toast(av.lbl+' iniciada ✓','ok');
+        mostrarVariaActiva();
+      },
+      function(){ // error — rehabilitar botón
+        if (btnIni) { btnIni.disabled = false; btnIni.textContent = '▶ Iniciar Actividad'; }
+      }
+    );
   });
 }
 function mostrarVariaActiva() {
@@ -1586,27 +1596,33 @@ function finActividadVaria() {
   if (!activa) return;
   // Deshabilitar boton inmediatamente para evitar doble tap
   var btnFin = document.getElementById('btn-va-fin');
-  if (btnFin) { btnFin.disabled = true; btnFin.style.display = 'none'; }
+  if (btnFin) { btnFin.disabled = true; btnFin.textContent = '⏳ Guardando...'; }
   var t=ahora(), dur=Math.round((new Date(t.ts.replace(' ','T'))-new Date(activa.ts.replace(' ','T')))/60000);
   var sesionAV=activa.sesionAV||'';
-  // Borrar de memoria ANTES de loguear para evitar re-entradas
-  delete activasVarias[op];
-  logearActVaria('Finalizada',activa.lbl,t,dur,sesionAV);
-  document.getElementById('va-fin').textContent       =t.hora;
-  document.getElementById('va-fin-row').style.display ='flex';
-  toast(activa.lbl+' finalizada · '+dur+' min','ok');
-  setTimeout(function(){ mostrar('s-tipo'); },1800);
-}
-function logearActVaria(evento,actividadLbl,t,duracion,sesionAV) {
-  escribirActVaria({
-    Fecha:t.fecha, Hora:t.hora, Sesion:sesionAV||estado.sesionId,
-    Tipo:'ACT_VARIA', Actividad:actividadLbl, Evento:evento,
-    Operador:estado.operadorActual, Timestamp:t.ts,
-    Duracion_min:duracion!==null?duracion:0,
+  var fila = {
+    Fecha:t.fecha, Hora:t.hora, Sesion:sesionAV,
+    Tipo:'ACT_VARIA', Actividad:activa.lbl, Evento:'Finalizada',
+    Operador:op, Timestamp:t.ts, Duracion_min:dur,
     Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
     Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(),
-  });
+  };
+  // Borrar de memoria ANTES de loguear para evitar re-entradas
+  delete activasVarias[op];
+  escribirActVaria(fila,
+    function(){ // éxito
+      document.getElementById('va-fin').textContent       = t.hora;
+      document.getElementById('va-fin-row').style.display = 'flex';
+      toast(activa.lbl+' finalizada · '+dur+' min','ok');
+      setTimeout(function(){ mostrar('s-tipo'); }, 1800);
+    },
+    function(){ // error — devolver al estado activo para que pueda reintentar
+      activasVarias[op] = activa;
+      if (btnFin) { btnFin.disabled = false; btnFin.style.display = 'block'; btnFin.textContent = '■ Finalizar Actividad'; }
+    }
+  );
 }
+// logearActVaria eliminado — iniciarActividadVaria y finActividadVaria
+// llaman a escribirActVaria directamente con callbacks de éxito/error
 
 // ============================================================
 // 14. NAV
