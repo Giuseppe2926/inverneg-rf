@@ -396,6 +396,10 @@
     </button>
   </div>
   <button class="btn btn-gris btn-sm" onclick="mostrar('s-tipo')">⌂ Menú principal</button>
+  <button class="btn btn-sm" onclick="forzarCierreVaria()"
+    style="background:transparent;border:1px solid var(--danger);color:var(--danger);margin-top:4px;font-size:12px;">
+    ⚠️ Forzar cierre de actividad
+  </button>
 </div>
 
 </main>
@@ -863,41 +867,55 @@ function escribirEnExcel(fila) {
     .catch(function(e){ console.error('[ERROR] RF_Registros_Despacho:', e.message); toast('Error al guardar registro','err',4000); });
 }
 
-// Escribir registro en RF_Actividades_Varias
-function escribirActVaria(fila, onExito, onError) {
+// ============================================================
+// ACTIVIDADES VARIAS — modelo registro único
+// Un solo ítem SP por sesión AV:
+//   POST al iniciar  → crea ítem con Estado='Activa'
+//   PATCH al cerrar  → actualiza ese mismo ítem: Estado='Cerrada', HoraFin, DuracionMin
+// Nunca quedan registros huérfanos porque no hay dos filas que emparejar.
+// ============================================================
+
+// Crea el ítem inicial en SP. Devuelve Promise<spItemId>
+function avCrearEnSP(op, actividad, sesionAV, t) {
   var listId = DB.listIds['varias'];
-  if (!listId) {
-    var msg = 'Lista RF_Actividades_Varias no encontrada en SharePoint';
-    console.error('[ActVaria]', msg);
-    toast('⚠️ '+msg, 'err', 6000);
-    if (onError) onError(new Error(msg));
-    return;
-  }
-  var url = urlLista(listId)+'/items';
-  // Solo campos que existen en RF_Actividades_Varias
+  if (!listId) return Promise.reject(new Error('Lista RF_Actividades_Varias no encontrada'));
   var fields = {
-    Actividad:         fila.Actividad    || '',
-    Evento:            fila.Evento       || '',
-    Operador:          fila.Operador     || '',
-    Sesi_x00f3_n:      fila.Sesion       || '',
-    TimestampEvento:   fila.Timestamp    || '',
-    Duraci_x00f3_nMin: fila.Duracion_min !== undefined && fila.Duracion_min !== null
-                         ? Number(fila.Duracion_min) : 0,
+    Actividad:       actividad,
+    Operador:        op,
+    Sesi_x00f3_n:    sesionAV,
+    TimestampEvento: t.ts,
+    Evento:          'Iniciada',
+    Duraci_x00f3_nMin: 0,
   };
-  console.log('[POST] RF_Actividades_Varias — URL:', url);
-  console.log('[POST] RF_Actividades_Varias — fields:', JSON.stringify(fields));
-  graphPost(url, { fields: fields })
+  console.log('[AV POST] fields:', JSON.stringify(fields));
+  return graphPost(urlLista(listId)+'/items', { fields: fields })
     .then(function(res){
-      console.log('[OK] RF_Actividades_Varias guardada — id:', res && res.id);
-      if (onExito) onExito(res);
-    })
-    .catch(function(e){
-      // Mostrar error completo al usuario para diagnóstico
-      var msg = e.message || 'Error desconocido';
-      console.error('[ERROR] RF_Actividades_Varias POST falló:', msg);
-      toast('❌ No se guardó la actividad: '+msg, 'err', 8000);
-      if (onError) onError(e);
+      console.log('[AV POST OK] id:', res && res.id);
+      return res.id;
     });
+}
+
+// Actualiza el ítem existente al cerrar. Devuelve Promise
+function avCerrarEnSP(spItemId, actividad, durMin, tFin) {
+  var listId = DB.listIds['varias'];
+  if (!listId) return Promise.reject(new Error('Lista RF_Actividades_Varias no encontrada'));
+  var fields = {
+    Evento:            'Finalizada',
+    Duraci_x00f3_nMin: durMin,
+    TimestampEvento:   tFin.ts,   // sobrescribe con hora de fin
+  };
+  console.log('[AV PATCH] item:', spItemId, 'fields:', JSON.stringify(fields));
+  return graphPatch(urlLista(listId)+'/items/'+spItemId, { fields: fields })
+    .then(function(){ console.log('[AV PATCH OK] item:', spItemId); });
+}
+
+// Fuerza cierre de una actividad abierta (sesionAV conocida, spItemId conocido)
+// sin calcular duración real — útil para limpiar desde el app
+function avForzarCierreEnSP(spItemId) {
+  var listId = DB.listIds['varias'];
+  if (!listId) return Promise.reject(new Error('Lista RF_Actividades_Varias no encontrada'));
+  var fields = { Evento: 'Finalizada', Duraci_x00f3_nMin: 0 };
+  return graphPatch(urlLista(listId)+'/items/'+spItemId, { fields: fields });
 }
 
 // Actualizar estado de orden en RF_Estado_OT
@@ -1392,103 +1410,90 @@ function ejecutarAccion() {
 // ============================================================
 // 13. FLUJO ACTIVIDADES VARIAS
 // ============================================================
-function parsearRegistroActVaria(item, op) {
-  if (!item.fields || item.fields.Operador !== op) return null;
-  var tsRaw = item.fields.TimestampEvento || '';
-  var tsLocal = '';
-  if (tsRaw) {
-    var d = new Date(tsRaw);
-    var pad = function(n){ return String(n).padStart(2,'0'); };
-    tsLocal = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+
-              ' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
-  }
-  return { actividad: item.fields.Actividad||'', evento: item.fields.Evento||'', ts: tsLocal, sesionAV: item.fields['Sesi_x00f3_n']||'' };
-}
-
+// Busca en SP el ítem más reciente del operador con Evento='Iniciada'.
+// Si existe → ese es la actividad abierta (guarda su spItemId para el PATCH).
+// Si no existe → no hay actividad abierta.
+// Carga solo los últimos 200 ítems del operador (ordenados por ID desc) —
+// suficiente para encontrar la apertura más reciente sin paginar toda la lista.
 function refrescarActividadVaria() {
   var listId = DB.listIds['varias'];
   var op = estado.operadorActual;
   if (!listId || !op) return Promise.resolve();
-  console.log('[ActVaria] Refrescando para operador:', op);
 
-  var todosRegistros = [];
+  // Trae los últimos registros del operador, ordenados más recientes primero
+  var url = urlLista(listId)+
+    '/items?$orderby=ID%20desc'+
+    '&$expand=fields($select=Actividad,Evento,Operador,Sesi_x00f3_n,TimestampEvento)'+
+    '&$top=200';
 
-  function cargarPagina(url) {
-    return graphGet(url).then(function(data) {
-      if (data.value) {
-        data.value.forEach(function(item) {
-          var r = parsearRegistroActVaria(item, op);
-          if (r) todosRegistros.push(r);
-        });
-      }
-      if (data['@odata.nextLink']) {
-        return cargarPagina(data['@odata.nextLink']);
-      }
+  var todosItems = [];
+  function cargarPagina(u) {
+    return graphGet(u).then(function(data) {
+      (data.value||[]).forEach(function(item){
+        if (item.fields && item.fields.Operador === op) todosItems.push(item);
+      });
+      // Si ya tenemos suficientes del operador, cortar
+      if (todosItems.length >= 50) return;
+      if (data['@odata.nextLink']) return cargarPagina(data['@odata.nextLink']);
     });
   }
 
-  var baseUrl = urlLista(listId)+'/items?$orderby=ID%20desc&$expand=fields($select=Actividad,Evento,Operador,Sesi_x00f3_n,TimestampEvento)&$top=500';
-  return cargarPagina(baseUrl).then(function() {
-    var registros = todosRegistros.sort(function(a,b){ return a.ts.localeCompare(b.ts); });
-    console.log('[ActVaria] Registros del operador:', registros.length);
-    registros.forEach(function(r){ console.log('[ActVaria]  ', r.ts, r.actividad, r.evento); });
+  return cargarPagina(url).then(function() {
+    // Buscar el ítem 'Iniciada' más reciente que NO tenga un 'Finalizada' con la misma sesionAV
+    // Como vienen ordenados desc por ID, el primero 'Iniciada' que encontremos sin par es el activo
+    var sesionesConFin = {};
+    var itemActivo = null;
 
-    // Agrupar por actividad
-    var mapaActs = {};
-    registros.forEach(function(r){
-      if (!mapaActs[r.actividad]) mapaActs[r.actividad] = [];
-      mapaActs[r.actividad].push(r);
-    });
-
-    // Para cada actividad, procesar ciclos INICIO->FIN
-    // Si el registro tiene sesionAV (AV-...), el emparejamiento se hace por ID de sesión
-    // Si no tiene sesionAV (registros viejos), se empareja por timestamp
-    var activa = null;
-    Object.keys(mapaActs).forEach(function(nombre) {
-      var evts = mapaActs[nombre]; // ya ordenados por ts
-      var pendiente = null;
-      evts.forEach(function(r) {
-        var esInicio = r.evento === 'Iniciada' || r.evento === 'INICIO';
-        var esFin    = r.evento === 'Finalizada' || r.evento === 'FIN';
-        if (esInicio) {
-          pendiente = r; // abre ciclo
-        } else if (esFin && pendiente) {
-          // Si ambos tienen sesionAV, verificar que coincidan
-          if (pendiente.sesionAV && r.sesionAV) {
-            if (r.sesionAV === pendiente.sesionAV) {
-              pendiente = null; // ciclo cerrado por ID de sesión AV
-            }
-            // si tienen distinto sesionAV, no cerrar (son pares distintos)
-          } else {
-            // Registros viejos sin sesionAV: cerrar por timestamp
-            if (r.ts > pendiente.ts) {
-              pendiente = null;
-            }
-          }
-        }
-      });
-      // Si quedó un INICIO sin FIN correspondiente, es la actividad pendiente
-      if (pendiente) {
-        activa = {
-          id:    'act_sp_' + nombre.replace(/\s+/g, '_').toLowerCase(),
-          lbl:   nombre,
-          icon:  '!',
-          inicio: pendiente.ts ? pendiente.ts.substring(11,16) : '--',
-          ts:    pendiente.ts,
-          sesionAV: pendiente.sesionAV||'',
-        };
+    // Primero recopilar todas las sesionAV que ya tienen Finalizada
+    todosItems.forEach(function(item) {
+      var f = item.fields;
+      var ev  = (f.Evento||'').trim();
+      var ses = (f['Sesi_x00f3_n']||'').trim();
+      if ((ev === 'Finalizada' || ev === 'FIN') && ses) {
+        sesionesConFin[ses] = true;
       }
     });
 
-    if (activa && !activasVarias[op]) {
-      activasVarias[op] = activa;
-      console.log('Actividad recuperada desde SP:', activa.lbl, 'para', op);
-    } else if (!activa && activasVarias[op] && activasVarias[op].id.startsWith('act_sp_')) {
-      // Si habia una activa cargada desde SP pero ya tiene FIN, limpiarla
-      delete activasVarias[op];
-      console.log('Actividad SP ya finalizada, limpiada para:', op);
+    // Luego buscar el primer Iniciada cuya sesion NO esté cerrada
+    for (var i = 0; i < todosItems.length; i++) {
+      var f = todosItems[i].fields;
+      var ev  = (f.Evento||'').trim();
+      var ses = (f['Sesi_x00f3_n']||'').trim();
+      if (ev === 'Iniciada' || ev === 'INICIO') {
+        // Si tiene sesionAV y ya tiene FIN → cerrada, saltar
+        if (ses && sesionesConFin[ses]) continue;
+        // Si no tiene sesionAV → registro viejo huérfano; lo marcamos igual
+        var tsRaw = f.TimestampEvento || '';
+        var tsLocal = '';
+        if (tsRaw) {
+          var d2 = new Date(tsRaw);
+          var pad = function(n){ return String(n).padStart(2,'0'); };
+          tsLocal = d2.getFullYear()+'-'+pad(d2.getMonth()+1)+'-'+pad(d2.getDate())+
+                    ' '+pad(d2.getHours())+':'+pad(d2.getMinutes())+':'+pad(d2.getSeconds());
+        }
+        itemActivo = {
+          spItemId: todosItems[i].id,          // ID del ítem SP — para el PATCH
+          lbl:      f.Actividad || '?',
+          inicio:   tsLocal ? tsLocal.substring(11,16) : '--',
+          ts:       tsLocal,
+          sesionAV: ses,
+          id:       'act_sp_'+(f.Actividad||'x').replace(/\s+/g,'_').toLowerCase(),
+          icon:     '⚡',
+        };
+        break; // solo la más reciente
+      }
     }
-  }).catch(function(e){ console.warn('refrescarActividadVaria:', e.message); });
+
+    console.log('[ActVaria]', op, '→', itemActivo ? ('activa: '+itemActivo.lbl+' spItem:'+itemActivo.spItemId) : 'sin actividad abierta');
+
+    if (itemActivo) {
+      // Siempre sobreescribir con lo que dice SP (fuente de verdad)
+      activasVarias[op] = itemActivo;
+    } else {
+      // SP no tiene nada abierto → limpiar memoria
+      delete activasVarias[op];
+    }
+  }).catch(function(e){ console.warn('[ActVaria] refrescar error:', e.message); });
 }
 
 function abrirActVarias() {
@@ -1547,82 +1552,111 @@ function selActVaria(av,estaActiva) {
   mostrar('s-varias-confirmar');
 }
 function iniciarActividadVaria() {
-  var op=estado.operadorActual, av=variaSeleccionada;
+  var op = estado.operadorActual, av = variaSeleccionada;
   if (activasVarias[op]) {
-    toast('Ya tienes una actividad activa: '+activasVarias[op].lbl,'warn',3000);
+    toast('Ya tienes una actividad activa: '+activasVarias[op].lbl, 'warn', 3000);
     mostrarVariaActiva();
     return;
   }
-  // Deshabilitar botón para evitar doble tap
   var btnIni = document.querySelector('#s-varias-confirmar .btn-teal');
   if (btnIni) { btnIni.disabled = true; btnIni.textContent = '⏳ Guardando...'; }
 
-  var t=ahora();
-  var listId=DB.listIds['varias'];
-  generarSesionAV(op, listId, function(sesionAV){
-    var fila = {
-      Fecha:t.fecha, Hora:t.hora, Sesion:sesionAV,
-      Tipo:'ACT_VARIA', Actividad:av.lbl, Evento:'Iniciada',
-      Operador:op, Timestamp:t.ts, Duracion_min:null,
-      Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
-      Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(),
-    };
-    escribirActVaria(fila,
-      function(){ // éxito
-        activasVarias[op]={ id:av.id, lbl:av.lbl, icon:av.icon||'⚡', inicio:t.hora, ts:t.ts, sesionAV:sesionAV };
-        toast(av.lbl+' iniciada ✓','ok');
+  var t = ahora();
+  generarSesionAV(op, null, function(sesionAV) {
+    avCrearEnSP(op, av.lbl, sesionAV, t)
+      .then(function(spItemId) {
+        activasVarias[op] = {
+          id: av.id, lbl: av.lbl, icon: av.icon||'⚡',
+          inicio: t.hora, ts: t.ts, sesionAV: sesionAV,
+          spItemId: spItemId,   // ← guardamos el ID del ítem SP
+        };
+        toast(av.lbl+' iniciada ✓', 'ok');
         mostrarVariaActiva();
-      },
-      function(){ // error — rehabilitar botón
+      })
+      .catch(function(e) {
+        console.error('[AV] iniciar falló:', e.message);
+        toast('❌ No se pudo iniciar: '+e.message, 'err', 7000);
         if (btnIni) { btnIni.disabled = false; btnIni.textContent = '▶ Iniciar Actividad'; }
-      }
-    );
+      });
   });
 }
+
 function mostrarVariaActiva() {
-  var op=estado.operadorActual, activa=activasVarias[op];
-  document.getElementById('va-act-lbl').textContent    =activa.lbl;
-  document.getElementById('va-op-val').textContent     =op;
-  document.getElementById('va-inicio-sub').textContent ='Inicio: '+activa.inicio;
-  document.getElementById('va-op').textContent         =op;
-  document.getElementById('va-act').textContent        =activa.lbl;
-  document.getElementById('va-inicio').textContent     =activa.inicio;
-  document.getElementById('va-fin-row').style.display  ='none';
-  document.getElementById('btn-va-fin').style.display  ='block';
+  var op = estado.operadorActual, activa = activasVarias[op];
+  if (!activa) { mostrar('s-varias'); return; }
+  document.getElementById('va-act-lbl').textContent    = activa.lbl;
+  document.getElementById('va-op-val').textContent     = op;
+  document.getElementById('va-inicio-sub').textContent = 'Inicio: '+activa.inicio;
+  document.getElementById('va-op').textContent         = op;
+  document.getElementById('va-act').textContent        = activa.lbl;
+  document.getElementById('va-inicio').textContent     = activa.inicio;
+  document.getElementById('va-fin-row').style.display  = 'none';
+  document.getElementById('btn-va-fin').style.display  = 'block';
+  document.getElementById('btn-va-fin').disabled       = false;
+  document.getElementById('btn-va-fin').textContent    = '■ Finalizar Actividad';
   mostrar('s-varias-activa');
 }
+
 function finActividadVaria() {
-  var op=estado.operadorActual, activa=activasVarias[op];
+  var op = estado.operadorActual, activa = activasVarias[op];
   if (!activa) return;
-  // Deshabilitar boton inmediatamente para evitar doble tap
   var btnFin = document.getElementById('btn-va-fin');
   if (btnFin) { btnFin.disabled = true; btnFin.textContent = '⏳ Guardando...'; }
-  var t=ahora(), dur=Math.round((new Date(t.ts.replace(' ','T'))-new Date(activa.ts.replace(' ','T')))/60000);
-  var sesionAV=activa.sesionAV||'';
-  var fila = {
-    Fecha:t.fecha, Hora:t.hora, Sesion:sesionAV,
-    Tipo:'ACT_VARIA', Actividad:activa.lbl, Evento:'Finalizada',
-    Operador:op, Timestamp:t.ts, Duracion_min:dur,
-    Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
-    Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(),
-  };
-  // Borrar de memoria ANTES de loguear para evitar re-entradas
-  delete activasVarias[op];
-  escribirActVaria(fila,
-    function(){ // éxito
+
+  var t   = ahora();
+  var dur = activa.ts
+    ? Math.max(0, Math.round((new Date(t.ts.replace(' ','T')) - new Date(activa.ts.replace(' ','T'))) / 60000))
+    : 0;
+
+  // Usar spItemId del registro original para hacer PATCH (no crear fila nueva)
+  var spItemId = activa.spItemId || null;
+
+  var cerrar = spItemId
+    ? avCerrarEnSP(spItemId, activa.lbl, dur, t)
+    : Promise.reject(new Error('spItemId desconocido — recarga la app e intenta de nuevo'));
+
+  delete activasVarias[op]; // limpiar memoria antes de la llamada
+
+  cerrar
+    .then(function() {
       document.getElementById('va-fin').textContent       = t.hora;
       document.getElementById('va-fin-row').style.display = 'flex';
-      toast(activa.lbl+' finalizada · '+dur+' min','ok');
+      if (btnFin) btnFin.style.display = 'none';
+      toast(activa.lbl+' finalizada · '+dur+' min', 'ok');
       setTimeout(function(){ mostrar('s-tipo'); }, 1800);
-    },
-    function(){ // error — devolver al estado activo para que pueda reintentar
+    })
+    .catch(function(e) {
+      console.error('[AV] cerrar falló:', e.message);
+      // Devolver al estado activo para que pueda reintentar
       activasVarias[op] = activa;
+      toast('❌ Error al finalizar: '+e.message, 'err', 7000);
       if (btnFin) { btnFin.disabled = false; btnFin.style.display = 'block'; btnFin.textContent = '■ Finalizar Actividad'; }
-    }
-  );
+    });
 }
-// logearActVaria eliminado — iniciarActividadVaria y finActividadVaria
-// llaman a escribirActVaria directamente con callbacks de éxito/error
+
+// Forzar cierre desde la pantalla de actividad activa (botón de rescate)
+function forzarCierreVaria() {
+  var op = estado.operadorActual, activa = activasVarias[op];
+  if (!activa) { mostrar('s-tipo'); return; }
+  if (!activa.spItemId) {
+    toast('Sin ID de registro — limpiando sesión local', 'warn', 4000);
+    delete activasVarias[op];
+    mostrar('s-tipo');
+    return;
+  }
+  var btnFin = document.getElementById('btn-va-fin');
+  if (btnFin) { btnFin.disabled = true; }
+  avForzarCierreEnSP(activa.spItemId)
+    .then(function() {
+      delete activasVarias[op];
+      toast('Actividad cerrada ✓', 'ok');
+      mostrar('s-tipo');
+    })
+    .catch(function(e) {
+      toast('❌ Error: '+e.message, 'err', 6000);
+      if (btnFin) btnFin.disabled = false;
+    });
+}
 
 // ============================================================
 // 14. NAV
@@ -1657,6 +1691,7 @@ window.abrirOverride         = abrirOverride;
 window.cerrarOverride        = cerrarOverride;
 window.confirmarOverride     = confirmarOverride;
 window.selActVaria           = selActVaria;
+window.forzarCierreVaria     = forzarCierreVaria;
 
 init();
 
