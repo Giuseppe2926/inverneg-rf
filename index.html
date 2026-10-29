@@ -1497,50 +1497,59 @@ function refrescarActividadVaria() {
 }
 
 function abrirActVarias() {
-  var op=estado.operadorActual;
-  var banner=document.getElementById('banner-activa');
-  var grid=document.getElementById('varias-grid');
-  banner.style.display='none';
-  grid.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">Verificando actividades...</div>';
+  var op = estado.operadorActual;
+  var grid = document.getElementById('varias-grid');
+  document.getElementById('banner-activa').style.display = 'none';
+  grid.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--sub)">⏳ Verificando...</div>';
   mostrar('s-varias');
-  refrescarActividadVaria().then(function(){
-    var activa=activasVarias[op];
-    if (activa){ banner.style.display='flex'; document.getElementById('banner-activa-det').textContent=activa.lbl+' — iniciada a las '+activa.inicio+'. Debes finalizarla primero.'; }
-    else { banner.style.display='none'; }
-    grid.innerHTML='';
-  var lista=DB.actividades.length>0?DB.actividades:[
-    { id:'inventario',    lbl:'Inventario',                  color:'var(--fact)'  },
-    { id:'etiquetar',     lbl:'Etiquetar',                   color:'var(--warn)'  },
-    { id:'danados',       lbl:'Danados',                     color:'var(--danger)'},
-    { id:'mkt',           lbl:'MKT',                         color:'#FF6AD2'      },
-    { id:'destruccion',   lbl:'Destruccion',                 color:'#FF8C42'      },
-    { id:'embPallets',    lbl:'Embarque Pallets',            color:'var(--teal)'  },
-    { id:'embDanados',    lbl:'Embarque Danados',            color:'var(--pack)'  },
-    { id:'stock',         lbl:'Stock',                       color:'var(--fact)'  },
-    { id:'diario',        lbl:'Diario',                      color:'var(--pick)'  },
-    { id:'perchado',      lbl:'Perchado',                    color:'var(--warn)'  },
-    { id:'abastecimiento',lbl:'Abastecimiento',              color:'var(--teal)'  },
-    { id:'recepTransf',   lbl:'Recepcion de Transferencias', color:'#FF8C42'      },
-    { id:'recepDevol',    lbl:'Recepcion de Devoluciones',   color:'var(--pack)'  },
-    { id:'procDevol',     lbl:'Procesar Devoluciones',       color:'var(--danger)'},
-    { id:'recepCont',     lbl:'Recepcion de Contenedores',   color:'var(--fact)'  },
-    { id:'revImport',     lbl:'Revision de Importaciones',   color:'var(--warn)'  },
-    { id:'sepImport',     lbl:'Separacion de Importaciones', color:'#FF6AD2'      },
-    { id:'desalojo',      lbl:'Desalojo de Materiales',      color:'#FF8C42'      },
-    { id:'infImport',     lbl:'Informe de Importaciones',    color:'var(--pick)'  },
-  ];
-  lista.forEach(function(av){
-    // Comparar por nombre (lbl) porque el id puede tener prefijo distinto si viene de SP
-    var estaActiva=activa&&activa.lbl===av.lbl;
-    var bloqueada=activa&&!estaActiva;
-    if (bloqueada) return;
-    var div=document.createElement('div'); div.className='var-card';
-    div.style.borderColor=av.color; div.style.color=av.color;
-    div.innerHTML='<div class="v-lbl">'+av.lbl+(estaActiva?' ⏳':'')+'</div>';
-    div.onclick=(function(a,e){ return function(){ selActVaria(a,e); }; })(av,estaActiva);
-    grid.appendChild(div);
+
+  refrescarActividadVaria().then(function() {
+    var activa = activasVarias[op];
+
+    // Si hay actividad abierta → ir directo a la pantalla de actividad activa
+    // No mostrar la grilla: evita el problema de grilla vacía cuando el nombre
+    // de SP no coincide exactamente con algún ítem de la lista local.
+    if (activa) {
+      mostrarVariaActiva();
+      return;
+    }
+
+    // Sin actividad activa → mostrar grilla normal
+    document.getElementById('banner-activa').style.display = 'none';
+    grid.innerHTML = '';
+    var lista = DB.actividades.length > 0 ? DB.actividades : [
+      { id:'inventario',    lbl:'Inventario',                  color:'var(--fact)'  },
+      { id:'etiquetar',     lbl:'Etiquetar',                   color:'var(--warn)'  },
+      { id:'danados',       lbl:'Danados',                     color:'var(--danger)'},
+      { id:'mkt',           lbl:'MKT',                         color:'#FF6AD2'      },
+      { id:'destruccion',   lbl:'Destruccion',                 color:'#FF8C42'      },
+      { id:'embPallets',    lbl:'Embarque Pallets',            color:'var(--teal)'  },
+      { id:'embDanados',    lbl:'Embarque Danados',            color:'var(--pack)'  },
+      { id:'stock',         lbl:'Stock',                       color:'var(--fact)'  },
+      { id:'diario',        lbl:'Diario',                      color:'var(--pick)'  },
+      { id:'perchado',      lbl:'Perchado',                    color:'var(--warn)'  },
+      { id:'abastecimiento',lbl:'Abastecimiento',              color:'var(--teal)'  },
+      { id:'recepTransf',   lbl:'Recepcion de Transferencias', color:'#FF8C42'      },
+      { id:'recepDevol',    lbl:'Recepcion de Devoluciones',   color:'var(--pack)'  },
+      { id:'procDevol',     lbl:'Procesar Devoluciones',       color:'var(--danger)'},
+      { id:'recepCont',     lbl:'Recepcion de Contenedores',   color:'var(--fact)'  },
+      { id:'revImport',     lbl:'Revision de Importaciones',   color:'var(--warn)'  },
+      { id:'sepImport',     lbl:'Separacion de Importaciones', color:'#FF6AD2'      },
+      { id:'desalojo',      lbl:'Desalojo de Materiales',      color:'#FF8C42'      },
+      { id:'infImport',     lbl:'Informe de Importaciones',    color:'var(--pick)'  },
+    ];
+    lista.forEach(function(av) {
+      var div = document.createElement('div');
+      div.className = 'var-card';
+      div.style.borderColor = av.color;
+      div.style.color = av.color;
+      div.innerHTML = '<div class="v-lbl">'+av.lbl+'</div>';
+      div.onclick = (function(a){ return function(){ selActVaria(a, false); }; })(av);
+      grid.appendChild(div);
+    });
+  }).catch(function(e) {
+    grid.innerHTML = '<div style="padding:20px;text-align:center;color:var(--danger);font-size:13px">Error al verificar actividades.<br>'+e.message+'</div>';
   });
-  }); // fin then
 }
 function selActVaria(av,estaActiva) {
   variaSeleccionada=av;
