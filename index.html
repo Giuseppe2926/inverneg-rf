@@ -1420,77 +1420,80 @@ function refrescarActividadVaria() {
   var op = estado.operadorActual;
   if (!listId || !op) return Promise.resolve();
 
-  // Trae los últimos registros del operador, ordenados más recientes primero
+  // Modelo de registro único: un ítem por sesión.
+  //   Evento='Iniciada'  → actividad abierta
+  //   Evento='Finalizada' → actividad cerrada
+  // Buscamos el ítem más reciente del operador que tenga Evento='Iniciada'.
+  // No existe lógica de pares INICIO/FIN — una fila, un estado.
+  // $filter directo en SP para traer solo los ítems del operador, ordenados más recientes primero.
   var url = urlLista(listId)+
     '/items?$orderby=ID%20desc'+
     '&$expand=fields($select=Actividad,Evento,Operador,Sesi_x00f3_n,TimestampEvento)'+
-    '&$top=200';
+    '&$top=50';
 
-  var todosItems = [];
+  var itemActivo = null;
+  var revisados  = 0;
+
   function cargarPagina(u) {
     return graphGet(u).then(function(data) {
-      (data.value||[]).forEach(function(item){
-        if (item.fields && item.fields.Operador === op) todosItems.push(item);
-      });
-      // Si ya tenemos suficientes del operador, cortar
-      if (todosItems.length >= 50) return;
-      if (data['@odata.nextLink']) return cargarPagina(data['@odata.nextLink']);
+      var items = data.value || [];
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        var f    = item.fields || {};
+        // Solo registros de este operador
+        if (f.Operador !== op) continue;
+        revisados++;
+        var ev = (f.Evento || '').trim();
+        if (ev === 'Iniciada' || ev === 'INICIO') {
+          // Este ítem está abierto — es el más reciente porque venimos desc por ID
+          var tsRaw   = f.TimestampEvento || '';
+          var tsLocal = '';
+          if (tsRaw) {
+            var d2  = new Date(tsRaw);
+            // Ignorar registros con más de 24 horas — huérfanos del modelo anterior
+            // o actividades que quedaron sin cerrar entre turnos
+            if ((Date.now() - d2.getTime()) > 24 * 60 * 60 * 1000) {
+              console.log('[ActVaria] ignorando registro >24h:', item.id, tsRaw);
+              continue;
+            }
+            var pad = function(n){ return String(n).padStart(2,'0'); };
+            tsLocal = d2.getFullYear()+'-'+pad(d2.getMonth()+1)+'-'+pad(d2.getDate())+
+                      ' '+pad(d2.getHours())+':'+pad(d2.getMinutes())+':'+pad(d2.getSeconds());
+          } else {
+            // Sin timestamp → registro viejo sin fecha, ignorar
+            console.log('[ActVaria] ignorando registro sin timestamp:', item.id);
+            continue;
+          }
+          itemActivo = {
+            spItemId: item.id,
+            lbl:      f.Actividad || '?',
+            inicio:   tsLocal ? tsLocal.substring(11,16) : '--',
+            ts:       tsLocal,
+            sesionAV: (f['Sesi_x00f3_n'] || '').trim(),
+            id:       'act_sp_'+(f.Actividad||'x').replace(/\s+/g,'_').toLowerCase(),
+            icon:     '⚡',
+          };
+          return; // encontrado, cortar
+        }
+        if (ev === 'Finalizada' || ev === 'FIN') {
+          // El más reciente ya está cerrado → no hay actividad abierta
+          return; // cortar
+        }
+        // Si revisamos 20 registros del operador sin encontrar nada → sin actividad
+        if (revisados >= 20) return;
+      }
+      // Paginar solo si no encontramos nada todavía y hay más páginas
+      if (!itemActivo && data['@odata.nextLink']) return cargarPagina(data['@odata.nextLink']);
     });
   }
 
   return cargarPagina(url).then(function() {
-    // Buscar el ítem 'Iniciada' más reciente que NO tenga un 'Finalizada' con la misma sesionAV
-    // Como vienen ordenados desc por ID, el primero 'Iniciada' que encontremos sin par es el activo
-    var sesionesConFin = {};
-    var itemActivo = null;
-
-    // Primero recopilar todas las sesionAV que ya tienen Finalizada
-    todosItems.forEach(function(item) {
-      var f = item.fields;
-      var ev  = (f.Evento||'').trim();
-      var ses = (f['Sesi_x00f3_n']||'').trim();
-      if ((ev === 'Finalizada' || ev === 'FIN') && ses) {
-        sesionesConFin[ses] = true;
-      }
-    });
-
-    // Luego buscar el primer Iniciada cuya sesion NO esté cerrada
-    for (var i = 0; i < todosItems.length; i++) {
-      var f = todosItems[i].fields;
-      var ev  = (f.Evento||'').trim();
-      var ses = (f['Sesi_x00f3_n']||'').trim();
-      if (ev === 'Iniciada' || ev === 'INICIO') {
-        // Si tiene sesionAV y ya tiene FIN → cerrada, saltar
-        if (ses && sesionesConFin[ses]) continue;
-        // Si no tiene sesionAV → registro viejo huérfano; lo marcamos igual
-        var tsRaw = f.TimestampEvento || '';
-        var tsLocal = '';
-        if (tsRaw) {
-          var d2 = new Date(tsRaw);
-          var pad = function(n){ return String(n).padStart(2,'0'); };
-          tsLocal = d2.getFullYear()+'-'+pad(d2.getMonth()+1)+'-'+pad(d2.getDate())+
-                    ' '+pad(d2.getHours())+':'+pad(d2.getMinutes())+':'+pad(d2.getSeconds());
-        }
-        itemActivo = {
-          spItemId: todosItems[i].id,          // ID del ítem SP — para el PATCH
-          lbl:      f.Actividad || '?',
-          inicio:   tsLocal ? tsLocal.substring(11,16) : '--',
-          ts:       tsLocal,
-          sesionAV: ses,
-          id:       'act_sp_'+(f.Actividad||'x').replace(/\s+/g,'_').toLowerCase(),
-          icon:     '⚡',
-        };
-        break; // solo la más reciente
-      }
-    }
-
-    console.log('[ActVaria]', op, '→', itemActivo ? ('activa: '+itemActivo.lbl+' spItem:'+itemActivo.spItemId) : 'sin actividad abierta');
-
+    console.log('[ActVaria]', op, '→', itemActivo
+      ? ('activa: '+itemActivo.lbl+' spItem:'+itemActivo.spItemId+' ses:'+itemActivo.sesionAV)
+      : 'sin actividad abierta (revisados: '+revisados+')');
     if (itemActivo) {
-      // Siempre sobreescribir con lo que dice SP (fuente de verdad)
       activasVarias[op] = itemActivo;
     } else {
-      // SP no tiene nada abierto → limpiar memoria
       delete activasVarias[op];
     }
   }).catch(function(e){ console.warn('[ActVaria] refrescar error:', e.message); });
