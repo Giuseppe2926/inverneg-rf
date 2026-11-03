@@ -532,7 +532,30 @@ function colorActividad(c) {
   return COLOR_MAP[key]||'var(--teal)';
 }
 
-var activasVarias     = {};
+// activasVarias se persiste en sessionStorage para sobrevivir navegación interna.
+// Clave: 'av_<operador>' → JSON del objeto activa.
+var activasVarias = (function() {
+  var _data = {};
+  return {
+    get: function(op) { return _data[op] || null; },
+    set: function(op, val) {
+      _data[op] = val;
+      try { sessionStorage.setItem('av_'+op, JSON.stringify(val)); } catch(e){}
+    },
+    del: function(op) {
+      delete _data[op];
+      try { sessionStorage.removeItem('av_'+op); } catch(e){}
+    },
+    load: function(op) {
+      if (_data[op]) return _data[op];
+      try {
+        var raw = sessionStorage.getItem('av_'+op);
+        if (raw) { _data[op] = JSON.parse(raw); return _data[op]; }
+      } catch(e){}
+      return null;
+    }
+  };
+})();
 var variaSeleccionada = null;
 var estado = {
   operadorActual:'', ordenActual:'', accionPendiente:null, sesionId:generarSesion(),
@@ -1492,9 +1515,9 @@ function refrescarActividadVaria() {
       ? ('activa: '+itemActivo.lbl+' spItem:'+itemActivo.spItemId+' ses:'+itemActivo.sesionAV)
       : 'sin actividad abierta (revisados: '+revisados+')');
     if (itemActivo) {
-      activasVarias[op] = itemActivo;
+      activasVarias.set(op, itemActivo);
     } else {
-      delete activasVarias[op];
+      activasVarias.del(op);
     }
   }).catch(function(e){ console.warn('[ActVaria] refrescar error:', e.message); });
 }
@@ -1503,15 +1526,22 @@ function abrirActVarias() {
   var op = estado.operadorActual;
   var grid = document.getElementById('varias-grid');
   document.getElementById('banner-activa').style.display = 'none';
-  grid.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--sub)">⏳ Verificando...</div>';
   mostrar('s-varias');
 
-  refrescarActividadVaria().then(function() {
-    var activa = activasVarias[op];
+  // 1. Revisar sessionStorage primero — si hay actividad en curso, ir directo.
+  //    Esto evita el parpadeo de grilla cuando el operador vuelve al menú y regresa.
+  var activaLocal = activasVarias.load(op);
+  if (activaLocal) {
+    mostrarVariaActiva();
+    return;
+  }
 
-    // Si hay actividad abierta → ir directo a la pantalla de actividad activa
-    // No mostrar la grilla: evita el problema de grilla vacía cuando el nombre
-    // de SP no coincide exactamente con algún ítem de la lista local.
+  // 2. No hay nada local → consultar SP como fuente de verdad
+  grid.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--sub)">⏳ Verificando...</div>';
+
+  refrescarActividadVaria().then(function() {
+    var activa = activasVarias.load(op);
+
     if (activa) {
       mostrarVariaActiva();
       return;
@@ -1565,8 +1595,8 @@ function selActVaria(av,estaActiva) {
 }
 function iniciarActividadVaria() {
   var op = estado.operadorActual, av = variaSeleccionada;
-  if (activasVarias[op]) {
-    toast('Ya tienes una actividad activa: '+activasVarias[op].lbl, 'warn', 3000);
+  if (activasVarias.load(op)) {
+    toast('Ya tienes una actividad activa: '+activasVarias.load(op).lbl, 'warn', 3000);
     mostrarVariaActiva();
     return;
   }
@@ -1577,11 +1607,11 @@ function iniciarActividadVaria() {
   generarSesionAV(op, null, function(sesionAV) {
     avCrearEnSP(op, av.lbl, sesionAV, t)
       .then(function(spItemId) {
-        activasVarias[op] = {
+        activasVarias.set(op, {
           id: av.id, lbl: av.lbl, icon: av.icon||'⚡',
           inicio: t.hora, ts: t.ts, sesionAV: sesionAV,
-          spItemId: spItemId,   // ← guardamos el ID del ítem SP
-        };
+          spItemId: spItemId,
+        });
         toast(av.lbl+' iniciada ✓', 'ok');
         mostrarVariaActiva();
       })
@@ -1594,7 +1624,7 @@ function iniciarActividadVaria() {
 }
 
 function mostrarVariaActiva() {
-  var op = estado.operadorActual, activa = activasVarias[op];
+  var op = estado.operadorActual, activa = activasVarias.load(op);
   if (!activa) { mostrar('s-varias'); return; }
   document.getElementById('va-act-lbl').textContent    = activa.lbl;
   document.getElementById('va-op-val').textContent     = op;
@@ -1610,7 +1640,7 @@ function mostrarVariaActiva() {
 }
 
 function finActividadVaria() {
-  var op = estado.operadorActual, activa = activasVarias[op];
+  var op = estado.operadorActual, activa = activasVarias.load(op);
   if (!activa) return;
   var btnFin = document.getElementById('btn-va-fin');
   if (btnFin) { btnFin.disabled = true; btnFin.textContent = '⏳ Guardando...'; }
@@ -1620,14 +1650,13 @@ function finActividadVaria() {
     ? Math.max(0, Math.round((new Date(t.ts.replace(' ','T')) - new Date(activa.ts.replace(' ','T'))) / 60000))
     : 0;
 
-  // Usar spItemId del registro original para hacer PATCH (no crear fila nueva)
   var spItemId = activa.spItemId || null;
 
   var cerrar = spItemId
     ? avCerrarEnSP(spItemId, activa.lbl, dur, t)
     : Promise.reject(new Error('spItemId desconocido — recarga la app e intenta de nuevo'));
 
-  delete activasVarias[op]; // limpiar memoria antes de la llamada
+  activasVarias.del(op); // limpiar memoria + sessionStorage antes de la llamada
 
   cerrar
     .then(function() {
@@ -1640,7 +1669,7 @@ function finActividadVaria() {
     .catch(function(e) {
       console.error('[AV] cerrar falló:', e.message);
       // Devolver al estado activo para que pueda reintentar
-      activasVarias[op] = activa;
+      activasVarias.set(op, activa); // restaurar en memoria + sessionStorage
       toast('❌ Error al finalizar: '+e.message, 'err', 7000);
       if (btnFin) { btnFin.disabled = false; btnFin.style.display = 'block'; btnFin.textContent = '■ Finalizar Actividad'; }
     });
@@ -1648,11 +1677,11 @@ function finActividadVaria() {
 
 // Forzar cierre desde la pantalla de actividad activa (botón de rescate)
 function forzarCierreVaria() {
-  var op = estado.operadorActual, activa = activasVarias[op];
+  var op = estado.operadorActual, activa = activasVarias.load(op);
   if (!activa) { mostrar('s-tipo'); return; }
   if (!activa.spItemId) {
     toast('Sin ID de registro — limpiando sesión local', 'warn', 4000);
-    delete activasVarias[op];
+    activasVarias.del(op);
     mostrar('s-tipo');
     return;
   }
@@ -1660,7 +1689,7 @@ function forzarCierreVaria() {
   if (btnFin) { btnFin.disabled = true; }
   avForzarCierreEnSP(activa.spItemId)
     .then(function() {
-      delete activasVarias[op];
+      activasVarias.del(op);
       toast('Actividad cerrada ✓', 'ok');
       mostrar('s-tipo');
     })
