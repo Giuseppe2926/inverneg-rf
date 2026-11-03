@@ -1515,9 +1515,23 @@ function refrescarActividadVaria() {
       ? ('activa: '+itemActivo.lbl+' spItem:'+itemActivo.spItemId+' ses:'+itemActivo.sesionAV)
       : 'sin actividad abierta (revisados: '+revisados+')');
     if (itemActivo) {
+      // SP confirma actividad abierta → actualizar sessionStorage con datos frescos de SP
       activasVarias.set(op, itemActivo);
     } else {
-      activasVarias.del(op);
+      // SP dice "nada abierto" — pero solo borrar sessionStorage si el registro local
+      // tiene MÁS de 5 minutos (evita borrar por latencia de indexación de SP).
+      // Si es reciente (<5 min), SP puede no haber indexado aún el ítem que acabamos de crear.
+      var local = activasVarias.load(op);
+      if (local) {
+        var tsLocal = local.ts; // formato 'YYYY-MM-DD HH:MM:SS'
+        var diffMs = tsLocal ? (Date.now() - new Date(tsLocal.replace(' ','T')).getTime()) : Infinity;
+        if (diffMs > 5 * 60 * 1000) {
+          console.log('[ActVaria] SP no encontró actividad y local tiene '+Math.round(diffMs/60000)+'min → borrar');
+          activasVarias.del(op);
+        } else {
+          console.log('[ActVaria] SP no encontró actividad pero local es reciente ('+Math.round(diffMs/1000)+'s) → mantener sessionStorage');
+        }
+      }
     }
   }).catch(function(e){ console.warn('[ActVaria] refrescar error:', e.message); });
 }
