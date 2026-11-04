@@ -952,12 +952,12 @@ function bindRevisar() {
         const estadoAnterior = lineas.find(l=>l.id===lid)?.EstadoLinea||'Pendiente';
         const now = new Date().toISOString();
         const quien = quien_es();
-        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
-          EstadoLinea:'Aprobada', FechaAprobada: fecha,
-          HoraAprobada: hora||'', ObservacionJefatura: obs||'', DecididoPor: quien, FechaDecision: now
-        });
+        const payloadAp = { EstadoLinea:'Aprobada', FechaAprobada: fecha,
+          HoraAprobada: hora||'', ObservacionJefatura: obs||'', DecididoPor: quien, FechaDecision: now };
+        console.log('[PATCH Aprobar]', JSON.stringify(payloadAp));
+        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`, payloadAp);
         await historial(lid, 'EstadoLinea', estadoAnterior, 'Aprobada', quien, now, obs||'Aprobada por Jefatura');
-        patchLocal(lid,{EstadoLinea:'Aprobada',FechaAprobada:fecha,HoraAprobada:hora||'',ObservacionJefatura:obs||''});
+        patchLocal(lid,{EstadoLinea:'Aprobada',FechaAprobada:fecha,HoraAprobada:hora||'',ObservacionJefatura:obs||'',DecididoPor:quien,FechaDecision:now});
         await recalcularEstadoSolicitud(viewId);
         render();
       } catch(e) { btn.disabled=false; btn.textContent='Confirmar aprobación'; showAlert('err','Error: '+e.message); }
@@ -979,12 +979,12 @@ function bindRevisar() {
         const estadoAnterior = lineas.find(l=>l.id===lid)?.EstadoLinea||'Pendiente';
         const now = new Date().toISOString();
         const quien = quien_es();
-        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
-          EstadoLinea:'Reprogramada', FechaAprobada: fecha,
-          HoraAprobada: hora, ObservacionJefatura: obs, DecididoPor: quien, FechaDecision: now
-        });
+        const payloadRp = { EstadoLinea:'Reprogramada', FechaAprobada: fecha,
+          HoraAprobada: hora, ObservacionJefatura: obs, DecididoPor: quien, FechaDecision: now };
+        console.log('[PATCH Reprogramar]', JSON.stringify(payloadRp));
+        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`, payloadRp);
         await historial(lid, 'EstadoLinea', estadoAnterior, 'Reprogramada', quien, now, obs||'Reprogramada por Jefatura');
-        patchLocal(lid,{EstadoLinea:'Reprogramada',FechaAprobada:fecha,HoraAprobada:hora,ObservacionJefatura:obs});
+        patchLocal(lid,{EstadoLinea:'Reprogramada',FechaAprobada:fecha,HoraAprobada:hora,ObservacionJefatura:obs,DecididoPor:quien,FechaDecision:now});
         await recalcularEstadoSolicitud(viewId);
         render();
       } catch(e) { btn.disabled=false; btn.textContent='Confirmar reprogramación'; showAlert('err','Error: '+e.message); }
@@ -1004,11 +1004,11 @@ function bindRevisar() {
         const estadoAnterior = lineas.find(l=>l.id===lid)?.EstadoLinea||'Pendiente';
         const now = new Date().toISOString();
         const quien = quien_es();
-        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
-          EstadoLinea:'Rechazada', ObservacionJefatura: obs, DecididoPor: quien, FechaDecision: now
-        });
+        const payloadRj = { EstadoLinea:'Rechazada', ObservacionJefatura: obs, DecididoPor: quien, FechaDecision: now };
+        console.log('[PATCH Rechazar]', JSON.stringify(payloadRj));
+        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`, payloadRj);
         await historial(lid, 'EstadoLinea', estadoAnterior, 'Rechazada', quien, now, obs);
-        patchLocal(lid,{EstadoLinea:'Rechazada',ObservacionJefatura:obs});
+        patchLocal(lid,{EstadoLinea:'Rechazada',ObservacionJefatura:obs,DecididoPor:quien,FechaDecision:now});
         await recalcularEstadoSolicitud(viewId);
         render();
       } catch(e) { btn.disabled=false; btn.textContent='Confirmar rechazo'; showAlert('err','Error: '+e.message); }
@@ -1028,12 +1028,12 @@ function bindRevisar() {
         const estadoAnterior = lineas.find(l=>l.id===lid)?.EstadoLinea||'Pendiente';
         const now = new Date().toISOString();
         const quien = quien_es();
-        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`,{
-          EstadoLinea:'Cancelada', OrigenCancelacion:'Jefatura',
-          MotivoCancelacion: motivo, CanceladoPor: quien, FechaCancelacion: now
-        });
+        const payloadCx = { EstadoLinea:'Cancelada', OrigenCancelacion:'Jefatura',
+          MotivoCancelacion: motivo, CanceladoPor: quien, FechaCancelacion: now, DecididoPor: quien, FechaDecision: now };
+        console.log('[PATCH Cancelar]', JSON.stringify(payloadCx));
+        await gPatch(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lid}/fields`, payloadCx);
         await historial(lid, 'EstadoLinea', estadoAnterior, 'Cancelada', quien, now, motivo);
-        patchLocal(lid,{EstadoLinea:'Cancelada',OrigenCancelacion:'Jefatura',MotivoCancelacion:motivo,CanceladoPor:quien,FechaCancelacion:now});
+        patchLocal(lid,{EstadoLinea:'Cancelada',OrigenCancelacion:'Jefatura',MotivoCancelacion:motivo,CanceladoPor:quien,FechaCancelacion:now,DecididoPor:quien,FechaDecision:now});
         await recalcularEstadoSolicitud(viewId);
         render();
       } catch(e) { btn.disabled=false; btn.textContent='Confirmar cancelación'; showAlert('err','Error: '+e.message); }
