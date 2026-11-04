@@ -114,6 +114,8 @@ body{margin:0;font-family:'Inter',system-ui,sans-serif;font-size:14px;
 .b-rechazadoop{background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
 .b-nopresentado{background:var(--err-bg);color:var(--err);border:1px solid var(--err-bd)}
 .b-anticipada{background:var(--info-bg);color:var(--info);border:1px solid var(--info-bd);font-size:10px}
+.badge-ciclo{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;
+  padding:2px 7px;border-radius:20px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
 
 /* ── SOLICITUDES LIST ─────────────────────────────────────────────────────── */
 .sol-row{display:flex;align-items:center;gap:10px;padding:12px 16px;
@@ -729,7 +731,7 @@ function verHTML() {
           <div class="ver-cell"><span class="ver-clbl">Cantidad</span><span class="ver-cval" style="font-weight:600;font-variant-numeric:tabular-nums">${l.Cantidad??'—'}</span></div>
           <div class="ver-cell"><span class="ver-clbl">Fecha Programada</span><span class="ver-cval" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${fDate(l.FechaAprobada||l.FechaSolicitada)}${esAnticipada(l)?`<span class="badge b-anticipada" style="font-size:10px">⚡ Anticipada</span>`:''}</span></div>
           <div class="ver-cell"><span class="ver-clbl">Hora</span><span class="ver-cval">${l.HoraAprobada||l.HoraSolicitada||'—'}</span></div>
-          <div class="ver-cell"><span class="ver-clbl">Estado Jef.</span><span class="ver-cval">${badge(l.EstadoLinea||'Pendiente')}</span></div>
+          <div class="ver-cell"><span class="ver-clbl">Estado Jef.</span><span class="ver-cval">${badge(l.EstadoLinea||'Pendiente')} ${(l.CicloRecepcion>1)?`<span class="badge-ciclo">♻️ Ciclo ${l.CicloRecepcion}</span>`:''}</span></div>
           ${l.ObservacionJefatura?`<div class="ver-cell" style="grid-column:1/-1"><span class="ver-clbl">Obs. Jefatura</span><span class="ver-cval">${esc(l.ObservacionJefatura)}</span></div>`:''}
           ${recepInfo}
         </div>
@@ -947,9 +949,12 @@ function bindVer() {
       if(cEl) cEl.classList.remove('err');
       const recibida  = Number(cant);
       const pendiente = Math.max(0, total - recibida);
+      const linea = lineas.find(l=>l.id===lid);
+      const cantOriginal = linea?.CantidadOriginal || linea?.Cantidad || total;
       await ejecutarRecepcion(btn,lid,'Parcialmente Recibida',{
         EstadoRecepcion:'Parcialmente Recibida',CantidadRecibida:recibida,
-        CantidadPendiente:pendiente,ObservacionOperacion:obs||''
+        CantidadPendiente:pendiente,ObservacionOperacion:obs||'',
+        CantidadOriginal: cantOriginal
       },'Confirmar recepción parcial');
     });
   });
