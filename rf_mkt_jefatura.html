@@ -116,6 +116,8 @@ body{margin:0;font-family:'Inter',system-ui,sans-serif;font-size:14px;
 .b-recibido{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-bd)}
 .b-novedades{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd)}
 
+.badge-ciclo{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;
+  padding:2px 7px;border-radius:20px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
 /* ── SOLICITUDES LIST ─────────────────────────────────────────────────────── */
 .sol-row{display:flex;align-items:center;gap:10px;padding:12px 16px;
          border-bottom:1px solid var(--border);cursor:pointer;
@@ -672,12 +674,15 @@ function pendientesHTML() {
     const provs = [...new Set(ls.map(l=>l.Proveedor).filter(Boolean))].join(', ') || '—';
     const pendChip = nPend > 0
       ? `<span class="sol-pending-count">${nPend} pendiente${nPend!==1?'s':''}</span>` : '';
+    const maxCiclo = Math.max(0, ...ls.map(l=>l.CicloRecepcion||1));
+    const cicloChip = maxCiclo > 1 ? `<span class="badge-ciclo">♻️ Ciclo ${maxCiclo}</span>` : '';
     return `<div class="sol-row" data-id="${esc(s.id)}">
       <div class="sol-info">
         <div class="sol-nro">${esc(s.NroSolicitud||'(Sin número)')}</div>
         <div class="sol-meta">${fDT(s.FechaCreacion)} · ${esc(provs)}</div>
       </div>
       ${pendChip}
+      ${cicloChip}
       ${badge(calcEstado(s))}
       <span style="color:var(--fg-muted);font-size:18px">›</span>
     </div>`;
@@ -778,7 +783,7 @@ function revisarHTML() {
           <div class="ver-cell"><span class="ver-clbl">Cantidad</span><span class="ver-cval">${l.Cantidad??'—'}</span></div>
           <div class="ver-cell"><span class="ver-clbl">Fecha Sol.</span><span class="ver-cval">${fDate(l.FechaSolicitada)}</span></div>
           <div class="ver-cell"><span class="ver-clbl">Hora</span><span class="ver-cval">${l.HoraSolicitada||'—'}</span></div>
-          <div class="ver-cell"><span class="ver-clbl">Estado</span><span class="ver-cval">${badge(l.EstadoLinea||'Pendiente')}</span></div>
+          <div class="ver-cell"><span class="ver-clbl">Estado</span><span class="ver-cval">${badge(l.EstadoLinea||'Pendiente')} ${(l.CicloRecepcion>1)?`<span class="badge-ciclo">♻️ Ciclo ${l.CicloRecepcion}</span>`:''}</span></div>
           ${l.ObservacionMKT?`<div class="ver-cell" style="grid-column:1/-1"><span class="ver-clbl">Obs. MKT</span><span class="ver-cval">${esc(l.ObservacionMKT)}</span></div>`:''}
           ${(l.FechaAprobada)?`
             <div class="ver-cell"><span class="ver-clbl">Fecha Aprobada</span><span class="ver-cval">${fDate(l.FechaAprobada)}</span></div>
