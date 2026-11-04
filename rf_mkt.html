@@ -240,6 +240,18 @@ tr:last-child td{border-bottom:none}
 .ver-reprog-form{display:none;margin-top:8px;padding:12px;background:var(--gray);
   border-radius:var(--r);border:1px solid var(--border)}
 .ver-reprog-form.open{display:block}
+.btn-saldo-linea{font-size:12px;padding:3px 10px;border-radius:20px;border:1px solid #d97706;
+  background:transparent;color:#d97706;cursor:pointer;font-weight:600;transition:.15s}
+.btn-saldo-linea:hover{background:#d97706;color:#fff}
+.btn-saldo-linea:disabled{opacity:.4;cursor:not-allowed}
+.ver-saldo-form{display:none;margin-top:8px;padding:12px;background:var(--gray);
+  border-radius:var(--r);border:1px solid #d97706}
+.ver-saldo-form.open{display:block}
+.ver-saldo-form label{display:block;font-size:11px;font-weight:600;margin-bottom:3px;color:var(--fg-muted)}
+.ver-saldo-form input{width:100%;margin-bottom:8px;padding:5px 8px;border:1px solid var(--border);
+  border-radius:var(--r);background:var(--bg);color:var(--fg);font-size:13px}
+.badge-ciclo{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;
+  padding:2px 7px;border-radius:20px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
 .ver-reprog-form label{font-size:11px;font-weight:700;text-transform:uppercase;
   letter-spacing:.05em;color:var(--fg-subtle);display:block;margin-bottom:3px}
 .ver-reprog-form input{width:100%;box-sizing:border-box;border:1px solid var(--border);
@@ -999,6 +1011,7 @@ function verHTML(){
       <div class="ver-linea${esCancelada?' ver-linea-cancelada':''}">
         <div class="ver-cell" style="grid-column:1/-1">
           <span class="ver-estado-row">${estadoIcono} ${badge(l.EstadoLinea||'Pendiente')}
+            ${(l.CicloRecepcion>1)?`<span class="badge-ciclo">♻️ Ciclo ${l.CicloRecepcion}</span>`:''}
             ${l.DecididoPor?`<span class="ver-decidido">por ${esc(l.DecididoPor)} · ${fDate(l.FechaDecision)}</span>`:''}
           </span>
         </div>
@@ -1040,6 +1053,23 @@ function verHTML(){
             <button class="btn btn-secondary btn-sm" id="rpfcx-${l.id}" data-lid="${l.id}">Cancelar</button>
           </div>
           <p id="rpferr-${l.id}" style="margin:6px 0 0;font-size:12px;color:var(--err)"></p>
+        </div>` : ''}
+        ${(l.EstadoRecepcion === 'Parcialmente Recibida' && l.CantidadPendiente > 0) ? `
+        <div class="ver-cell" style="grid-column:1/-1;align-items:flex-end;flex-direction:row;gap:8px">
+          <button class="btn-saldo-linea" data-lid="${l.id}" data-pendiente="${l.CantidadPendiente}">♻️ Reprogramar saldo (${l.CantidadPendiente} pendiente)</button>
+        </div>
+        <div class="ver-saldo-form" id="slf-${l.id}">
+          <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:var(--primary)">Reprogramar saldo — Ciclo ${(l.CicloRecepcion||1)+1}</p>
+          <p style="margin:0 0 8px;font-size:12px;color:var(--fg-muted)">Cantidad a reprogramar: <strong>${l.CantidadPendiente}</strong></p>
+          <label for="slfd-${l.id}">Nueva fecha <span style="color:var(--err)">*</span></label>
+          <input type="date" id="slfd-${l.id}" required>
+          <label for="slfh-${l.id}">Nueva hora (opcional)</label>
+          <input type="time" id="slfh-${l.id}">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" id="slfok-${l.id}" data-lid="${l.id}">Confirmar reprogramación de saldo</button>
+            <button class="btn btn-secondary btn-sm" id="slfcx-${l.id}" data-lid="${l.id}">Cancelar</button>
+          </div>
+          <p id="slferr-${l.id}" style="margin:6px 0 0;font-size:12px;color:var(--err)"></p>
         </div>` : ''}
         ${cancelBtn}
         ${cancelForm}
@@ -1171,6 +1201,77 @@ async function reprogramarNP(lineaId, nuevaFecha, nuevaHora) {
   }
 }
 
+async function reprogramarSaldo(lineaId, nuevaFecha, nuevaHora) {
+  const now    = new Date().toISOString();
+  const quien  = me?.username || me?.name || me?.displayName || 'Desconocido';
+  const linea  = lineas.find(l=>l.id===lineaId);
+  const sol    = sols.find(s=>s.id===viewId);
+  const cicloActual   = linea?.CicloRecepcion || 1;
+  const cicloNuevo    = cicloActual + 1;
+  const cantOriginal  = linea?.CantidadOriginal || linea?.Cantidad || 0;
+  const cantPendiente = linea?.CantidadPendiente || 0;
+
+  await gPatch(
+    `${BASE}/sites/${SITE}/lists/MKT_Lineas/items/${lineaId}/fields`,
+    {
+      EstadoLinea:        'Pendiente',
+      EstadoRecepcion:    '',
+      FechaSolicitada:    nuevaFecha,
+      HoraSolicitada:     nuevaHora || '',
+      Cantidad:           cantPendiente,
+      CicloRecepcion:     cicloNuevo,
+      CantidadOriginal:   cantOriginal,
+      // Limpiar recepción previa
+      CantidadRecibida:   null,
+      CantidadPendiente:  null,
+      EjecutadoPor:       '',
+      FechaEjecucionReal: null,
+      ObservacionOperacion: '',
+      // Limpiar aprobación — Jefatura debe aprobar de nuevo
+      FechaAprobada:      null,
+      HoraAprobada:       '',
+      DecididoPor:        '',
+      FechaDecision:      null,
+      ObservacionJefatura: ''
+    }
+  );
+
+  await gPost(`${BASE}/sites/${SITE}/lists/MKT_Historial/items`, {
+    fields: {
+      SolicitudId:   viewId,
+      NroSolicitud:  sol?.NroSolicitud || '',
+      LineaId:       lineaId,
+      Campo:         'CicloRecepcion',
+      ValorAnterior: String(cicloActual),
+      ValorNuevo:    String(cicloNuevo),
+      Modulo:        'Marketing',
+      UsuarioAccion: quien,
+      Timestamp:     now,
+      Observacion:   `Ciclo ${cicloNuevo}: saldo ${cantPendiente} reprogramado al ${nuevaFecha}${nuevaHora?' hora '+nuevaHora:''}. Cantidad original: ${cantOriginal}`
+    }
+  });
+
+  // Actualizar estado local
+  if(linea){
+    linea.EstadoLinea        = 'Pendiente';
+    linea.EstadoRecepcion    = '';
+    linea.FechaSolicitada    = nuevaFecha;
+    linea.HoraSolicitada     = nuevaHora || '';
+    linea.Cantidad           = cantPendiente;
+    linea.CicloRecepcion     = cicloNuevo;
+    linea.CantidadOriginal   = cantOriginal;
+    linea.CantidadRecibida   = null;
+    linea.CantidadPendiente  = null;
+    linea.EjecutadoPor       = '';
+    linea.FechaEjecucionReal = null;
+    linea.FechaAprobada      = null;
+    linea.HoraAprobada       = '';
+    linea.DecididoPor        = '';
+    linea.FechaDecision      = null;
+    linea.ObservacionJefatura = '';
+  }
+}
+
 function bindVer(){
   document.getElementById('btn-bk')?.addEventListener('click',()=>{ screen='mis'; renderContent(); });
 
@@ -1248,6 +1349,47 @@ function bindVer(){
     btn.addEventListener('click',()=>{
       const lid = btn.dataset.lid;
       document.getElementById(`rpf-${lid}`)?.classList.remove('open');
+    });
+  });
+
+  // Reprogramar saldo — abrir/cerrar form
+  document.querySelectorAll('.btn-saldo-linea').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const lid = btn.dataset.lid;
+      const form = document.getElementById(`slf-${lid}`);
+      if(form){ form.classList.toggle('open'); }
+    });
+  });
+
+  // Confirmar reprogramación de saldo
+  document.querySelectorAll('[id^="slfok-"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const lid   = btn.dataset.lid;
+      const fecha = document.getElementById(`slfd-${lid}`)?.value?.trim();
+      const hora  = document.getElementById(`slfh-${lid}`)?.value?.trim();
+      const errEl = document.getElementById(`slferr-${lid}`);
+      if(!fecha){
+        if(errEl) errEl.textContent = 'La fecha es obligatoria.';
+        document.getElementById(`slfd-${lid}`)?.focus();
+        return;
+      }
+      if(errEl) errEl.textContent = '';
+      btn.disabled = true; btn.textContent = 'Guardando…';
+      try {
+        await reprogramarSaldo(lid, fecha, hora);
+        renderContent();
+      } catch(e) {
+        btn.disabled = false; btn.textContent = 'Confirmar reprogramación de saldo';
+        if(errEl) errEl.textContent = 'Error: ' + e.message;
+      }
+    });
+  });
+
+  // Dismiss saldo form
+  document.querySelectorAll('[id^="slfcx-"]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const lid = btn.dataset.lid;
+      document.getElementById(`slf-${lid}`)?.classList.remove('open');
     });
   });
 
