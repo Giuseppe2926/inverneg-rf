@@ -704,22 +704,41 @@ function _guardCatalogosPesados(){
 /* ── Consultas SP: recepciones y movimientos ─────────────────── */
 function cargarRecepcionesPedido(pedido){
   if(!DB.listIds.recepciones) return Promise.resolve([]);
-  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+  // FIX LENTITUD: usar $filter server-side para evitar paginar toda la lista
+  var pedidoEnc=encodeURIComponent(pedido);
+  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500&$filter=fields/Pedido eq \''+pedidoEnc+'\'';
   var todos=[];
   function paginar(u){
     return gGet(u).then(function(d){
       (d.value||[]).forEach(function(i){
         var f=i.fields||{};
+        // validación defensiva aunque SP ya filtró
         if(normStr(f.Pedido||'')===normStr(pedido)) todos.push(f);
       });
       var next=d['@odata.nextLink']||d['odata.nextLink']||null;
       if(next) return paginar(next);
+      console.log('[REC] Recepciones para "'+pedido+'":',todos.length);
       return todos;
     });
   }
   return paginar(url).catch(function(e){
     console.error('[REC] Error cargando recepciones:',e.message);
-    return todos;
+    // fallback sin filtro si la columna no está indexada
+    console.warn('[REC] Reintentando sin $filter...');
+    var urlFull=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+    var fallback=[];
+    function paginarFull(u){
+      return gGet(u).then(function(d){
+        (d.value||[]).forEach(function(i){
+          var f=i.fields||{};
+          if(normStr(f.Pedido||'')===normStr(pedido)) fallback.push(f);
+        });
+        var next=d['@odata.nextLink']||d['odata.nextLink']||null;
+        if(next) return paginarFull(next);
+        return fallback;
+      });
+    }
+    return paginarFull(urlFull).catch(function(){return fallback;});
   });
 }
 function cargarMovimientosPedido(pedido){
@@ -727,7 +746,27 @@ function cargarMovimientosPedido(pedido){
     console.warn('[VISTA-OP] listIds.movimientos no disponible');
     return Promise.resolve([]);
   }
-  var url=urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=500';
+
+  // FIX SKUs-PERSIST: si hay movimientos locales inyectados hace menos de 30s,
+  // devolver el cache inmediatamente (SP aún no indexó el registro nuevo)
+  if(DB._movsCache && DB._movsCacheLocalTs){
+    var edadMs=Date.now()-DB._movsCacheLocalTs;
+    if(edadMs < 30*1000){
+      console.log('[VISTA-OP] Usando cache local ('+Math.round(edadMs/1000)+'s, <30s) para pedido "'+pedido+'"');
+      var cacheDelPedido=DB._movsCache.filter(function(f){
+        return normStr(f.Pedido||'')===normStr(pedido);
+      });
+      return Promise.resolve(cacheDelPedido);
+    } else {
+      // Cache expirado — limpiar flag para que próxima vez vaya a SP
+      console.log('[VISTA-OP] Cache local expirado ('+Math.round(edadMs/1000)+'s), consultando SP');
+      DB._movsCacheLocalTs=null;
+    }
+  }
+
+  // FIX LENTITUD: usar $filter server-side para evitar paginar toda la lista
+  var pedidoEnc=encodeURIComponent(pedido);
+  var url=urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=500&$filter=fields/Pedido eq \''+pedidoEnc+'\'';
   var todos=[];
   function paginar(u){
     return gGet(u).then(function(d){
@@ -750,8 +789,27 @@ function cargarMovimientosPedido(pedido){
     });
   }
   return paginar(url).catch(function(e){
-    console.error('[VISTA-OP] Error:',e.message);
-    return todos;
+    console.error('[VISTA-OP] Error con $filter:',e.message);
+    // fallback sin filtro si la columna no está indexada
+    console.warn('[VISTA-OP] Reintentando sin $filter...');
+    var urlFull=urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=500';
+    var fallback=[];
+    function paginarFull(u){
+      return gGet(u).then(function(d){
+        (d.value||[]).forEach(function(i){
+          var p=(i.fields||{}).Pedido||'';
+          if(normStr(p)===normStr(pedido)){
+            var f=i.fields||{};
+            f.Created=f.Created||i.createdDateTime||i.Created||f.FechaMovimiento||'';
+            fallback.push(f);
+          }
+        });
+        var next=d['@odata.nextLink']||d['odata.nextLink']||null;
+        if(next) return paginarFull(next);
+        return fallback;
+      });
+    }
+    return paginarFull(urlFull).catch(function(){return fallback;});
   });
 }
 
@@ -2177,6 +2235,10 @@ function _ejecutarSepConLPN(sku,cantReq,destino,lpnOrigen){
   console.log('[SEP-LPN] LPN='+lpnOrigen+' SKU='+sku+' Cant='+cantReq+' Dest='+destino);
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Registrando separación...</div></div>');
   gPost(urlLista(DB.listIds.movimientos)+'/items',{fields:fields}).then(function(){
+    // FIX SKUs-PERSIST: actualizar cache local inmediatamente para que al volver
+    // a destinos el saldo ya refleje esta separación (sin esperar indexado de SP)
+    _aplicarMovimientoLocalSep(lpnOrigen, sku, cantReq, destino);
+
     render(
       '<div style="text-align:center;padding:24px 0">'+
         '<div style="font-size:48px;margin-bottom:12px">✓</div>'+
@@ -2256,6 +2318,11 @@ function _ejecutarSepDesdeDestino(sku,cantReq,destino,saldoDisp){
       });
     });
     chain.then(function(){
+      // FIX SKUs-PERSIST: actualizar cache local para cada LPN/cantidad separada
+      posts.forEach(function(p){
+        _aplicarMovimientoLocalSep(p.fields.LPN, p.fields.SKU, p.fields.Cantidad, destino);
+      });
+
       var lineas=posts.map(function(p){
         return '• LPN '+p.fields.LPN+': '+p.fields.Cantidad+' un';
       }).join('\n');
@@ -2338,6 +2405,11 @@ function ejecutarSeparacion(idx,sku,cantReq,destino,saldoDisp){
       });
     });
     chain.then(function(){
+      // FIX SKUs-PERSIST: actualizar cache local para cada LPN/cantidad separada
+      posts.forEach(function(p){
+        _aplicarMovimientoLocalSep(p.fields.LPN, p.fields.SKU, p.fields.Cantidad, destino);
+      });
+
       var lineas=posts.map(function(p){
         return '• LPN '+p.fields.LPN+': '+p.fields.Cantidad+' un';
       }).join('\n');
@@ -2355,6 +2427,49 @@ function ejecutarSeparacion(idx,sku,cantReq,destino,saldoDisp){
       );
     }).catch(function(e){toast('Error: '+e.message.slice(0,60));showSeparacion();});
   });
+}
+
+/* ── FIX SKUs-PERSIST: inyecta el movimiento en DB._movsCache inmediatamente ──
+   Después de un POST exitoso de separación, agregamos el movimiento al cache
+   local de movimientos (DB._movsCache) y marcamos el timestamp.
+   cargarMovimientosPedido usará el cache si fue actualizado en los últimos
+   30 segundos, evitando un viaje a SP que devolvería datos viejos por latencia
+   de indexado (típicamente 5-30 seg). ──────────────────────────────────────── */
+function _aplicarMovimientoLocalSep(lpn, sku, cantidad, destino){
+  try {
+    console.log('[SEP-LOCAL] Inyectando movimiento en cache: LPN='+lpn+' SKU='+sku+' Cant='+cantidad);
+
+    // Construir objeto de movimiento idéntico al que devuelve cargarMovimientosPedido
+    var t=ahora();
+    var destInfo=DB.destinosSep?DB.destinosSep.find(function(d){
+      return normStr(d.destino)===normStr(destino);
+    }):null;
+    var origData=CFG&&CFG.empresas?CFG.empresas['INV']:null;
+    var movLocal={
+      Pedido:          S.pedido,
+      LPN:             lpn,
+      SKU:             sku,
+      Cantidad:        cantidad,
+      TipoMovimiento:  'SEPARACION',
+      AlmacenOrigen:   origData?origData.almacenOrigen:'',
+      AlmacenDestino:  destInfo?destInfo.almacen:'',
+      DestinoSeparacion:destino,
+      FechaMovimiento: t.ts,
+      Created:         new Date().toISOString(),
+      _local:          true  // marcador para diagnóstico
+    };
+
+    // Agregar al cache de movimientos
+    if(!DB._movsCache) DB._movsCache=[];
+    DB._movsCache.push(movLocal);
+    // Registrar timestamp de la última inyección local
+    DB._movsCacheLocalTs=Date.now();
+    console.log('[SEP-LOCAL] DB._movsCache ahora tiene',DB._movsCache.length,'movimientos (1 local)');
+
+  } catch(e){
+    console.warn('[SEP-LOCAL] Error inyectando en cache local:',e.message);
+    // No es crítico — el POST ya fue exitoso
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
