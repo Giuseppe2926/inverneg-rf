@@ -1929,6 +1929,28 @@ function showSeparacion(){
       porDestSku[dest][sku]+=Number(r.cantidad)||0;
     });
 
+    // ── FIX Bug2: Descontar separaciones ya ejecutadas en SP ──────────────
+    var movsSep=res[1]; // movimientos del pedido ya cargados por cargarMovimientosPedido
+    movsSep.forEach(function(m){
+      if(normStr(m.TipoMovimiento||'')!=='separacion') return;
+      var mDest=((m.DestinoSeparacion||m.AlmacenDestino||'').toString().trim())||'Sin destino';
+      var mSku=String(m.SKU||'').trim();
+      var mCant=Number(m.Cantidad)||0;
+      if(!mCant) return;
+      // Buscar clave de destino con normalización
+      var dKey=Object.keys(porDestSku).find(function(k){
+        return normStr(k)===normStr(mDest);
+      });
+      if(!dKey) return;
+      // Buscar clave de SKU con normalización
+      var sKey=Object.keys(porDestSku[dKey]||{}).find(function(k){
+        return normStr(k)===normStr(mSku);
+      });
+      if(!sKey) return;
+      porDestSku[dKey][sKey]=Math.max(0, porDestSku[dKey][sKey]-mCant);
+    });
+    // ── FIN FIX Bug2 ──────────────────────────────────────────────────────
+
     // Filtrar SKU con cantidad <= 0 y destinos vacíos
     Object.keys(porDestSku).forEach(function(dest){
       Object.keys(porDestSku[dest]).forEach(function(sku){
