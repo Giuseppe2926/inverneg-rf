@@ -1935,7 +1935,7 @@ function showSeparacion(){
     console.log('[FIX2] Claves destino en porDestSku:',destinosEnPorDest.join(' | '));
     var sepCount=0;
     movsSep.forEach(function(m){
-      if(normStr(m.TipoMovimiento||'')!=='separacion') return;
+      if(normStr(m.TipoMovimiento||'')!=='SEPARACION') return;
       // Usar DestinoSeparacion primero (nombre corto del Excel), luego AlmacenDestino
       var mDest=((m.DestinoSeparacion||m.AlmacenDestino||'').toString().trim())||'Sin destino';
       var mSku=String(m.SKU||'').trim();
