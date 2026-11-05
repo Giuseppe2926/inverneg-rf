@@ -1931,24 +1931,33 @@ function showSeparacion(){
 
     // ── FIX Bug2: Descontar separaciones ya ejecutadas en SP ──────────────
     var movsSep=res[1]; // movimientos del pedido ya cargados por cargarMovimientosPedido
+    var destinosEnPorDest=Object.keys(porDestSku);
+    console.log('[FIX2] Claves destino en porDestSku:',destinosEnPorDest.join(' | '));
+    var sepCount=0;
     movsSep.forEach(function(m){
       if(normStr(m.TipoMovimiento||'')!=='separacion') return;
+      // Usar DestinoSeparacion primero (nombre corto del Excel), luego AlmacenDestino
       var mDest=((m.DestinoSeparacion||m.AlmacenDestino||'').toString().trim())||'Sin destino';
       var mSku=String(m.SKU||'').trim();
       var mCant=Number(m.Cantidad)||0;
       if(!mCant) return;
+      sepCount++;
       // Buscar clave de destino con normalización
-      var dKey=Object.keys(porDestSku).find(function(k){
+      var dKey=destinosEnPorDest.find(function(k){
         return normStr(k)===normStr(mDest);
       });
+      console.log('[FIX2] MOV SEP: SKU='+mSku+' Cant='+mCant+' Dest="'+mDest+'" → dKey='+dKey);
       if(!dKey) return;
       // Buscar clave de SKU con normalización
       var sKey=Object.keys(porDestSku[dKey]||{}).find(function(k){
         return normStr(k)===normStr(mSku);
       });
-      if(!sKey) return;
-      porDestSku[dKey][sKey]=Math.max(0, porDestSku[dKey][sKey]-mCant);
+      if(!sKey){ console.log('[FIX2] SKU no encontrado en porDestSku['+dKey+']'); return; }
+      var antes=porDestSku[dKey][sKey];
+      porDestSku[dKey][sKey]=Math.max(0, antes-mCant);
+      console.log('[FIX2] Descontado '+mSku+' en '+dKey+': '+antes+' → '+porDestSku[dKey][sKey]);
     });
+    console.log('[FIX2] Total SEPARACION procesados:',sepCount,' de ',movsSep.length,' movimientos');
     // ── FIN FIX Bug2 ──────────────────────────────────────────────────────
 
     // Filtrar SKU con cantidad <= 0 y destinos vacíos
