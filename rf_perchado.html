@@ -654,19 +654,59 @@ function cargarCatalogos(){
   });
 }
 
+/* ── sessionStorage helpers para catálogos pesados ───────────── */
+var _CACHE_KEY_CBARRA='rfp_cbarra_v1';
+var _CACHE_KEY_UBIC='rfp_ubicaciones_v1';
+var _CACHE_TTL_MS=4*60*60*1000; // 4 horas
+
+function _ssCargado(key,parseFn){
+  try{
+    var raw=sessionStorage.getItem(key);
+    if(!raw) return false;
+    var obj=JSON.parse(raw);
+    if(!obj||!obj.ts||!obj.data) return false;
+    if(Date.now()-obj.ts>_CACHE_TTL_MS){ sessionStorage.removeItem(key); return false; }
+    parseFn(obj.data);
+    return true;
+  }catch(e){ return false; }
+}
+function _ssGuardar(key,data){
+  try{ sessionStorage.setItem(key,JSON.stringify({ts:Date.now(),data:data})); }catch(e){}
+}
+
 /* ── Carga diferida: Ubicaciones + CodigosBarra (pesados) ────── */
 function cargarCatalogosLazy(){
   console.log('[LAZY] Iniciando carga de catálogos pesados...');
   var _t=performance.now();
   DB.catalogosPesadosCargados=false;
+
+  // Mostrar badge de carga en el footer
+  (function(){
+    var ftr=document.getElementById('ftr-status');
+    if(ftr&&!document.getElementById('lazy-badge')){
+      var b=document.createElement('span');
+      b.id='lazy-badge';
+      b.textContent=' ⏳';
+      b.title='Cargando catálogos...';
+      b.style.cssText='opacity:.7;font-size:11px;';
+      ftr.appendChild(b);
+    }
+  })();
+
   var tareas=[];
-  // Ubicaciones (22k filas)
+
+  // Ubicaciones (22k filas) — con sessionStorage
   if(DB.perchadoDriveId&&DB.perchadoItemId){
     tareas.push((function(){
       var t=performance.now();
+      if(_ssCargado(_CACHE_KEY_UBIC,parsearUbicaciones)){
+        console.log('[TIME] Ubicaciones (sessionStorage):',Math.round(performance.now()-t),'ms ('+DB.ubicaciones.length+' filas)');
+        return Promise.resolve();
+      }
       return gGet(urlWB(DB.perchadoDriveId,DB.perchadoItemId,'Ubicaciones'))
         .then(function(d){
           parsearUbicaciones(d);
+          _ssGuardar(_CACHE_KEY_UBIC,d);
           console.log('[TIME] Ubicaciones (lazy):',Math.round(performance.now()-t),'ms ('+DB.ubicaciones.length+' filas)');
         })
         .catch(function(e){ console.error('[LAZY] Ubicaciones ERROR:',e.message); });
@@ -674,13 +714,19 @@ function cargarCatalogosLazy(){
   } else {
     console.warn('[LAZY] perchadoDriveId no disponible — Ubicaciones no se cargarán');
   }
-  // CodigosBarra / C.Barra (5.8k filas)
+
+  // CodigosBarra / C.Barra (5.8k filas) — con sessionStorage
   if(DB.recepDriveId&&DB.recepItemId){
     tareas.push((function(){
       var t=performance.now();
+      if(_ssCargado(_CACHE_KEY_CBARRA,parsearCBarra)){
+        console.log('[TIME] CodigosBarra (sessionStorage):',Math.round(performance.now()-t),'ms ('+DB.codigosBarra.length+' SKUs)');
+        return Promise.resolve();
+      }
       return gGet(urlWB(DB.recepDriveId,DB.recepItemId,'C.Barra'))
         .then(function(d){
           parsearCBarra(d);
+          _ssGuardar(_CACHE_KEY_CBARRA,d);
           console.log('[TIME] CodigosBarra (lazy):',Math.round(performance.now()-t),'ms ('+DB.codigosBarra.length+' SKUs)');
         })
         .catch(function(e){ console.error('[LAZY] C.Barra ERROR:',e.message); });
@@ -688,8 +734,12 @@ function cargarCatalogosLazy(){
   } else {
     console.warn('[LAZY] recepDriveId no disponible — CodigosBarra no se cargarán');
   }
+
   return Promise.all(tareas).then(function(){
     DB.catalogosPesadosCargados=true;
+    // Quitar badge de carga
+    var b=document.getElementById('lazy-badge');
+    if(b) b.remove();
     console.log('[TIME] LAZY TOTAL:',Math.round(performance.now()-_t),'ms — listo para usar');
   });
 }
