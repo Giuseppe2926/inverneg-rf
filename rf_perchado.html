@@ -825,6 +825,7 @@ function cargarMovimientosPedido(pedido){
         if(normStr(p)===normStr(pedido)){
           var f=i.fields||{};
           f.Created=f.Created||i.createdDateTime||i.Created||f.FechaMovimiento||'';
+          f._itemId=i.id||null; // Guardar ID de SP para PATCH posterior
           todos.push(f);
         }
       });
@@ -877,8 +878,9 @@ function calcularSaldos(recepciones,movimientos,logSKU){
     });
   }
 
-  // Restar movimientos ejecutados (Perchado + Separación)
+  // Restar movimientos ejecutados (Perchado + Separación) — ANULADO no cuenta
   movimientos.forEach(function(m){
+    if(normStr(m.TipoMovimiento||'')==='ANULADO') return; // excluir anulados
     var lpn=normLPN(m.LPN);
     var sku=(m.SKU||'').toString().trim();
     var k=claveK(lpn,sku);
@@ -3149,11 +3151,24 @@ function _renderVisualizacion(pedido){
         }
         // Color por tipo de destino
         var tipo=categorizarMovimiento(mov);
+        var esAnulado=normStr(mov.TipoMovimiento||'')==='ANULADO';
         var tipoCols={PERCHADO:'var(--ok)',SEPARACION:'var(--sep)',
-          SEP:'var(--sep)',DANA:'var(--dan)',OBSE:'var(--warn)',PEND:'var(--warn)'};
-        var col=tipoCols[tipo]||'var(--txt)';
-        var bg=i%2===0?'':'background:rgba(255,255,255,.02)';
-        h+='<div style="display:grid;grid-template-columns:52px 1fr 1fr 56px 1fr;'+
+          SEP:'var(--sep)',DANA:'var(--dan)',OBSE:'var(--warn)',PEND:'var(--warn)',ANULADO:'var(--mut)'};
+        var col=esAnulado?'var(--mut)':(tipoCols[tipo]||'var(--txt)');
+        var bg=esAnulado?'background:rgba(255,255,255,.04);opacity:.5':
+                (i%2===0?'':'background:rgba(255,255,255,.02)');
+
+        // Botón anular — solo para PERCHADO con _itemId conocido
+        var esPerchadoAnulable=normStr(mov.TipoMovimiento||'')==='PERCHADO'&&mov._itemId;
+        var btnAnular=esPerchadoAnulable
+          ? '<button onclick="anularPerchado(\''+mov._itemId+'\',\''+
+              (mov.LPN||'').replace(/'/g,'')+'|'+(mov.SKU||'').replace(/'/g,'')+'\',\''+pedido+'\')" '+
+            'style="background:var(--dan);color:#fff;border:none;border-radius:5px;'+
+            'padding:3px 7px;font-size:10px;cursor:pointer;white-space:nowrap" '+
+            'title="Anular este perchado">🚫 Anular</button>'
+          : (esAnulado?'<span style="font-size:9px;color:var(--mut)">ANULADO</span>':'');
+
+        h+='<div style="display:grid;grid-template-columns:52px 1fr 1fr 56px 1fr auto;'+
           'gap:0;padding:7px 10px;border-top:1px solid var(--bor);font-size:11px;'+bg+'">'+
           '<div style="color:var(--mut)">'+
             '<div>'+horaStr+'</div>'+
@@ -3164,13 +3179,16 @@ function _renderVisualizacion(pedido){
           '<div style="font-weight:700;color:'+col+'">'+
             (mov.SKU||'—')+
             '<div style="font-size:9px;color:var(--mut);font-weight:400">'+
-              (mov.TipoMovimiento||'')+'</div>'+
+              (mov.TipoMovimiento||'')+
+              (mov.LPN?'<br>'+mov.LPN:'')+
+            '</div>'+
           '</div>'+
           '<div style="text-align:right;font-weight:700">'+Number(mov.Cantidad||0).toLocaleString()+'</div>'+
           '<div style="text-align:right;font-size:10px;color:var(--mut);overflow:hidden;text-overflow:ellipsis">'+
             (mov.AlmacenDestino||'—')+
             (mov.UbicacionDestino?'<div style="font-size:9px">'+mov.UbicacionDestino+'</div>':'')+
           '</div>'+
+          '<div style="padding-left:6px;display:flex;align-items:center">'+btnAnular+'</div>'+
         '</div>';
       });
       h+='</div>';
@@ -3409,6 +3427,26 @@ function generarExcelSeparacion(destinos){
   }).catch(function(e){toast('Error: '+e.message.slice(0,60));showSeleccionDestinosSep();});
 }
 
+/* ── Anular perchado: cambia TipoMovimiento a ANULADO en SP ─────── */
+function anularPerchado(itemId, lpnSku, pedido){
+  if(!itemId){ toast('No se puede anular: ID no disponible'); return; }
+  if(!confirm('¿Anular el perchado de '+lpnSku+'?\n\nEl LPN quedará disponible nuevamente para perchar o separar.')){ return; }
+
+  var url=urlLista(DB.listIds.movimientos)+'/items/'+itemId+'/fields';
+  toast('Anulando...');
+  gPatch(url,{TipoMovimiento:'ANULADO'}).then(function(){
+    // Invalidar caché para que la próxima carga traiga el estado actualizado
+    _invalidarCachePedido();
+    console.log('[ANULAR] Perchado anulado. ItemId='+itemId+' LPN|SKU='+lpnSku);
+    toast('✓ Perchado anulado — '+lpnSku);
+    // Recargar la visualización
+    _renderVisualizacion(pedido);
+  }).catch(function(e){
+    console.error('[ANULAR] Error:',e.message);
+    toast('Error al anular: '+e.message.slice(0,60));
+  });
+}
+
 // Exports para HTML onclick
 window.goBack=goBack;
 window.showPedidosTotales=showPedidosTotales;
@@ -3438,6 +3476,7 @@ window.selGenerarExcel=selGenerarExcel;
 window.resolverSKU=resolverSKU;
 window.showSeleccionOperador=showSeleccionOperador;
 window.showVistaOperativa=showVistaOperativa;
+window.anularPerchado=anularPerchado;
 function selVistaOperativa(){
   var pedido=getPedidoMenu();
   if(!pedido){toast('Selecciona un pedido primero');return;}
