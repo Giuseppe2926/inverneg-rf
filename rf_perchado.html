@@ -2658,7 +2658,8 @@ function tipoUbicacion(almacen, ubicacion){
 
 // Categoriza un movimiento en las 5 categorías del resumen
 function categorizarMovimiento(mov){
-  if(normStr(mov.TipoMovimiento||'')===normStr('SEPARACION')) return 'SEP';
+  if(normStr(mov.TipoMovimiento||'')==='ANULADO') return 'ANULADO';
+  if(normStr(mov.TipoMovimiento||'')==='SEPARACION') return 'SEP';
   return tipoUbicacion(mov.AlmacenDestino||'', mov.UbicacionDestino||'');
 }
 
@@ -2869,6 +2870,7 @@ function calcularResumenPerchado(recepciones, movimientos){
   var detalle={};
 
   movimientos.forEach(function(m){
+    if(normStr(m.TipoMovimiento||'')==='ANULADO') return; // excluir anulados del resumen
     var cant=Number(m.Cantidad)||0;
     var cat=categorizarMovimiento(m);
     if(cats.hasOwnProperty(cat)) cats[cat]+=cant;
@@ -3072,6 +3074,9 @@ function showVistaOperativa(){
 
 function _renderVisualizacion(pedido){
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Cargando movimientos...</div></div>');
+  // Siempre carga fresca en visualización para garantizar que _itemId esté disponible
+  // y para reflejar cambios recientes (anulaciones) sin esperar el TTL
+  _invalidarCachePedido();
   Promise.all([
     cargarRecepcionesPedido(pedido),
     cargarMovimientosPedido(pedido),
@@ -3128,11 +3133,12 @@ function _renderVisualizacion(pedido){
     } else {
       // Encabezado tabla
       h+='<div style="background:var(--sur);border:1px solid var(--bor);border-radius:8px;overflow:hidden">'+
-        '<div style="display:grid;grid-template-columns:52px 1fr 1fr 56px 1fr;'+
+        '<div style="display:grid;grid-template-columns:52px 1fr 1fr 56px 1fr 60px;'+
           'gap:0;padding:6px 10px;background:var(--sur2);'+
           'font-size:9px;font-weight:700;color:var(--mut);letter-spacing:.04em">'+
           '<span>HORA</span><span>OPERADOR</span><span>SKU</span>'+
           '<span style="text-align:right">CANT</span><span style="text-align:right">DESTINO</span>'+
+          '<span style="text-align:center">ACCIÓN</span>'+
         '</div>';
 
       movs.forEach(function(mov,i){
@@ -3168,7 +3174,7 @@ function _renderVisualizacion(pedido){
             'title="Anular este perchado">🚫 Anular</button>'
           : (esAnulado?'<span style="font-size:9px;color:var(--mut)">ANULADO</span>':'');
 
-        h+='<div style="display:grid;grid-template-columns:52px 1fr 1fr 56px 1fr auto;'+
+        h+='<div style="display:grid;grid-template-columns:52px 1fr 1fr 56px 1fr 60px;'+
           'gap:0;padding:7px 10px;border-top:1px solid var(--bor);font-size:11px;'+bg+'">'+
           '<div style="color:var(--mut)">'+
             '<div>'+horaStr+'</div>'+
