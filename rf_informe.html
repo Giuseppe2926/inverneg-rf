@@ -1037,6 +1037,30 @@ function generarDetalleRecepcion(){
       }
     });
 
+    // ── SKUs recibidos fuera del Packing List → SOBRANTE total ──────
+    var skusEnPackingNorm={};
+    packingPedido.forEach(function(pk){skusEnPackingNorm[normStr(pk.sku)]=true;});
+    var netoFuera={}; // normSKU → {cant, lote, cont, skuOrig, desc}
+    recepciones.forEach(function(r){
+      var kn=normStr(r.CodProducto||'');
+      if(!kn||skusEnPackingNorm[kn]) return;
+      if(!netoFuera[kn]) netoFuera[kn]={cant:0,lote:'',cont:'',skuOrig:r.CodProducto||'',desc:r.Nombre||''};
+      netoFuera[kn].cant+=Number(r.Cantidad)||0;
+      if(!netoFuera[kn].lote&&r.Lote) netoFuera[kn].lote=r.Lote;
+      if(!netoFuera[kn].cont&&r.Contenedor) netoFuera[kn].cont=r.Contenedor;
+    });
+    Object.keys(netoFuera).forEach(function(kn){
+      var e=netoFuera[kn];
+      if(!e.cant) return;
+      var desc=e.desc||(DB.codigosBarra.find(function(c){return normStr(c.sku)===kn;})||{}).desc||'';
+      filas.push({
+        sku:e.skuOrig, desc:desc,
+        esperado:0, recibido:e.cant, diff:e.cant,
+        novedad:'SOBRANTE', novCant:e.cant,
+        primera:true, rowspan:1,
+      });
+    });
+
     // Totales
     var totalEsp=packingPedido.reduce(function(a,p){return a+p.cantidad;},0);
     var totalRec=0;
@@ -1049,6 +1073,11 @@ function generarDetalleRecepcion(){
       if(d===0) skusCompletos++;
       else if(d<0) skusFaltantes++;
       else skusSobrantes++;
+    });
+    // Sumar también los sobrantes fuera del packing al total recibido y al contador
+    Object.keys(netoFuera).forEach(function(kn){
+      var e=netoFuera[kn];
+      if(e.cant){totalRec+=e.cant; skusSobrantes++;}
     });
 
     // ── Renderizar informe A4 ────────────────────────────────────
@@ -1152,15 +1181,28 @@ function generarDetalleLPN(){
       skuMap[k].regs.push(r);
     });
 
-    // Filtrar solo SKUs con FALTANTE o SOBRANTE
+    // Filtrar solo SKUs con FALTANTE o SOBRANTE (incluir los que no tienen packing → SOBRANTE total)
     var skusConNovedad=[];
     Object.keys(skuMap).forEach(function(k){
       var entry=skuMap[k];
-      var packing=entry.packing?entry.packing.cantidad:null;
-      if(packing===null) return; // sin packing → ignorar
       // Neto incluye correcciones
       var neto=0;
       entry.regs.forEach(function(r){neto+=Number(r.Cantidad)||0;});
+      if(!neto) return; // nada recibido → ignorar
+
+      if(entry.packing===null){
+        // SKU recibido sin Packing List → SOBRANTE total
+        var descFuera=(DB.codigosBarra.find(function(c){return normStr(c.sku)===k;})||{}).desc||'';
+        var skuOrig=entry.regs.length>0?(entry.regs[0].CodProducto||k):k;
+        skusConNovedad.push({
+          sku:skuOrig, desc:descFuera,
+          packing:0, neto:neto, diff:neto,
+          tipo:'SOBRANTE', regs:entry.regs,
+        });
+        return;
+      }
+
+      var packing=entry.packing.cantidad;
       var diff=neto-packing;
       if(diff===0) return; // completo → no mostrar
       skusConNovedad.push({
