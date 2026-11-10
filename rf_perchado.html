@@ -761,8 +761,8 @@ function _guardCatalogosPesados(){
 var _cacheRec={pedido:null,data:null,ts:0};   // recepciones
 var _cacheMov={pedido:null,data:null,ts:0};   // movimientos
 
-var TTL_REC=60*1000;   // recepciones: 60 seg (raramente cambian)
-var TTL_MOV=30*1000;   // movimientos: 30 seg (pueden cambiar)
+var TTL_REC=5*60*1000;  // recepciones: 5 min (raramente cambian durante el turno)
+var TTL_MOV=2*60*1000;  // movimientos: 2 min (se invalida explícitamente al guardar)
 
 function _invalidarCachePedido(){
   _cacheRec={pedido:null,data:null,ts:0};
@@ -782,13 +782,15 @@ function cargarRecepcionesPedido(pedido){
     return Promise.resolve(_cacheRec.data);
   }
 
-  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+  // Filtrar en servidor por Pedido — evita traer toda la lista
+  var filtro="fields/Pedido eq '"+pedido.replace(/'/g,"''")+"'";
+  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
   function paginar(u){
     return gGet(u).then(function(d){
       (d.value||[]).forEach(function(i){
         var f=i.fields||{};
-        if(normStr(f.Pedido||'')===normStr(pedido)) todos.push(f);
+        todos.push(f);
       });
       var next=d['@odata.nextLink']||d['odata.nextLink']||null;
       if(next) return paginar(next);
@@ -798,8 +800,23 @@ function cargarRecepcionesPedido(pedido){
     });
   }
   return paginar(url).catch(function(e){
-    console.error('[REC] Error cargando recepciones:',e.message);
-    return todos;
+    // Fallback sin filtro si OData falla
+    console.warn('[REC] Filtro OData falló, usando fallback:',e.message);
+    var todos2=[];
+    var urlFb=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+    function pagFb(u){
+      return gGet(u).then(function(d){
+        (d.value||[]).forEach(function(i){
+          var f=i.fields||{};
+          if(normStr(f.Pedido||'')===normStr(pedido)) todos2.push(f);
+        });
+        var next=d['@odata.nextLink']||d['odata.nextLink']||null;
+        if(next) return pagFb(next);
+        _cacheRec={pedido:normStr(pedido),data:todos2,ts:Date.now()};
+        return todos2;
+      });
+    }
+    return pagFb(urlFb).catch(function(e2){console.error('[REC] Fallback error:',e2.message);return todos2;});
   });
 }
 function cargarMovimientosPedido(pedido){
@@ -816,18 +833,17 @@ function cargarMovimientosPedido(pedido){
     return Promise.resolve(_cacheMov.data);
   }
 
-  var url=urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=500';
+  // Filtrar en servidor por Pedido — evita traer toda la lista
+  var filtro="fields/Pedido eq '"+pedido.replace(/'/g,"''")+"'";
+  var url=urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
   function paginar(u){
     return gGet(u).then(function(d){
       (d.value||[]).forEach(function(i){
-        var p=(i.fields||{}).Pedido||'';
-        if(normStr(p)===normStr(pedido)){
-          var f=i.fields||{};
-          f.Created=f.Created||i.createdDateTime||i.Created||f.FechaMovimiento||'';
-          f._itemId=i.id||null; // Guardar ID de SP para PATCH posterior
-          todos.push(f);
-        }
+        var f=i.fields||{};
+        f.Created=f.Created||i.createdDateTime||i.Created||f.FechaMovimiento||'';
+        f._itemId=i.id||null; // Guardar ID de SP para PATCH posterior
+        todos.push(f);
       });
       var next=d['@odata.nextLink']||d['odata.nextLink']||null;
       if(next) return paginar(next);
@@ -841,8 +857,28 @@ function cargarMovimientosPedido(pedido){
     });
   }
   return paginar(url).catch(function(e){
-    console.error('[VISTA-OP] Error:',e.message);
-    return todos;
+    // Fallback sin filtro si OData falla
+    console.warn('[MOV] Filtro OData falló, usando fallback:',e.message);
+    var todos2=[];
+    var urlFb=urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=500';
+    function pagFb(u){
+      return gGet(u).then(function(d){
+        (d.value||[]).forEach(function(i){
+          var p=(i.fields||{}).Pedido||'';
+          if(normStr(p)===normStr(pedido)){
+            var f=i.fields||{};
+            f.Created=f.Created||i.createdDateTime||i.Created||f.FechaMovimiento||'';
+            f._itemId=i.id||null;
+            todos2.push(f);
+          }
+        });
+        var next=d['@odata.nextLink']||d['odata.nextLink']||null;
+        if(next) return pagFb(next);
+        _cacheMov={pedido:normStr(pedido),data:todos2,ts:Date.now()};
+        return todos2;
+      });
+    }
+    return pagFb(urlFb).catch(function(e2){console.error('[MOV] Fallback error:',e2.message);return todos2;});
   });
 }
 
