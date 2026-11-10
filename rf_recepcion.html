@@ -381,6 +381,35 @@ function descubrirExcel(){
 // ═══════════════════════════════════════════════════════════════════
 // 8. LECTURA DE CATÁLOGOS DESDE EXCEL
 // ═══════════════════════════════════════════════════════════════════
+// \u2500\u2500 Cache sessionStorage para hojas pesadas \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var _SS_TTL=4*60*60*1000; // 4 horas
+var _SS_KEYS={
+  'C.Barra':    'rfr_cbarra_v1',
+  'Packing':    'rfr_packing_v1',
+  'Asignaciones':'rfr_asig_v1',
+};
+function _ssTryLoad(hoja){
+  var key=_SS_KEYS[hoja];
+  if(!key) return null;
+  try{
+    var raw=sessionStorage.getItem(key);
+    if(!raw) return null;
+    var obj=JSON.parse(raw);
+    if(!obj||!obj.ts||!obj.values) return null;
+    if(Date.now()-obj.ts>_SS_TTL){sessionStorage.removeItem(key);return null;}
+    console.log('[SS-CACHE] HIT "'+hoja+'" ('+obj.values.length+' filas, edad '+(Math.round((Date.now()-obj.ts)/60000))+'min)');
+    return {hoja:hoja, data:{values:obj.values}, err:null};
+  }catch(e){return null;}
+}
+function _ssSave(hoja,values){
+  var key=_SS_KEYS[hoja];
+  if(!key) return;
+  try{
+    sessionStorage.setItem(key,JSON.stringify({ts:Date.now(),values:values}));
+    console.log('[SS-CACHE] SAVED "'+hoja+'" ('+values.length+' filas)');
+  }catch(e){console.warn('[SS-CACHE] No se pudo guardar "'+hoja+'":',e.message);}
+}
+
 var NOISE=/^[\u2191\*\-\#]/;
 
 // Normalizar fechas desde Workbook API a formato YYYY-MM-DD
@@ -438,11 +467,17 @@ function leerCatalogos(){
     }
     var hojas=['Operadores','Supervisores','Pedidos','Contenedores','Packing','C.Barra','Asignaciones'];
     return Promise.all(hojas.map(function(h){
-      return gGet(urlWB(h)).then(function(r){return{hoja:h,data:r,err:null};})
-        .catch(function(e){
-          console.warn('[EXCEL] Hoja '+h+' error:',e.message);
-          return{hoja:h,data:null,err:e.message};
-        });
+      // Intentar servir desde sessionStorage para hojas pesadas
+      var cached=_ssTryLoad(h);
+      if(cached) return Promise.resolve(cached);
+      return gGet(urlWB(h)).then(function(r){
+        // Guardar en cache las hojas pesadas
+        if(r&&r.values) _ssSave(h,r.values);
+        return{hoja:h,data:r,err:null};
+      }).catch(function(e){
+        console.warn('[EXCEL] Hoja '+h+' error:',e.message);
+        return{hoja:h,data:null,err:e.message};
+      });
     })).then(function(res){
       res.forEach(function(r){parsear(r.hoja,r.data,r.err);});
     });
@@ -787,13 +822,14 @@ function cargarAsignacionesSP(){
 }
 function cargarEventosSP(pedido){
   if(!DB.listIds.eventos) return Promise.resolve([]);
-  var url=urlLista(DB.listIds.eventos)+'/items?$expand=fields&$top=500';
+  var filtro="fields/Pedido eq '"+pedido.replace(/'/g,"''")+"'";
+  var url=urlLista(DB.listIds.eventos)+'/items?$expand=fields&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
   function paginar(u){
     return gGet(u).then(function(d){
       (d.value||[]).forEach(function(i){
         var f=i.fields;
-        if(f&&f.Pedido===pedido) todos.push(f);
+        if(f) todos.push(f);
       });
       var next=d['@odata.nextLink']||d['odata.nextLink']||null;
       if(next) return paginar(next);
@@ -808,15 +844,18 @@ function cargarSKUsSP(pedido,contenedor){
     return Promise.resolve([]);
   }
   console.log('[CORREGIR] Pedido seleccionado:',pedido);
-  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+  // Filtrar en servidor por Pedido para evitar traer toda la lista
+  var filtro="fields/Pedido eq '"+pedido.replace(/'/g,"''")+"'";
+  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
   function paginar(u){
     return gGet(u).then(function(d){
       (d.value||[]).forEach(function(i){
         var f=i.fields||{};
-        var matchPed=normStr(f.Pedido||'')===normStr(pedido);
+        f._spId=i.id||null;
+        // Filtro adicional por contenedor si se especifica
         var matchCont=!contenedor||normStr(f.Contenedor||'')===normStr(contenedor);
-        if(matchPed&&matchCont) todos.push(f);
+        if(matchCont) todos.push(f);
       });
       var next=d['@odata.nextLink']||d['odata.nextLink']||null;
       if(next) return paginar(next);
@@ -827,8 +866,24 @@ function cargarSKUsSP(pedido,contenedor){
     });
   }
   return paginar(url).catch(function(e){
-    console.error('[CORREGIR] Error cargando SP:',e.message);
-    return todos;
+    // Fallback sin filtro si OData no está habilitado
+    console.warn('[CORREGIR] Filtro OData falló, usando fallback sin filtro:',e.message);
+    var urlFb=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+    var fb=[];
+    function pagFb(u){
+      return gGet(u).then(function(d){
+        (d.value||[]).forEach(function(i){
+          var f=i.fields||{};f._spId=i.id||null;
+          var matchPed=normStr(f.Pedido||'')===normStr(pedido);
+          var matchCont=!contenedor||normStr(f.Contenedor||'')===normStr(contenedor);
+          if(matchPed&&matchCont) fb.push(f);
+        });
+        var next=d['@odata.nextLink']||d['odata.nextLink']||null;
+        if(next) return pagFb(next);
+        return fb;
+      });
+    }
+    return pagFb(urlFb).catch(function(e2){console.error('[CORREGIR] Fallback error:',e2.message);return fb;});
   });
 }
 
@@ -1061,6 +1116,9 @@ function refrescarContenedoresExcel(){
 
 // ── Recargar catálogos desde Excel ────────────────────────────────
 function recargarCatalogos(){
+  // Limpiar cache de sessionStorage para forzar lectura fresca del Excel
+  Object.values(_SS_KEYS).forEach(function(k){try{sessionStorage.removeItem(k);}catch(e){}});
+  console.log('[SS-CACHE] Cache limpiado — recargando desde Excel...');
   render('<div class="loading"><div class="loading-icon">...</div>'+
     '<div class="loading-txt">Actualizando desde Excel...</div></div>');
   leerCatalogos().then(function(){
