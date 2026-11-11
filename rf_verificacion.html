@@ -515,16 +515,14 @@ function pantallaResultadoNO(cb){
 window.confirmarYSiguiente=function(resultado,sku,desc){
   var t=ahora();
   var fields={
-    Title:                S.codigoActual+'-'+Date.now(),
-    C_x00f3_digo:         S.codigoActual,
-    SKU:                  sku,
-    Descripci_x00f3_n:    desc,
-    Ubicaci_x00f3_n:      S.ubicacion,
-    Resultado:            resultado,
-    Operario:             S.operario,
-    Fecha:                t.fecha,
-    Hora:                 t.hora,
-    Timestamp:            t.ts,
+    Title:                         S.codigoActual+'-'+Date.now(),
+    C_x00f3_digo:                  S.codigoActual,
+    SKU:                           sku,
+    Descripci_x00f3_n:             desc,
+    Ubicaci_x00f3_n:               S.ubicacion,
+    Resultado:                     resultado,
+    Operario:                      S.operario,
+    Fecha_x0020_y_x0020_Hora:      new Date().toISOString(),
   };
   renderGuardando();
   guardarRegistro(fields).then(function(){
@@ -545,16 +543,14 @@ window.registrarNoConsta=function(){
   if(!sku){toast('⚠ Ingresa el SKU');return;}
   var t=ahora();
   var fields={
-    Title:                S.codigoActual+'-'+Date.now(),
-    C_x00f3_digo:         S.codigoActual,
-    SKU:                  sku,
-    Descripci_x00f3_n:    desc,
-    Ubicaci_x00f3_n:      S.ubicacion,
-    Resultado:            'No Consta',
-    Operario:     S.operario,
-    Fecha:        t.fecha,
-    Hora:         t.hora,
-    Timestamp:    t.ts,
+    Title:                         S.codigoActual+'-'+Date.now(),
+    C_x00f3_digo:                  S.codigoActual,
+    SKU:                           sku,
+    Descripci_x00f3_n:             desc,
+    Ubicaci_x00f3_n:               S.ubicacion,
+    Resultado:                     'No Consta',
+    Operario:                      S.operario,
+    Fecha_x0020_y_x0020_Hora:      new Date().toISOString(),
   };
   renderGuardando();
   guardarRegistro(fields).then(function(){
