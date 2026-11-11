@@ -522,7 +522,6 @@ window.confirmarYSiguiente=function(resultado,sku,desc){
     Ubicaci_x00f3_n:               S.ubicacion,
     Resultado:                     resultado,
     Operario:                      S.operario,
-    Fecha_x0020_y_x0020_Hora:      new Date().toISOString(),
   };
   renderGuardando();
   guardarRegistro(fields).then(function(){
@@ -550,7 +549,6 @@ window.registrarNoConsta=function(){
     Ubicaci_x00f3_n:               S.ubicacion,
     Resultado:                     'No Consta',
     Operario:                      S.operario,
-    Fecha_x0020_y_x0020_Hora:      new Date().toISOString(),
   };
   renderGuardando();
   guardarRegistro(fields).then(function(){
