@@ -65,6 +65,7 @@ body{
 .app-card.inf::before{background:var(--ok)}
 .app-card.perc::before{background:var(--perc)}
 .app-card.des::before{background:var(--warn)}
+.app-card.vcod::before{background:var(--ok)}
 
 .app-icon{font-size:28px;flex-shrink:0;width:44px;text-align:center}
 .app-name{font-size:15px;font-weight:700;margin-bottom:3px}
@@ -186,6 +187,14 @@ var APPS=[
     desc:'Registro y control de despachos desde bodega',
     href:'https://giuseppe2926.github.io/inverneg-rf/',
     cls:'des',
+  },
+  {
+    id:'vcod',
+    icon:'🔍',
+    name:'RF Verificación',
+    desc:'Verificación de códigos de barra y registro de códigos faltantes',
+    href:'rf_verificacion.html',
+    cls:'vcod',
   },
 ];
 
