@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<title>RF Verificación — Inverneg</title>
+<style>
+:root{
+  --bg:#0D1117;--sur:#161B22;--sur2:#1C2330;--bor:#2A3340;
+  --txt:#E6EDF3;--mut:#7D8590;
+  --acc:#58A6FF;--ok:#3FB950;--warn:#E3B341;--dan:#F85149;--rec:#F0883E;
+  --mono:'Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden}
+#app{display:flex;flex-direction:column;min-height:100vh}
+
+.hdr{background:var(--sur);border-bottom:1px solid var(--bor);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.hdr-brand{font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--acc)}
+.hdr-sub{font-size:10px;color:var(--mut);margin-top:1px}
+.hdr-btn{background:var(--sur2);border:1px solid var(--bor);color:var(--mut);font-size:11px;padding:5px 10px;border-radius:5px;cursor:pointer}
+
+#screen{flex:1;padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+.ftr{background:var(--sur);border-top:1px solid var(--bor);padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;min-height:44px}
+.ftr-op{font-size:11px;color:var(--mut)}
+.ftr-conn{display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--warn)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--warn)}
+.dot.ok{background:var(--ok)}.dot.err{background:var(--dan)}
+
+.lbl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;margin-top:12px}
+.inp{width:100%;background:var(--sur2);border:1px solid var(--bor);color:var(--txt);font-size:16px;padding:10px 12px;border-radius:6px;outline:none;font-family:inherit}
+.inp:focus{border-color:var(--acc)}
+select.inp{appearance:none;-webkit-appearance:none}
+
+.btn{border:none;border-radius:6px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .1s}
+.btn:active{opacity:.75}
+.btn-pri{background:var(--acc);color:#000}
+.btn-ok{background:var(--ok);color:#000}
+.btn-warn{background:var(--dan);color:#fff}
+.btn-sec{background:var(--sur2);color:var(--txt);border:1px solid var(--bor)}
+.btn-big{width:100%;padding:13px;font-size:15px;margin-top:10px}
+.btn-row{display:flex;gap:8px;margin-top:10px}
+.btn-row .btn{flex:1}
+
+/* RESULTADO CARDS */
+.res-card{border-radius:10px;padding:18px;margin:12px 0;text-align:center}
+.res-ok{background:rgba(63,185,80,.12);border:2px solid rgba(63,185,80,.4)}
+.res-no{background:rgba(248,81,73,.12);border:2px solid rgba(248,81,73,.4)}
+.res-icon{font-size:44px;margin-bottom:8px}
+.res-title{font-size:20px;font-weight:800;margin-bottom:4px}
+.res-title.ok{color:var(--ok)}.res-title.dan{color:var(--dan)}
+.res-sku{font-size:13px;color:var(--acc);font-weight:700;margin-bottom:2px}
+.res-desc{font-size:14px;color:var(--txt)}
+.res-tipo{font-size:11px;color:var(--mut);margin-top:4px}
+
+/* INFO ROW */
+.info-row{background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.info-key{font-size:11px;color:var(--mut)}
+.info-val{font-size:13px;font-weight:700;color:var(--txt)}
+
+/* SCAN BOX */
+.scan-box{background:var(--sur2);border:2px dashed var(--bor);border-radius:10px;padding:20px 14px;text-align:center;margin-bottom:12px}
+.scan-box.active{border-color:var(--acc)}
+.scan-label{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.scan-inp{width:100%;background:transparent;border:none;border-bottom:2px solid var(--bor);color:var(--txt);font-size:22px;padding:8px 4px;text-align:center;outline:none;font-family:var(--mono);font-weight:700;letter-spacing:.05em}
+.scan-inp:focus{border-bottom-color:var(--acc)}
+
+/* LOADING */
+.loading{text-align:center;padding:40px 0}
+.loading-icon{font-size:32px;margin-bottom:12px}
+.loading-txt{font-size:13px;font-weight:700;color:var(--acc);margin-bottom:6px}
+.loading-sub{font-size:11px;color:var(--mut)}
+
+/* TOAST */
+.toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--sur2);border:1px solid var(--bor);color:var(--txt);padding:8px 16px;border-radius:8px;font-size:12px;z-index:999;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* ALERT */
+.alert{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);color:var(--dan);border-radius:6px;padding:8px 12px;font-size:12px;margin:8px 0}
+
+/* SECTION TITLE */
+.sec-title{font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px}
+
+/* BADGE */
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;text-transform:uppercase}
+.badge-ok{background:rgba(63,185,80,.2);color:var(--ok)}
+.badge-no{background:rgba(248,81,73,.2);color:var(--dan)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hdr">
+    <div>
+      <div class="hdr-brand">▸ RF VERIFICACIÓN</div>
+      <div class="hdr-sub" id="hdr-sub">Inverneg · CND</div>
+    </div>
+    <button class="hdr-btn" onclick="window.goHome&&goHome()">⌂ Inicio</button>
+  </div>
+  <div id="screen">
+    <div class="loading">
+      <div class="loading-icon">🔍</div>
+      <div class="loading-txt">Iniciando...</div>
+      <div class="loading-sub">Cargando catálogo de códigos</div>
+    </div>
+  </div>
+  <div class="ftr">
+    <div class="ftr-op" id="ftr-op">—</div>
+    <div class="ftr-conn"><div class="dot" id="conn-dot"></div><span id="conn-lbl">CONECTANDO</span></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+
+// ════════════════════════════════════════════════
+// 1. UTILS
+// ════════════════════════════════════════════════
+function pad(n){return String(n).padStart(2,'0');}
+function ahora(){
+  var d=new Date();
+  return{
+    fecha:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),
+    hora:pad(d.getHours())+':'+pad(d.getMinutes()),
+    ts:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()),
+  };
+}
+function render(html){document.getElementById('screen').innerHTML=html;}
+function toast(msg,dur){
+  var el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},dur||2200);
+}
+function setConn(s){
+  var dot=document.getElementById('conn-dot');
+  var lbl=document.getElementById('conn-lbl');
+  dot.className='dot';
+  if(s==='ok'){dot.classList.add('ok');lbl.textContent='LIVE';}
+  else if(s==='err'){dot.classList.add('err');lbl.textContent='SIN CONEXIÓN';}
+  else lbl.textContent='CONECTANDO';
+}
+function normStr(s){return s?s.toString().trim().toUpperCase():'';}
+function updateFtr(){
+  document.getElementById('ftr-op').textContent=
+    (S.operario||'—')+(S.ubicacion?' · '+S.ubicacion:'');
+}
+
+// ════════════════════════════════════════════════
+// 2. CONFIG — mismo tenant/app que resto de RF apps
+// ════════════════════════════════════════════════
+var CFG={
+  clientId:   'ec976114-e146-4ce4-850c-5d978e12acfd',
+  tenantId:   '5e008bd3-17b6-4f83-8d23-019691a40609',
+  siteId:     'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
+  catalogoCBarra:    'Inverneg_ConteoRF_Base_Live.xlsx',      // fuente códigos de barra
+  catalogoPersonal:  'Inverneg_DespachoRF_Base_Catálogos.xlsx', // fuente operadores
+  listaNombre:       'RF_VCodigos_LRegistros',
+};
+var GRAPH='https://graph.microsoft.com/v1.0';
+var SCOPES=['Files.ReadWrite','Sites.ReadWrite.All'];
+
+// ════════════════════════════════════════════════
+// 3. BASE DE DATOS LOCAL
+// ════════════════════════════════════════════════
+// Respaldo operadores (mismo que Despacho RF) — se sobreescribe si Excel carga
+var OPERADORES_BACKUP=['ALAVA LUIS','ALBAN FERNANDO','BACILIO WILLIAN','BRIONES JOHNNY',
+  'CAMPOVERDE ERWIN','CORDERO JOEL','GARCIA JAVIER','JUMBO JONATHAN','LEDEZMA CRISTIAN',
+  'LUCAS DAVE','MENDOZA HENRY','COBOS CRISTHIAN','RIVERO BRYAN','MORA KEVIN',
+  'MUDUMBA ISAAC','MURILLO JOSE','VERA OMAR','RODRIGUEZ PETER','SALDAÑA JHON',
+  'TOALA ERICK','ZAMBRANO ANDRES','LOPEZ KEVIN','MONTEVERDE LONDRES','JUNCO GIUSEPPE'];
+
+var DB={
+  operadores:[],
+  codigosBarra:[],           // [{sku, desc, cb, tipo, factor}]
+  cbarraDriveId:null,        // drive del Excel de C.Barra
+  cbarraItemId:null,
+  personalDriveId:null,      // drive del Excel de operadores
+  personalItemId:null,
+  listaId:null,              // ID de RF_VCodigos_LRegistros
+};
+
+// ════════════════════════════════════════════════
+// 4. ESTADO
+// ════════════════════════════════════════════════
+var S={
+  operario:'',
+  ubicacion:'',
+  step:'login',          // login | scan | resultado | registrar
+  codigoActual:'',
+  resultadoActual:null,  // {encontrado, matches:[]}
+};
+
+// ════════════════════════════════════════════════
+// 5. MSAL
+// ════════════════════════════════════════════════
+var msalInst,msalAcc;
+var msalCfg={
+  auth:{
+    clientId:CFG.clientId,
+    authority:'https://login.microsoftonline.com/'+CFG.tenantId,
+    redirectUri:location.href.split('?')[0].split('#')[0],
+    navigateToLoginRequestUrl:false,
+  },
+  cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true},
+};
+
+// ════════════════════════════════════════════════
+// 6. GRAPH HELPERS
+// ════════════════════════════════════════════════
+function getToken(){
+  if(!msalAcc) return Promise.reject(new Error('Sin sesión'));
+  return msalInst.acquireTokenSilent({scopes:SCOPES,account:msalAcc})
+    .catch(function(){return msalInst.acquireTokenRedirect({scopes:SCOPES,account:msalAcc});});
+}
+function gGet(url){
+  return getToken().then(function(r){
+    return fetch(url,{headers:{'Authorization':'Bearer '+r.accessToken}});
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,120));});
+    return r.json();
+  });
+}
+function gPost(url,body){
+  return getToken().then(function(r){
+    return fetch(url,{method:'POST',
+      headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,120));});
+    return r.json();
+  });
+}
+
+// ════════════════════════════════════════════════
+// 7. DESCUBRIMIENTO CATÁLOGO + LISTA SP
+// ════════════════════════════════════════════════
+function buscarArchivo(nom){
+  var urlSP=GRAPH+'/sites/'+CFG.siteId+'/drive/root/search(q='+encodeURIComponent("'"+nom+"'")+')';
+  var urlOD=GRAPH+'/me/drive/root/search(q='+encodeURIComponent("'"+nom+"'")+')';
+  return gGet(urlSP).then(function(d){
+    var f=d.value&&d.value.find(function(x){return x.name===nom;});
+    if(f) return f;
+    return gGet(urlOD).then(function(d2){
+      return d2.value&&d2.value.find(function(x){return x.name===nom;})||null;
+    });
+  });
+}
+
+function descubrirExcel(){
+  // Buscar ambos Excels en paralelo
+  return Promise.all([
+    buscarArchivo(CFG.catalogoCBarra).then(function(f){
+      if(f){
+        DB.cbarraDriveId=f.parentReference&&f.parentReference.driveId||null;
+        DB.cbarraItemId=f.id;
+        console.log('[EXCEL] C.Barra encontrado:',CFG.catalogoCBarra);
+        return true;
+      }
+      console.error('[EXCEL] No encontrado:',CFG.catalogoCBarra);
+      return false;
+    }).catch(function(e){console.error('[EXCEL] C.Barra:',e.message);return false;}),
+
+    buscarArchivo(CFG.catalogoPersonal).then(function(f){
+      if(f){
+        DB.personalDriveId=f.parentReference&&f.parentReference.driveId||null;
+        DB.personalItemId=f.id;
+        console.log('[EXCEL] Personal encontrado:',CFG.catalogoPersonal);
+        return true;
+      }
+      console.warn('[EXCEL] Personal no encontrado — se usará lista de respaldo');
+      return false;
+    }).catch(function(e){console.warn('[EXCEL] Personal:',e.message);return false;}),
+  ]).then(function(res){return res[0];}); // solo C.Barra es crítico
+}
+
+function descubrirLista(){
+  var url=GRAPH+'/sites/'+CFG.siteId+'/lists?$select=id,displayName&$top=200';
+  return gGet(url).then(function(d){
+    var l=(d.value||[]).find(function(x){return x.displayName===CFG.listaNombre;});
+    if(l){DB.listaId=l.id;console.log('[SP] Lista encontrada:',l.id);return true;}
+    console.log('[SP] Lista no encontrada — se creará al primer registro');
+    return false;
+  }).catch(function(e){console.error('[SP] descubrirLista:',e.message);return false;});
+}
+
+// ════════════════════════════════════════════════
+// 8. LECTURA HOJAS EXCEL
+// ════════════════════════════════════════════════
+function urlWB(driveId,itemId,hoja){
+  return GRAPH+'/drives/'+driveId+'/items/'+itemId+
+    "/workbook/worksheets('"+hoja+"')/usedRange";
+}
+function NOISE(s){return/^[\u2191\*\-\#]/.test(s);}
+
+function leerCatalogos(){
+  return descubrirExcel().then(function(cbarraOk){
+    if(!cbarraOk) return false;
+
+    var promesas=[];
+
+    // C.Barra \u2014 cr\u00edtico
+    promesas.push(
+      gGet(urlWB(DB.cbarraDriveId,DB.cbarraItemId,'C.Barra'))
+        .catch(function(e){console.error('[EXCEL] C.Barra:',e.message);return null;})
+    );
+
+    // Operadores desde Despacho Excel \u2014 opcional (hay respaldo)
+    if(DB.personalDriveId&&DB.personalItemId){
+      promesas.push(
+        gGet(urlWB(DB.personalDriveId,DB.personalItemId,'Operadores'))
+          .catch(function(e){console.warn('[EXCEL] Operadores:',e.message);return null;})
+      );
+    } else {
+      promesas.push(Promise.resolve(null));
+    }
+
+    return Promise.all(promesas).then(function(res){
+      parsearCBarra(res[0]);
+      if(res[1]){
+        parsearOperadores(res[1]);
+      } else {
+        // Usar respaldo hardcoded igual que Despacho RF
+        DB.operadores=OPERADORES_BACKUP.slice();
+        console.log('[EXCEL] Operadores: usando lista de respaldo ('+DB.operadores.length+')');
+      }
+      return true;
+    });
+  });
+}
+
+function parsearOperadores(data){
+  if(!data||!data.values||data.values.length<2) return;
+  var raw=data.values.slice(1);
+  DB.operadores=raw.filter(function(r){
+    return r[0]&&r[0].toString().trim().length>0&&!NOISE(r[0].toString().trim());
+  }).map(function(r){return r[0].toString().trim();});
+  console.log('[EXCEL] Operadores:',DB.operadores.length);
+}
+
+function parsearCBarra(data){
+  if(!data||!data.values||data.values.length<2) return;
+  var raw=data.values.slice(1);
+  DB.codigosBarra=[];
+  raw.filter(function(r){
+    return r[0]&&r[0].toString().trim().length>0&&!NOISE(r[0].toString().trim());
+  }).forEach(function(r){
+    var sku =r[0]?r[0].toString().trim():'';
+    var desc=r[1]?r[1].toString().trim():'';
+    var cbU =r[3]?r[3].toString().trim():'';
+    var uncj=r[4]?Number(r[4]):1;
+    var cbC =r[5]?r[5].toString().trim():'';
+    if(cbU) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbU,tipo:'Unidad',factor:1});
+    if(cbC) DB.codigosBarra.push({sku:sku,desc:desc,cb:cbC,tipo:'Caja',factor:uncj||1});
+  });
+  console.log('[EXCEL] C.Barra:',DB.codigosBarra.length,'entradas');
+}
+
+// ════════════════════════════════════════════════
+// 9. BUSCAR CÓDIGO
+// ════════════════════════════════════════════════
+function buscarCodigo(cb){
+  var norm=normStr(cb);
+  return DB.codigosBarra.filter(function(r){return normStr(r.cb)===norm;});
+}
+
+// ════════════════════════════════════════════════
+// 10. GUARDAR EN SP
+// ════════════════════════════════════════════════
+function guardarRegistro(fields){
+  if(!DB.listaId){
+    // Intentar redescubrir por si acaso
+    return descubrirLista().then(function(ok){
+      if(!ok||!DB.listaId) throw new Error('Lista SP no disponible');
+      return _postRegistro(fields);
+    });
+  }
+  return _postRegistro(fields);
+}
+function _postRegistro(fields){
+  var url=GRAPH+'/sites/'+CFG.siteId+'/lists/'+DB.listaId+'/items';
+  return gPost(url,{fields:fields})
+    .then(function(r){console.log('[SP] Registro guardado OK');return r;})
+    .catch(function(e){console.error('[SP] Error guardando:',e.message);throw e;});
+}
+
+// ════════════════════════════════════════════════
+// 11. PANTALLAS
+// ════════════════════════════════════════════════
+
+// ── LOGIN / INICIO ───────────────────────────────
+function pantallaLogin(){
+  S.step='login';
+  var optsHtml='<option value="">— Seleccionar —</option>';
+  DB.operadores.forEach(function(op){
+    optsHtml+='<option value="'+op+'">'+op+'</option>';
+  });
+  render(
+    '<div class="sec-title">Operario</div>'+
+    '<select class="inp" id="sel-op">'+optsHtml+'</select>'+
+    '<div class="lbl">Ubicación de verificación</div>'+
+    '<input class="inp" id="inp-ub" type="text" placeholder="Ej: Pasillo A — Estante 3" autocomplete="off">'+
+    '<button class="btn btn-pri btn-big" onclick="iniciarSesion()">▸ Iniciar verificación</button>'
+  );
+  updateFtr();
+}
+
+window.iniciarSesion=function(){
+  var op=document.getElementById('sel-op');
+  var ub=document.getElementById('inp-ub');
+  if(!op||!op.value){toast('⚠ Selecciona un operario');return;}
+  if(!ub||!ub.value.trim()){toast('⚠ Ingresa la ubicación');return;}
+  S.operario=op.value.trim();
+  S.ubicacion=ub.value.trim();
+  updateFtr();
+  pantallaScan();
+};
+
+// ── PANTALLA DE ESCANEO ──────────────────────────
+function pantallaScan(){
+  S.step='scan';
+  render(
+    '<div class="scan-box active">'+
+      '<div class="scan-label">📷 Escanea o digita el código de barras</div>'+
+      '<input class="scan-inp" id="inp-cb" type="text" inputmode="numeric" autocomplete="off" '+
+        'placeholder="Código..." autofocus>'+
+    '</div>'+
+    '<button class="btn btn-pri btn-big" onclick="verificarCodigo()">🔍 Verificar</button>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="pantallaLogin()">✎ Cambiar operario / ubicación</button>'
+  );
+  // Auto-foco y verificar al presionar Enter
+  setTimeout(function(){
+    var el=document.getElementById('inp-cb');
+    if(el){
+      el.focus();
+      el.addEventListener('keydown',function(e){
+        if(e.key==='Enter'||e.keyCode===13) verificarCodigo();
+      });
+    }
+  },100);
+  updateFtr();
+}
+window.pantallaScan=pantallaScan;
+
+// ── VERIFICAR CÓDIGO ─────────────────────────────
+window.verificarCodigo=function(){
+  var el=document.getElementById('inp-cb');
+  if(!el||!el.value.trim()){toast('Ingresa un código');return;}
+  var cb=el.value.trim();
+  S.codigoActual=cb;
+  var matches=buscarCodigo(cb);
+  S.resultadoActual={encontrado:matches.length>0,matches:matches};
+  if(matches.length>0){
+    pantallaResultadoOK(cb,matches);
+  } else {
+    pantallaResultadoNO(cb);
+  }
+};
+
+// ── RESULTADO: CÓDIGO OK ─────────────────────────
+function pantallaResultadoOK(cb,matches){
+  S.step='resultado';
+  var m=matches[0]; // primer match (puede haber unidad y caja del mismo SKU)
+  var extra='';
+  if(matches.length>1){
+    extra='<div class="res-tipo">También encontrado como: '+
+      matches.slice(1).map(function(x){return x.tipo+'('+x.sku+')';}).join(', ')+'</div>';
+  }
+  render(
+    '<div class="res-card res-ok">'+
+      '<div class="res-icon">✅</div>'+
+      '<div class="res-title ok">CÓDIGO OK</div>'+
+      '<div class="res-sku">'+m.sku+'</div>'+
+      '<div class="res-desc">'+m.desc+'</div>'+
+      '<div class="res-tipo">'+m.tipo+' · x'+m.factor+'</div>'+
+      extra+
+    '</div>'+
+    '<div class="info-row"><span class="info-key">Código</span><span class="info-val" style="font-family:var(--mono);color:var(--acc)">'+cb+'</span></div>'+
+    '<div class="info-row"><span class="info-key">Ubicación</span><span class="info-val">'+S.ubicacion+'</span></div>'+
+    '<div class="info-row"><span class="info-key">Operario</span><span class="info-val">'+S.operario+'</span></div>'+
+    '<button class="btn btn-ok btn-big" onclick="confirmarYSiguiente(\'OK\',\''+esc(m.sku)+'\',\''+esc(m.desc)+'\')">✓ Guardar y continuar</button>'+
+    '<button class="btn btn-sec btn-big" style="margin-top:6px" onclick="pantallaScan()">↩ Sin guardar — siguiente código</button>'
+  );
+}
+
+// ── RESULTADO: NO CONSTA ─────────────────────────
+function pantallaResultadoNO(cb){
+  S.step='resultado';
+  render(
+    '<div class="res-card res-no">'+
+      '<div class="res-icon">❌</div>'+
+      '<div class="res-title dan">NO CONSTA</div>'+
+      '<div style="font-size:12px;color:var(--mut);margin-top:4px">Código no encontrado en la base</div>'+
+    '</div>'+
+    '<div class="info-row"><span class="info-key">Código escaneado</span><span class="info-val" style="font-family:var(--mono);color:var(--dan)">'+cb+'</span></div>'+
+    '<div class="sec-title">Registrar código faltante</div>'+
+    '<div class="lbl">SKU correspondiente</div>'+
+    '<input class="inp" id="inp-sku" type="text" placeholder="Ej: INV-00123" autocomplete="off" style="text-transform:uppercase">'+
+    '<div class="lbl">Descripción (opcional)</div>'+
+    '<input class="inp" id="inp-desc" type="text" placeholder="Nombre del producto" autocomplete="off">'+
+    '<div class="btn-row">'+
+      '<button class="btn btn-warn" onclick="registrarNoConsta()">⚠ Registrar como faltante</button>'+
+      '<button class="btn btn-sec" onclick="pantallaScan()">↩ Cancelar</button>'+
+    '</div>'
+  );
+  setTimeout(function(){
+    var el=document.getElementById('inp-sku');
+    if(el) el.focus();
+  },100);
+}
+
+// ── GUARDAR OK Y SIGUIENTE ───────────────────────
+window.confirmarYSiguiente=function(resultado,sku,desc){
+  var t=ahora();
+  var fields={
+    Title:        S.codigoActual+'-'+Date.now(),
+    Codigo:       S.codigoActual,
+    SKU:          sku,
+    Descripcion:  desc,
+    Ubicacion:    S.ubicacion,
+    Resultado:    resultado,
+    Operario:     S.operario,
+    Fecha:        t.fecha,
+    Hora:         t.hora,
+    Timestamp:    t.ts,
+  };
+  renderGuardando();
+  guardarRegistro(fields).then(function(){
+    toast('✅ Guardado');
+    pantallaScan();
+  }).catch(function(e){
+    toast('⚠ Error al guardar: '+e.message.slice(0,60));
+    pantallaScan();
+  });
+};
+
+// ── REGISTRAR NO CONSTA ──────────────────────────
+window.registrarNoConsta=function(){
+  var skuEl=document.getElementById('inp-sku');
+  var descEl=document.getElementById('inp-desc');
+  var sku=skuEl?skuEl.value.trim().toUpperCase():'';
+  var desc=descEl?descEl.value.trim():'';
+  if(!sku){toast('⚠ Ingresa el SKU');return;}
+  var t=ahora();
+  var fields={
+    Title:        S.codigoActual+'-'+Date.now(),
+    Codigo:       S.codigoActual,
+    SKU:          sku,
+    Descripcion:  desc,
+    Ubicacion:    S.ubicacion,
+    Resultado:    'No Consta',
+    Operario:     S.operario,
+    Fecha:        t.fecha,
+    Hora:         t.hora,
+    Timestamp:    t.ts,
+  };
+  renderGuardando();
+  guardarRegistro(fields).then(function(){
+    toast('⚠ Código faltante registrado');
+    pantallaScan();
+  }).catch(function(e){
+    toast('⚠ Error al guardar: '+e.message.slice(0,60));
+    pantallaScan();
+  });
+};
+
+function renderGuardando(){
+  render('<div class="loading"><div class="loading-icon">💾</div>'+
+    '<div class="loading-txt">Guardando en SharePoint...</div></div>');
+}
+
+function esc(s){return(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+
+// ════════════════════════════════════════════════
+// 12. INICIO: MSAL + CARGA
+// ════════════════════════════════════════════════
+function init(){
+  var MSAL_CDN='https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js';
+  var s=document.createElement('script');
+  s.src=MSAL_CDN;
+  s.onload=function(){startMsal();};
+  s.onerror=function(){
+    render('<div class="loading"><div class="loading-icon">⚠️</div>'+
+      '<div class="loading-txt" style="color:var(--dan)">Error cargando MSAL</div>'+
+      '<div class="loading-sub">Verifica conexión a internet</div></div>');
+  };
+  document.head.appendChild(s);
+}
+
+function startMsal(){
+  msalInst=new msal.PublicClientApplication(msalCfg);
+  msalInst.initialize().then(function(){
+    return msalInst.handleRedirectPromise();
+  }).then(function(resp){
+    if(resp&&resp.account) msalAcc=resp.account;
+    else{
+      var accounts=msalInst.getAllAccounts();
+      if(accounts.length>0) msalAcc=accounts[0];
+    }
+    if(!msalAcc){
+      return msalInst.loginRedirect({scopes:SCOPES});
+    }
+    document.getElementById('hdr-sub').textContent=
+      'Inverneg · '+( msalAcc.name||msalAcc.username).split(' ')[0];
+    cargarTodo();
+  }).catch(function(e){
+    console.error('[MSAL]',e);
+    render('<div class="loading"><div class="loading-icon">⚠️</div>'+
+      '<div class="loading-txt" style="color:var(--dan)">Error de autenticación</div>'+
+      '<div class="loading-sub">'+e.message+'</div>'+
+      '<button class="btn btn-sec btn-big" onclick="location.reload()">↻ Reintentar</button></div>');
+  });
+}
+
+function cargarTodo(){
+  render('<div class="loading"><div class="loading-icon">📂</div>'+
+    '<div class="loading-txt">Cargando catálogo...</div>'+
+    '<div class="loading-sub">Leyendo '+CFG.catalogoNombre+'</div></div>');
+  Promise.all([
+    leerCatalogos(),
+    descubrirLista(),
+  ]).then(function(res){
+    var excelOk=res[0];
+    if(!excelOk){
+      render('<div class="loading"><div class="loading-icon">⚠️</div>'+
+        '<div class="loading-txt" style="color:var(--dan)">Excel no encontrado</div>'+
+        '<div class="loading-sub">Verifica que "'+CFG.catalogoNombre+'" está en SharePoint</div>'+
+        '<button class="btn btn-sec btn-big" onclick="location.reload()">↻ Reintentar</button></div>');
+      setConn('err');
+      return;
+    }
+    setConn('ok');
+    console.log('[INIT] Listo — '+DB.codigosBarra.length+' códigos de barra cargados');
+    console.log('[INIT] Lista SP: '+(DB.listaId||'NO ENCONTRADA — se debe crear'));
+    pantallaLogin();
+  }).catch(function(e){
+    console.error('[INIT] Error:',e.message);
+    setConn('err');
+    render('<div class="loading"><div class="loading-icon">⚠️</div>'+
+      '<div class="loading-txt" style="color:var(--dan)">Error de inicio</div>'+
+      '<div class="loading-sub">'+e.message+'</div>'+
+      '<button class="btn btn-sec btn-big" onclick="location.reload()">↻ Reintentar</button></div>');
+  });
+}
+
+window.pantallaLogin=pantallaLogin;
+init();
+
+})();
+</script>
+</body>
+</html>
