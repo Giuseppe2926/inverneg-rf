@@ -1232,7 +1232,10 @@ async function reprogramarSaldo(lineaId, nuevaFecha, nuevaHora) {
       HoraAprobada:       '',
       DecididoPor:        '',
       FechaDecision:      null,
-      ObservacionJefatura: ''
+      ObservacionJefatura: '',
+      // Limpiar llegada Garita — evita falsos positivos en flujos PA
+      FechaLlegadaGarita:  null,
+      HoraLlegadaGarita:   ''
     }
   );
 
