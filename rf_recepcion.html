@@ -203,7 +203,7 @@ function fechaDisplay(iso){
 var CFG={
   clientId:   'ec976114-e146-4ce4-850c-5d978e12acfd',
   tenantId:   '5e008bd3-17b6-4f83-8d23-019691a40609',
-  siteId:     'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
+  siteId:     'inverneg.sharepoint.com,65348f57-a25e-4137-ac5c-1347926aad8f,66ece2da-3fcc-473d-add2-0eccc5cd3863',
   catalogoNombre: 'Inverneg_ConteoRF_Base_Live.xlsx',
   listas:{
     recepciones: 'RF_PRecepciones_LRecepciones',
@@ -270,9 +270,10 @@ function getToken(){
     return msalInst.acquireTokenRedirect(req);
   });
 }
-function gGet(url){
+function gGet(url,extraHeaders){
   return getToken().then(function(r){
-    return fetch(url,{headers:{'Authorization':'Bearer '+r.accessToken}});
+    var hdrs=Object.assign({'Authorization':'Bearer '+r.accessToken},extraHeaders||{});
+    return fetch(url,{headers:hdrs});
   }).then(function(r){
     if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
     return r.json();
@@ -687,15 +688,15 @@ function escribirEvento(tipo,hora,contenedor){
   if(!DB.listIds.eventos) return Promise.resolve();
   var t=ahora();
   var fields={
-    Title:       S.recId+'-'+tipo,
-    RecepcionId: S.recId,
-    Pedido:      S.pedido,
-    Contenedor:  contenedor||S.contenedor||'',
-    TipoEvento:  tipo,
-    Operario:    S.operario,
-    Hora:        hora||t.hora,
-    Fecha:       t.fecha,
-    Timestamp:   t.ts,
+    Title:    S.recId+'-'+tipo,
+    field_1:  S.recId,
+    field_2:  S.pedido,
+    field_3:  contenedor||S.contenedor||'',
+    field_4:  tipo,
+    field_5:  S.operario,
+    field_6:  hora||t.hora,
+    field_7:  t.fecha,
+    field_8:  t.ts,
   };
   return gPost(urlLista(DB.listIds.eventos)+'/items',{fields:fields})
     .then(function(r){console.log('[SP] Evento '+tipo+' OK');return r;})
@@ -704,34 +705,34 @@ function escribirEvento(tipo,hora,contenedor){
 
 function escribirSKU(reg){
   if(!DB.listIds.recepciones) return Promise.resolve();
+  var tSKU=ahora();
   var fields={
-    Title:          S.recId+'-'+reg.sku+'-'+Date.now(),
-    Sesion:         S.recId,
-    Operario:       S.operario,
-    Solicitante:    S.operario,
-    Subtipo:        S.subtipo,
-    Pedido:         S.pedido,
-    Contenedor:     S.contenedor,
-    Sello:          '', // Sello guardado en LHoras, no en LRecepciones
-    Pallets:        Number(S.pallets)||0,
-    H_Llegada:      '',
-    H_Apertura:     '',
-    H_Cierre:       '',
-    H_Salida:       '',
-    LPN:            reg.lpn||'',
-    LPN_OK:         true,
-    CodProducto:    reg.sku,
-    CodInterno:     reg.sku,
-    Nombre:         reg.desc,
-    UnXCaja:        Number(reg.factor)||1,
-    NumCajas:       Number(reg.numCajas)||1,
-    Cantidad:       Number(reg.cantidad)||0,
-    Estado:         reg.estado||'OK',
-    Novedades:      reg.novedad||'',
-    Personas:       0,
-    AlertaProducto: false,
-    Fecha:          ahora().fecha,
-    Hora:           ahora().hora,
+    Title:     S.recId+'-'+reg.sku+'-'+Date.now(),
+    field_1:   S.recId,
+    field_2:   S.operario,
+    field_3:   S.operario,
+    field_4:   S.subtipo,
+    field_5:   S.pedido,
+    field_6:   S.contenedor,
+    field_7:   '', // Sello guardado en LHoras, no en LRecepciones
+    field_8:   Number(S.pallets)||0,
+    field_9:   0,
+    field_10:  0,
+    field_11:  0,
+    field_12:  0,
+    field_13:  reg.lpn||'',
+    field_14:  1, // LPN_OK como número 1
+    field_15:  reg.sku,
+    field_16:  reg.sku,
+    field_17:  reg.desc,
+    field_18:  Number(reg.factor)||1,
+    field_19:  Number(reg.numCajas)||1,
+    field_20:  Number(reg.cantidad)||0,
+    field_21:  reg.estado||'OK',
+    field_22:  0, // Novedades como número
+    field_23:  0,
+    field_24:  0, // AlertaProducto como número
+    field_25:  tSKU.ts.replace(' ','T')+'Z', // DateTime ISO 8601
   };
   return gPost(urlLista(DB.listIds.recepciones)+'/items',{fields:fields})
     .then(function(r){console.log('[SP] SKU '+reg.sku+' OK');return r;})
@@ -757,13 +758,13 @@ function escribirAsignacion(pedido,tipo,operario){
     // No existe — crear nueva
     var t=ahora();
     var fields={
-      Title:          pedido+'-'+tipo,
-      Pedido:         pedido,
-      TipoAsignacion: tipo,
-      Operario:       operario||'',
-      Supervisor:     S.operario,
-      FechaAsignacion:t.fecha,
-      Status:         'Activo',
+      Title:    pedido+'-'+tipo,
+      field_1:  pedido,
+      field_2:  tipo,
+      field_3:  operario||'',
+      field_4:  S.operario,
+      field_5:  t.fecha,
+      field_6:  'Activo',
     };
     return gPost(urlLista(DB.listIds.asignaciones)+'/items',{fields:fields})
       .then(function(r){console.log('[SP] Asignacion creada OK:',pedido,tipo,operario);return r;})
@@ -778,10 +779,10 @@ function actualizarStatusAsignacion(pedido,tipo,nuevoStatus,nuevoOperario){
     var ex=asigs.find(function(a){
       return normStr(a.Pedido)===normStr(pedido)&&normStr(a.TipoAsignacion)===normStr(tipo);
     });
-    if(!ex||!ex.ID) return;
-    var fields={Status:nuevoStatus};
-    if(nuevoOperario) fields.Operario=nuevoOperario;
-    return gPatch(urlLista(DB.listIds.asignaciones)+'/items/'+ex.ID,{fields:fields})
+    if(!ex||!ex._spId) return;
+    var fields={field_6:nuevoStatus};
+    if(nuevoOperario) fields.field_3=nuevoOperario;
+    return gPatch(urlLista(DB.listIds.asignaciones)+'/items/'+ex._spId,{fields:fields})
       .then(function(){console.log('[SP] Asignacion actualizada:',pedido,tipo,'->',nuevoStatus);})
       .catch(function(e){console.error('[SP] PATCH asignacion:',e.message);});
   });
@@ -792,24 +793,31 @@ function cargarAsignacionesSP(){
     console.warn('[ASIG] Lista asignaciones no disponible');
     return Promise.resolve([]);
   }
-  var url=urlLista(DB.listIds.asignaciones)+'/items?$expand=fields&$top=500';
+  var url=urlLista(DB.listIds.asignaciones)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6)&$top=500';
   var todos=[];
   var logged=false;
   function paginar(u){
     return gGet(u).then(function(d){
       (d.value||[]).forEach(function(i){
-        var f=i.fields||{};f._spId=i.id;
+        var f=i.fields||{};
+        f._spId=i.id;
+        // Alias display para compatibilidad con lógica existente
+        f.Pedido=f.field_1||'';
+        f.TipoAsignacion=f.field_2||'';
+        f.Operario=f.field_3||'';
+        f.Supervisor=f.field_4||'';
+        f.FechaAsignacion=f.field_5||'';
+        f.Status=f.field_6||'';
         todos.push(f);
       });
       if(!logged&&todos.length>0){
         logged=true;
         console.log('[ASIG] Total ítems en SP (hasta ahora):',todos.length);
         todos.slice(0,10).forEach(function(f,i){
-          console.log('[ASIG] Item '+i+': Pedido="'+(f.Pedido||f.Title||'?')+
-            '" TipoAsig="'+(f.TipoAsignacion||'?')+
-            '" Operario="'+(f.Operario||'?')+
-            '" Status="'+(f.Status||f.Status0||'?')+
-            '" Keys='+JSON.stringify(Object.keys(f).filter(function(k){return !k.startsWith('@');})));
+          console.log('[ASIG] Item '+i+': Pedido="'+f.Pedido+
+            '" TipoAsig="'+f.TipoAsignacion+
+            '" Operario="'+f.Operario+
+            '" Status="'+f.Status+'"');
         });
       }
       var next=d['@odata.nextLink']||d['odata.nextLink']||null;
@@ -822,14 +830,21 @@ function cargarAsignacionesSP(){
 }
 function cargarEventosSP(pedido){
   if(!DB.listIds.eventos) return Promise.resolve([]);
-  var filtro="fields/Pedido eq '"+pedido.replace(/'/g,"''")+"'";
-  var url=urlLista(DB.listIds.eventos)+'/items?$expand=fields&$top=500&$filter='+encodeURIComponent(filtro);
+  var filtro="fields/field_2 eq '"+pedido.replace(/'/g,"''")+"'";
+  var prefer={'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'};
+  var url=urlLista(DB.listIds.eventos)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8)&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
   function paginar(u){
-    return gGet(u).then(function(d){
+    return gGet(u,prefer).then(function(d){
       (d.value||[]).forEach(function(i){
         var f=i.fields;
-        if(f) todos.push(f);
+        if(f){
+          // Alias display
+          f.RecepcionId=f.field_1||''; f.Pedido=f.field_2||''; f.Contenedor=f.field_3||'';
+          f.TipoEvento=f.field_4||''; f.Operario=f.field_5||''; f.Hora=f.field_6||'';
+          f.Fecha=f.field_7||''; f.Timestamp=f.field_8||'';
+          todos.push(f);
+        }
       });
       var next=d['@odata.nextLink']||d['odata.nextLink']||null;
       if(next) return paginar(next);
@@ -844,17 +859,27 @@ function cargarSKUsSP(pedido,contenedor){
     return Promise.resolve([]);
   }
   console.log('[CORREGIR] Pedido seleccionado:',pedido);
-  // Filtrar en servidor por Pedido para evitar traer toda la lista
-  var filtro="fields/Pedido eq '"+pedido.replace(/'/g,"''")+"'";
-  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500&$filter='+encodeURIComponent(filtro);
+  // Filtrar en servidor por Pedido (field_5) para evitar traer toda la lista
+  var filtro="fields/field_5 eq '"+pedido.replace(/'/g,"''")+"'";
+  var prefer={'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'};
+  var selectFields='field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15,field_16,field_17,field_18,field_19,field_20,field_21,field_22,field_23,field_24,field_25';
+  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select='+selectFields+')&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
   function paginar(u){
-    return gGet(u).then(function(d){
+    return gGet(u,prefer).then(function(d){
       (d.value||[]).forEach(function(i){
         var f=i.fields||{};
         f._spId=i.id||null;
+        // Alias display para compatibilidad con lógica existente
+        f.Sesion=f.field_1||''; f.Operario=f.field_2||''; f.Solicitante=f.field_3||'';
+        f.Subtipo=f.field_4||''; f.Pedido=f.field_5||''; f.Contenedor=f.field_6||'';
+        f.Sello=f.field_7||''; f.Pallets=f.field_8||0; f.LPN=f.field_13||'';
+        f.LPN_OK=f.field_14||0; f.CodProducto=f.field_15||''; f.CodInterno=f.field_16||'';
+        f.Nombre=f.field_17||''; f.UnXCaja=f.field_18||1; f.NumCajas=f.field_19||1;
+        f.Cantidad=f.field_20||0; f.Estado=f.field_21||''; f.Novedades=f.field_22||0;
+        f.Personas=f.field_23||0; f.AlertaProducto=f.field_24||0;
         // Filtro adicional por contenedor si se especifica
-        var matchCont=!contenedor||normStr(f.Contenedor||'')===normStr(contenedor);
+        var matchCont=!contenedor||normStr(f.Contenedor)===normStr(contenedor);
         if(matchCont) todos.push(f);
       });
       var next=d['@odata.nextLink']||d['odata.nextLink']||null;
@@ -868,14 +893,16 @@ function cargarSKUsSP(pedido,contenedor){
   return paginar(url).catch(function(e){
     // Fallback sin filtro si OData no está habilitado
     console.warn('[CORREGIR] Filtro OData falló, usando fallback sin filtro:',e.message);
-    var urlFb=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+    var urlFb=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select='+selectFields+')&$top=500';
     var fb=[];
     function pagFb(u){
       return gGet(u).then(function(d){
         (d.value||[]).forEach(function(i){
           var f=i.fields||{};f._spId=i.id||null;
-          var matchPed=normStr(f.Pedido||'')===normStr(pedido);
-          var matchCont=!contenedor||normStr(f.Contenedor||'')===normStr(contenedor);
+          f.Pedido=f.field_5||''; f.Contenedor=f.field_6||'';
+          f.CodProducto=f.field_15||''; f.Cantidad=f.field_20||0; f.Estado=f.field_21||'';
+          var matchPed=normStr(f.Pedido)===normStr(pedido);
+          var matchCont=!contenedor||normStr(f.Contenedor)===normStr(contenedor);
           if(matchPed&&matchCont) fb.push(f);
         });
         var next=d['@odata.nextLink']||d['odata.nextLink']||null;
@@ -1284,16 +1311,16 @@ function confirmarAnularAsig(){
   if(!confirm('Anular asignacion de "'+tipo+'" para "'+pedido+'"?\nQuedara registrado.')) return;
   var t=ahora();
   gPatch(urlLista(DB.listIds.asignaciones)+'/items/'+spId,{
-    fields:{Status:'Anulada'}
+    fields:{field_6:'Anulada'}
   }).then(function(){
     // Auditar en LEventos
     if(DB.listIds.eventos){
       gPost(urlLista(DB.listIds.eventos)+'/items',{fields:{
-        Title: pedido+'-ANULACION_ASIG',
-        RecepcionId: '', Pedido: pedido, Contenedor: '',
-        TipoEvento: 'ANULACION_ASIG',
-        Operario: S.operario,
-        Hora: t.hora, Fecha: t.fecha, Timestamp: t.ts,
+        Title:    pedido+'-ANULACION_ASIG',
+        field_1:  '', field_2: pedido, field_3: '',
+        field_4:  'ANULACION_ASIG',
+        field_5:  S.operario,
+        field_6:  t.hora, field_7: t.fecha, field_8: t.ts,
       }}).catch(function(e){console.warn('[SP] Auditoria anulacion:',e.message);});
     }
     toast('Asignacion anulada: '+pedido+' ('+tipo+')');
@@ -1376,11 +1403,11 @@ function confirmarReopenar(){
     // Auditar en LEventos
     if(DB.listIds.eventos){
       gPost(urlLista(DB.listIds.eventos)+'/items',{fields:{
-        Title:     c.pedido+'-'+c.contenedor+'-REAPERTURA',
-        RecepcionId:'', Pedido:c.pedido, Contenedor:c.contenedor,
-        TipoEvento:'REAPERTURA_SUP',
-        Operario:  S.operario,
-        Hora:t.hora, Fecha:t.fecha, Timestamp:t.ts,
+        Title:   c.pedido+'-'+c.contenedor+'-REAPERTURA',
+        field_1: '', field_2: c.pedido, field_3: c.contenedor,
+        field_4: 'REAPERTURA_SUP',
+        field_5: S.operario,
+        field_6: t.hora, field_7: t.fecha, field_8: t.ts,
       }}).catch(function(e){console.warn('[SP] Auditoria reapertura:',e.message);});
     }
     toast('Contenedor reaperturado: '+c.contenedor);
@@ -1681,7 +1708,7 @@ function reasignarExistente(){
   if(!spId){toast('Error: id SP faltante');return;}
   var t=ahora();
   gPatch(urlLista(DB.listIds.asignaciones)+'/items/'+spId,{
-    fields:{Operario:_asigOp,Supervisor:S.operario,FechaAsignacion:t.fecha,Status:'Activo'}
+    fields:{field_3:_asigOp,field_4:S.operario,field_5:t.fecha,field_6:'Activo'}
   }).then(function(){
     toast('Reasignado: '+_asigOp+' -> '+_asigPedido);
     showMenuSup();
@@ -2545,7 +2572,7 @@ function confCorreccion(){
 // Trae todos y filtra en JS por Pedido + Contenedor
 function buscarItemHorasSP(pedido, contenedor){
   if(!DB.listIds.horas){console.warn('[LHORAS] Lista horas no disponible');return Promise.resolve(null);}
-  var url=urlLista(DB.listIds.horas)+'/items?$expand=fields&$top=500';
+  var url=urlLista(DB.listIds.horas)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15,field_16)&$top=500';
   var found=null;
   function paginar(u){
     return gGet(u).then(function(d){
@@ -2553,12 +2580,12 @@ function buscarItemHorasSP(pedido, contenedor){
       if(!found){
         var match=items.find(function(i){
           var f=i.fields||{};
-          return normStr(f.Pedido||'')===normStr(pedido)&&
-                 normStr(f.Contenedor||'')===normStr(contenedor);
+          return normStr(f.field_1||'')===normStr(pedido)&&
+                 normStr(f.field_2||'')===normStr(contenedor);
         });
         if(match){
           found=match;
-          console.log('[LHORAS] Encontrado: id='+found.id+' Llegada="'+(found.fields.HoraLlegada||'')+'"');
+          console.log('[LHORAS] Encontrado: id='+found.id+' Llegada="'+(found.fields.field_4||'')+'"');
           return found; // encontrado, no seguir paginando
         }
       }
@@ -2572,6 +2599,12 @@ function buscarItemHorasSP(pedido, contenedor){
     if(!item) return null;
     var f=item.fields;
     f._spId=item.id;
+    // Alias display para compatibilidad con lógica de UI
+    f.Pedido=f.field_1||''; f.Contenedor=f.field_2||''; f.Operario=f.field_3||'';
+    f.HoraLlegada=f.field_4||''; f.HoraApertura=f.field_5||''; f.HoraCierre=f.field_6||''; f.HoraSalida=f.field_7||'';
+    f.FechaRegistro=f.field_8||''; f.Personas=f.field_9||0; f.Novedades=f.field_10||'';
+    f.Estado=f.field_11||''; f.Timestamp=f.field_12||''; f.Sello1=f.field_13||''; f.Sello2=f.field_14||'';
+    f.Capacidad=f.field_15||''; f.PalletsRecibidos=f.field_16||0;
     return f;
   }).catch(function(e){console.error('[LHORAS] buscar error:',e.message);return null;});
 }
@@ -2581,23 +2614,23 @@ function escribirHoras(datos){
   var t=ahora();
   var titulo=S.pedido+'-'+S.contenedor;
   var fields={
-    Title:        titulo,
-    Pedido:       S.pedido,
-    Contenedor:   S.contenedor,
-    Operario:     S.operario,
-    HoraLlegada:  datos.llegada||'',
-    HoraApertura: datos.apertura||'',
-    HoraCierre:   datos.cierre||'',
-    HoraSalida:   datos.salida||'',
-    FechaRegistro:t.fecha,
-    Personas:     Number(datos.personas)||0,
-    Novedades:    datos.novedades||'',
-    Estado:          datos.estado||'En Proceso',
-    Sello1:          datos.sello1||'',
-    Sello2:          datos.sello2||'',
-    PalletsRecibidos:Number(datos.palletsRecibidos)||0,
-    Capacidad:       datos.capacidad||'',
-    Timestamp:       t.ts,
+    Title:     titulo,
+    field_1:   S.pedido,
+    field_2:   S.contenedor,
+    field_3:   S.operario,
+    field_4:   datos.llegada||'',
+    field_5:   datos.apertura||'',
+    field_6:   datos.cierre||'',
+    field_7:   datos.salida||'',
+    field_8:   t.fecha,
+    field_9:   Number(datos.personas)||0,
+    field_10:  datos.novedades||'',
+    field_11:  datos.estado||'En Proceso',
+    field_12:  t.ts,
+    field_13:  datos.sello1||'',
+    field_14:  datos.sello2||'',
+    field_15:  datos.capacidad||'',
+    field_16:  Number(datos.palletsRecibidos)||0,
   };
   return buscarItemHorasSP(S.pedido, S.contenedor).then(function(existing){
     if(existing&&existing._spId){
