@@ -842,15 +842,15 @@ function procesarPaginaEstado(data) {
   if (!data.value) return;
   data.value.forEach(function(item) {
     var f = item.fields;
-    if (!f || !f.OrdenId) return;
-    aplicarEstadoDesdeItem(item, f.OrdenId.toString().trim());
+    if (!f || !f.field_1) return;
+    aplicarEstadoDesdeItem(item, f.field_1.toString().trim());
   });
 }
 
 function leerEstadoOrdenes() {
   var listId = DB.listIds['estado'];
   if (!listId) { console.warn('Lista estado no disponible'); return Promise.resolve(); }
-  var baseUrl = urlLista(listId)+'/items?$orderby=ID%20desc&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=500';
+  var baseUrl = urlLista(listId)+'/items?$orderby=ID%20desc&$expand=fields($select=field_1,field_2,field_3,field_4,field_5)&$top=500';
 
   function cargarPagina(url) {
     return graphGet(url).then(function(data) {
@@ -873,16 +873,16 @@ function escribirEnExcel(fila) {
   if (!listId) { console.warn('Lista registros no disponible'); return; }
   var url = urlLista(listId)+'/items';
   var fields = {
-    Orden:                fila.Orden         || '',
-    Etapa:                fila.Etapa         || '',
-    Evento:               fila.Evento        || '',
-    Operador:             fila.Operador      || '',
-    Sesi_x00f3_n:         fila.Sesion        || '',
-    Multipersona:         fila.Multipersona === 'SI' ? true : false,
-    N_x00fa_mero:         fila.Total_Personas!==undefined ? Number(fila.Total_Personas) : 1,
-    TimestampEvento:      fila.Timestamp     || '',
-    DuracionMin:          fila.Duracion_min  !==undefined ? Number(fila.Duracion_min) : 0,
-    Novedades:            fila.Novedades     || '',
+    field_1:  fila.Orden         || '',
+    field_2:  fila.Etapa         || '',
+    field_3:  fila.Evento        || '',
+    field_4:  fila.Operador      || '',
+    field_5:  fila.Timestamp     || '',
+    field_6:  fila.Sesion        || '',
+    field_7:  fila.Multipersona === 'SI' ? true : false,
+    field_8:  fila.Total_Personas!==undefined ? Number(fila.Total_Personas) : 1,
+    field_9:  fila.Duracion_min  !==undefined ? Number(fila.Duracion_min) : 0,
+    field_10: fila.Novedades     || '',
   };
   console.log('[POST] RF_Registros_Despacho — campos:', JSON.stringify(fields));
   graphPost(url, { fields:fields })
@@ -903,12 +903,12 @@ function avCrearEnSP(op, actividad, sesionAV, t) {
   var listId = DB.listIds['varias'];
   if (!listId) return Promise.reject(new Error('Lista RF_Actividades_Varias no encontrada'));
   var fields = {
-    Actividad:       actividad,
-    Operador:        op,
-    Sesi_x00f3_n:    sesionAV,
-    TimestampEvento: t.ts,
-    Evento:          'Iniciada',
-    Duraci_x00f3_nMin: 0,
+    field_1: actividad,
+    field_2: 'Iniciada',
+    field_3: op,
+    field_4: sesionAV,
+    field_5: t.ts,
+    field_6: 0,
   };
   console.log('[AV POST] fields:', JSON.stringify(fields));
   return graphPost(urlLista(listId)+'/items', { fields: fields })
@@ -923,9 +923,9 @@ function avCerrarEnSP(spItemId, actividad, durMin, tFin) {
   var listId = DB.listIds['varias'];
   if (!listId) return Promise.reject(new Error('Lista RF_Actividades_Varias no encontrada'));
   var fields = {
-    Evento:            'Finalizada',
-    Duraci_x00f3_nMin: durMin,
-    TimestampEvento:   tFin.ts,   // sobrescribe con hora de fin
+    field_2: 'Finalizada',
+    field_5: tFin.ts,
+    field_6: durMin,
   };
   console.log('[AV PATCH] item:', spItemId, 'fields:', JSON.stringify(fields));
   return graphPatch(urlLista(listId)+'/items/'+spItemId, { fields: fields })
@@ -937,7 +937,7 @@ function avCerrarEnSP(spItemId, actividad, durMin, tFin) {
 function avForzarCierreEnSP(spItemId) {
   var listId = DB.listIds['varias'];
   if (!listId) return Promise.reject(new Error('Lista RF_Actividades_Varias no encontrada'));
-  var fields = { Evento: 'Finalizada', Duraci_x00f3_nMin: 0 };
+  var fields = { field_2: 'Finalizada', field_6: 0 };
   return graphPatch(urlLista(listId)+'/items/'+spItemId, { fields: fields });
 }
 
@@ -947,11 +947,12 @@ function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
   var listId = DB.listIds['estado'];
   if (!listId) { console.warn('Lista estado no disponible'); return; }
 
-  // Normalizar nombre del campo: PICKING -> Picking
-  var campoSP = etapa==='FACTURACION' ? 'Facturaci_x00f3_n' : etapa[0]+etapa.slice(1).toLowerCase();
+  // Mapear etapa a nombre interno de columna en nuevo sitio
+  var mapaEtapaCampo = { PICKING:'field_2', CHECKING:'field_3', PACKING:'field_4', FACTURACION:'field_5' };
+  var campoSP = mapaEtapaCampo[etapa] || ('field_2');
   var fields = {};
   fields[campoSP] = nuevoEstado;
-  fields['UltimaActualizaci_x00f3_n'] = ahora().ts;
+  fields['field_6'] = ahora().ts;
 
   var o = DB.ordenes[ordenId];
   if (o && o._spItemId) {
@@ -963,9 +964,9 @@ function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
       .catch(function(e){ console.error('[ERROR] RF_Estado_OT PATCH:', e.message); });
   } else {
     // Item no existe — crear
-    fields['OrdenId'] = ordenId;
+    fields['field_1'] = ordenId;
     // Inicializar etapas vacías
-    ['Picking','Checking','Packing','Facturaci_x00f3_n'].forEach(function(c){
+    ['field_2','field_3','field_4','field_5'].forEach(function(c){
       if (!fields[c]) fields[c]='';
     });
     console.log('[POST] RF_Estado_OT nueva orden:', ordenId, '— campos:', JSON.stringify(fields));
@@ -1100,10 +1101,10 @@ function aplicarEstadoDesdeItem(item, ordenId) {
   var o = DB.ordenes[ordenId];
   o._spItemId = item.id;
   var mapaEtapas = {
-    PICKING:     f['Picking']           || '',
-    CHECKING:    f['Checking']          || '',
-    PACKING:     f['Packing']           || '',
-    FACTURACION: f['Facturaci_x00f3_n'] || '',
+    PICKING:     f['field_2'] || '',
+    CHECKING:    f['field_3'] || '',
+    PACKING:     f['field_4'] || '',
+    FACTURACION: f['field_5'] || '',
   };
   Object.keys(mapaEtapas).forEach(function(et) {
     if (mapaEtapas[et] === 'finalizada') {
@@ -1451,7 +1452,7 @@ function refrescarActividadVaria() {
   // $filter directo en SP para traer solo los ítems del operador, ordenados más recientes primero.
   var url = urlLista(listId)+
     '/items?$orderby=ID%20desc'+
-    '&$expand=fields($select=Actividad,Evento,Operador,Sesi_x00f3_n,TimestampEvento)'+
+    '&$expand=fields($select=field_1,field_2,field_3,field_4,field_5)'+
     '&$top=50';
 
   var itemActivo = null;
@@ -1464,12 +1465,12 @@ function refrescarActividadVaria() {
         var item = items[i];
         var f    = item.fields || {};
         // Solo registros de este operador
-        if (f.Operador !== op) continue;
+        if (f.field_3 !== op) continue;
         revisados++;
-        var ev = (f.Evento || '').trim();
+        var ev = (f.field_2 || '').trim();
         if (ev === 'Iniciada' || ev === 'INICIO') {
           // Este ítem está abierto — es el más reciente porque venimos desc por ID
-          var tsRaw   = f.TimestampEvento || '';
+          var tsRaw   = f.field_5 || '';
           var tsLocal = '';
           if (tsRaw) {
             var d2  = new Date(tsRaw);
@@ -1489,11 +1490,11 @@ function refrescarActividadVaria() {
           }
           itemActivo = {
             spItemId: item.id,
-            lbl:      f.Actividad || '?',
+            lbl:      f.field_1 || '?',
             inicio:   tsLocal ? tsLocal.substring(11,16) : '--',
             ts:       tsLocal,
-            sesionAV: (f['Sesi_x00f3_n'] || '').trim(),
-            id:       'act_sp_'+(f.Actividad||'x').replace(/\s+/g,'_').toLowerCase(),
+            sesionAV: (f['field_4'] || '').trim(),
+            id:       'act_sp_'+(f.field_1||'x').replace(/\s+/g,'_').toLowerCase(),
             icon:     '⚡',
           };
           return; // encontrado, cortar
