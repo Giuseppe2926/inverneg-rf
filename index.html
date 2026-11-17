@@ -877,9 +877,9 @@ function escribirEnExcel(fila) {
     field_2:  fila.Etapa         || '',
     field_3:  fila.Evento        || '',
     field_4:  fila.Operador      || '',
-    field_5:  fila.Timestamp     || '',
+    field_5:  fila.Timestamp ? fila.Timestamp.replace(' ','T')+'Z' : null,
     field_6:  fila.Sesion        || '',
-    field_7:  fila.Multipersona === 'SI' ? true : false,
+    field_7:  fila.Multipersona === 'SI' ? 'SI' : 'NO',
     field_8:  fila.Total_Personas!==undefined ? Number(fila.Total_Personas) : 1,
     field_9:  fila.Duracion_min  !==undefined ? Number(fila.Duracion_min) : 0,
     field_10: fila.Novedades     || '',
@@ -907,7 +907,7 @@ function avCrearEnSP(op, actividad, sesionAV, t) {
     field_2: 'Iniciada',
     field_3: op,
     field_4: sesionAV,
-    field_5: t.ts,
+    field_5: t.ts.replace(' ','T')+'Z',
     field_6: 0,
   };
   console.log('[AV POST] fields:', JSON.stringify(fields));
@@ -924,7 +924,7 @@ function avCerrarEnSP(spItemId, actividad, durMin, tFin) {
   if (!listId) return Promise.reject(new Error('Lista RF_Actividades_Varias no encontrada'));
   var fields = {
     field_2: 'Finalizada',
-    field_5: tFin.ts,
+    field_5: tFin.ts.replace(' ','T')+'Z',
     field_6: durMin,
   };
   console.log('[AV PATCH] item:', spItemId, 'fields:', JSON.stringify(fields));
@@ -952,7 +952,7 @@ function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
   var campoSP = mapaEtapaCampo[etapa] || ('field_2');
   var fields = {};
   fields[campoSP] = nuevoEstado;
-  fields['field_6'] = ahora().ts;
+  fields['field_6'] = ahora().ts.replace(' ','T')+'Z';
 
   var o = DB.ordenes[ordenId];
   if (o && o._spItemId) {
@@ -1130,9 +1130,9 @@ function refrescarEstadoOrden(ordenId) {
   var listId = DB.listIds['estado'];
   if (!listId) return Promise.resolve();
   // OrdenId esta indexado — filtro directo, respuesta instantanea
-  var filtro = "fields/OrdenId eq '" + ordenId.replace(/'/g, "''") + "'";
+  var filtro = "fields/field_1 eq '" + ordenId.replace(/'/g, "''") + "'";
   var url = urlLista(listId)+'/items?$filter='+encodeURIComponent(filtro)+
-            '&$expand=fields($select=OrdenId,Picking,Checking,Packing,Facturaci_x00f3_n)&$top=1';
+            '&$expand=fields($select=field_1,field_2,field_3,field_4,field_5)&$top=1';
   return graphGet(url).then(function(data) {
     if (!data.value || data.value.length === 0) {
       console.log('refrescarEstadoOrden: orden nueva sin estado en SP:', ordenId);
