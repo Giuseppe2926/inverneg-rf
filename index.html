@@ -621,9 +621,10 @@ function intentarSesionSilenciosa() {
 // ============================================================
 // 6. GRAPH API — helpers
 // ============================================================
-function graphGet(url) {
+function graphGet(url, extraHeaders) {
   return getToken().then(function(token) {
-    return fetch(url, { headers:{ Authorization:'Bearer '+token } });
+    var headers = Object.assign({ Authorization:'Bearer '+token }, extraHeaders||{});
+    return fetch(url, { headers: headers });
   }).then(function(res) {
     if (!res.ok) return res.json().then(function(e){ throw new Error((e.error&&e.error.message)||'Graph GET '+res.status); });
     return res.json();
@@ -1129,11 +1130,11 @@ function aplicarEstadoDesdeItem(item, ordenId) {
 function refrescarEstadoOrden(ordenId) {
   var listId = DB.listIds['estado'];
   if (!listId) return Promise.resolve();
-  // OrdenId esta indexado — filtro directo, respuesta instantanea
   var filtro = "fields/field_1 eq '" + ordenId.replace(/'/g, "''") + "'";
   var url = urlLista(listId)+'/items?$filter='+encodeURIComponent(filtro)+
             '&$expand=fields($select=field_1,field_2,field_3,field_4,field_5)&$top=1';
-  return graphGet(url).then(function(data) {
+  var prefer = { 'Prefer': 'HonorNonIndexedQueriesWarningMayFailRandomly' };
+  return graphGet(url, prefer).then(function(data) {
     if (!data.value || data.value.length === 0) {
       console.log('refrescarEstadoOrden: orden nueva sin estado en SP:', ordenId);
       return;
