@@ -239,6 +239,7 @@ var S={
   skusRegistrados:[],
   step:'home',
   lpnActual:'', // LPN activo en el flujo de mercadería
+  lote:'',      // Lote activo (ingresado en pantalla LPN)
   // Calendario
   calFecha:'',
   // SKU scan
@@ -731,8 +732,10 @@ function escribirSKU(reg){
     field_21:  reg.estado||'OK',
     field_22:  0, // Novedades como número
     field_23:  0,
-    field_24:  0, // AlertaProducto como número
+    field_24:  '',    // AlertaProducto (Text)
     field_25:  tSKU.ts.replace(' ','T')+'Z', // DateTime ISO 8601
+    field_26:  tSKU.hora||'',   // Hora (Text)
+    field_27:  S.lote||'',      // Lote (Text) — ingresado por operador
   };
   return gPost(urlLista(DB.listIds.recepciones)+'/items',{fields:fields})
     .then(function(r){console.log('[SP] SKU '+reg.sku+' OK');return r;})
@@ -862,7 +865,7 @@ function cargarSKUsSP(pedido,contenedor){
   // Filtrar en servidor por Pedido (field_5) para evitar traer toda la lista
   var filtro="fields/field_5 eq '"+pedido.replace(/'/g,"''")+"'";
   var prefer={'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'};
-  var selectFields='field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15,field_16,field_17,field_18,field_19,field_20,field_21,field_22,field_23,field_24,field_25';
+  var selectFields='field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15,field_16,field_17,field_18,field_19,field_20,field_21,field_22,field_23,field_24,field_25,field_26,field_27';
   var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select='+selectFields+')&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
   function paginar(u){
@@ -877,7 +880,8 @@ function cargarSKUsSP(pedido,contenedor){
         f.LPN_OK=f.field_14||0; f.CodProducto=f.field_15||''; f.CodInterno=f.field_16||'';
         f.Nombre=f.field_17||''; f.UnXCaja=f.field_18||1; f.NumCajas=f.field_19||1;
         f.Cantidad=f.field_20||0; f.Estado=f.field_21||''; f.Novedades=f.field_22||0;
-        f.Personas=f.field_23||0; f.AlertaProducto=f.field_24||0;
+        f.Personas=f.field_23||0; f.AlertaProducto=f.field_24||'';
+        f.Hora=f.field_26||''; f.Lote=f.field_27||'';
         // Filtro adicional por contenedor si se especifica
         var matchCont=!contenedor||normStr(f.Contenedor)===normStr(contenedor);
         if(matchCont) todos.push(f);
@@ -1792,7 +1796,7 @@ function _renderSeleccionarContenedor(){
 function selContRow(cont,sello,pallets){
   S.contenedor=cont;S.sello=sello||'';S.pallets=pallets||0;
   S.skusRegistrados=[];
-  S.lpnActual='';
+  S.lpnActual='';S.lote='';
   DB.skusPedidoCache=[];
   S.eventos={llegada:null,apertura:null,cierre:null,salida:null};
 
@@ -2826,6 +2830,9 @@ function showIngresarLPN(){
       'value="'+(tieneSkus?'':S.lpnActual||'')+'" autocomplete="off" autocorrect="off" spellcheck="false" '+
       'style="font-size:20px;font-weight:700;text-align:center;text-transform:uppercase">'+
     '<div style="font-size:11px;color:var(--mut);margin-top:6px;text-align:center">Ingresa o escanea el código LPN del pallet</div>'+
+    '<div class="lbl" style="margin-top:10px">Lote <span style="color:var(--mut);font-weight:400">(opcional)</span></div>'+
+    '<input class="inp" id="inp-lote" type="text" placeholder="Número de lote" '+
+      'value="'+(S.lote||'')+'" autocomplete="off" autocorrect="off" spellcheck="false">'+
     '<div class="btn-row" style="margin-top:10px">'+
       '<button class="btn btn-sec" onclick="showOpcionesContenedor()">← ATR</button>'+
       '<button class="btn btn-rec btn-big" onclick="confLPN()">→ ESCANEAR PRODUCTOS</button>'+
@@ -2849,6 +2856,7 @@ function confLPN(){
   var v=document.getElementById('inp-lpn').value.trim().toUpperCase();
   if(!v){toast('Ingresa el LPN del pallet');return;}
   S.lpnActual=v;
+  S.lote=(document.getElementById('inp-lote').value||'').trim();
   // Cargar caché de SKUs del pedido para validación correcta de exceso
   // (incluye registros de otros contenedores del mismo pedido)
   render('<div class="loading"><div class="loading-icon">...</div>'+
