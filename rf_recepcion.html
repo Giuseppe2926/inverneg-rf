@@ -286,7 +286,7 @@ function gPost(url,body){
       headers:{'Authorization':'Bearer '+r.accessToken,'Content-Type':'application/json'},
       body:JSON.stringify(body)});
   }).then(function(r){
-    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
+    if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,400));});
     return r.json();
   });
 }
@@ -734,12 +734,31 @@ function escribirSKU(reg){
     field_23:  0,
     field_24:  '',    // AlertaProducto (Text)
     field_25:  tSKU.ts.replace(' ','T')+'Z', // DateTime ISO 8601
-    field_26:  tSKU.hora||'',   // Hora (Text)
-    field_27:  S.lote||'',      // Lote (Text) — ingresado por operador
   };
+  // field_26 y field_27: solo si la lista los tiene (evitar 400 si aún no existen)
+  if(DB.listIds.tieneHoraLote!==false){
+    fields.field_26=tSKU.hora||'';
+    fields.field_27=S.lote||'';
+  }
+  console.log('[SP-DEBUG] Enviando fields:',JSON.stringify(fields));
   return gPost(urlLista(DB.listIds.recepciones)+'/items',{fields:fields})
-    .then(function(r){console.log('[SP] SKU '+reg.sku+' OK');return r;})
-    .catch(function(e){console.error('[SP] SKU error:',e.message);});
+    .then(function(r){
+      DB.listIds.tieneHoraLote=true;
+      console.log('[SP] SKU '+reg.sku+' OK');return r;
+    })
+    .catch(function(e){
+      console.error('[SP] SKU error:',e.message);
+      // Si falló con field_26/27 incluidos, reintentar sin ellos
+      if(DB.listIds.tieneHoraLote!==false && e.message.indexOf('400')===0){
+        console.warn('[SP] Reintentando sin field_26/27...');
+        DB.listIds.tieneHoraLote=false;
+        var f2=Object.assign({},fields);
+        delete f2.field_26; delete f2.field_27;
+        return gPost(urlLista(DB.listIds.recepciones)+'/items',{fields:f2})
+          .then(function(r){console.log('[SP] SKU '+reg.sku+' OK (sin Hora/Lote)');return r;})
+          .catch(function(e2){console.error('[SP] SKU error retry:',e2.message);});
+      }
+    });
 }
 
 function escribirAsignacion(pedido,tipo,operario){
