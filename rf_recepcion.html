@@ -2080,26 +2080,11 @@ function showIngresoCantidad(){
   h+='<div id="novedad-wrap" style="display:none">';
   h+='<div class="lbl" style="margin-top:8px">descripcion de la novedad</div>';
   h+='<textarea class="inp" id="inp-novedad" rows="2" style="font-size:13px;resize:none"></textarea></div>';
-  // Bloquear si el SKU ya está completo (saldo >= esperado)
-  var _espBlock=esperadoSKU(sk.sku);
-  var _saldoBlock=(_espBlock!==null)?saldoSKU(S.pedido,sk.sku):0;
-  var _yaCompleto=(_espBlock!==null&&_saldoBlock>=_espBlock);
-  if(_yaCompleto){
-    h+='<div style="background:rgba(248,81,73,.15);border:2px solid var(--dan);border-radius:10px;padding:16px;margin-top:10px;text-align:center">'+
-      '<div style="font-size:22px;margin-bottom:6px">🚫</div>'+
-      '<div style="font-size:14px;font-weight:700;color:var(--dan);margin-bottom:6px">SKU YA COMPLETO</div>'+
-      '<div style="font-size:12px;color:var(--mut)">Este SKU ya fue recepcionado en su totalidad según el packing list.<br>Si necesitás corregir una cantidad, usá "Corregir registro anterior".</div>'+
-    '</div>';
-    h+='<div class="btn-row" style="margin-top:10px">';
-    h+='<button class="btn btn-sec btn-big" onclick="showEscaneo()">← Volver</button>';
-    h+='<button class="btn btn-warn" onclick="showCorreccion()">Corregir registro</button></div>';
-  } else {
-    h+='<div class="btn-row" style="margin-top:10px">';
-    h+='<button class="btn btn-sec" onclick="showEscaneo()">ATR</button>';
-    h+='<button class="btn btn-ok btn-big" onclick="confCantidad()">CONFIRMAR</button></div>';
-  }
+  h+='<div class="btn-row" style="margin-top:10px">';
+  h+='<button class="btn btn-sec" onclick="showEscaneo()">ATR</button>';
+  h+='<button class="btn btn-ok btn-big" onclick="confCantidad()">CONFIRMAR</button></div>';
   render(h);
-  if(!_yaCompleto) setTimeout(function(){var el=document.getElementById('inp-cant');if(el)el.focus();},100);
+  setTimeout(function(){var el=document.getElementById('inp-cant');if(el)el.focus();},100);
   window._estadoActual='OK';
 }
 function calcCantidad(){
