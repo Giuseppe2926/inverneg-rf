@@ -251,7 +251,7 @@ body{
 var CFG={
   clientId:   'ec976114-e146-4ce4-850c-5d978e12acfd',
   tenantId:   '5e008bd3-17b6-4f83-8d23-019691a40609',
-  siteId:     'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
+  siteId:     'inverneg.sharepoint.com,65348f57-a25e-4137-ac5c-1347926aad8f,66ece2da-3fcc-473d-add2-0eccc5cd3863',
   perchadoNombre:'Inverneg_PerchadoRF.xlsx',
   recepcionNombre:'Inverneg_ConteoRF_Base_Live.xlsx',
   listas:{
@@ -350,9 +350,10 @@ function getToken(){
   return msalInst.acquireTokenSilent({scopes:SCOPES,account:msalAcc})
     .catch(function(){return msalInst.acquireTokenRedirect({scopes:SCOPES});});
 }
-function gGet(url){
+function gGet(url,extraHeaders){
   return getToken().then(function(r){
-    return fetch(url,{headers:{'Authorization':'Bearer '+r.accessToken}});
+    var hdrs=Object.assign({'Authorization':'Bearer '+r.accessToken},extraHeaders||{});
+    return fetch(url,{headers:hdrs});
   }).then(function(r){
     if(!r.ok) return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,100));});
     return r.json();
@@ -783,13 +784,29 @@ function cargarRecepcionesPedido(pedido){
   }
 
   // Filtrar en servidor por Pedido — evita traer toda la lista
-  var filtro="fields/Pedido eq '"+pedido.replace(/'/g,"''")+"'";
-  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500&$filter='+encodeURIComponent(filtro);
+  var filtro="fields/field_5 eq '"+pedido.replace(/'/g,"''")+"'";
+  var prefer={'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'};
+  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15,field_16,field_17,field_18,field_19,field_20,field_21,field_22,field_23,field_24,field_25)&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
+  function aliasRec(f){
+    f.Sesion=f.field_1||'';f.Operario=f.field_2||'';f.Solicitante=f.field_3||'';
+    f.Subtipo=f.field_4||'';f.Pedido=f.field_5||'';f.Contenedor=f.field_6||'';
+    f.Sello=f.field_7||0;f.Pallets=f.field_8||0;
+    f.H_Llegada=f.field_9||0;f.H_Apertura=f.field_10||0;
+    f.H_Cierre=f.field_11||0;f.H_Salida=f.field_12||0;
+    f.LPN=f.field_13||'';f.LPN_OK=f.field_14||0;
+    f.CodProducto=f.field_15||'';f.CodInterno=f.field_16||'';
+    f.Nombre=f.field_17||'';f.UnXCaja=f.field_18||1;
+    f.NumCajas=f.field_19||1;f.Cantidad=f.field_20||0;
+    f.Estado=f.field_21||'';f.Novedades=f.field_22||0;
+    f.Personas=f.field_23||0;f.AlertaProducto=f.field_24||0;
+    f.Fecha=f.field_25||'';
+    return f;
+  }
   function paginar(u){
-    return gGet(u).then(function(d){
+    return gGet(u,prefer).then(function(d){
       (d.value||[]).forEach(function(i){
-        var f=i.fields||{};
+        var f=aliasRec(i.fields||{});
         todos.push(f);
       });
       var next=d['@odata.nextLink']||d['odata.nextLink']||null;
@@ -803,11 +820,11 @@ function cargarRecepcionesPedido(pedido){
     // Fallback sin filtro si OData falla
     console.warn('[REC] Filtro OData falló, usando fallback:',e.message);
     var todos2=[];
-    var urlFb=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+    var urlFb=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15,field_16,field_17,field_18,field_19,field_20,field_21,field_22,field_23,field_24,field_25)&$top=500';
     function pagFb(u){
-      return gGet(u).then(function(d){
+      return gGet(u,prefer).then(function(d){
         (d.value||[]).forEach(function(i){
-          var f=i.fields||{};
+          var f=aliasRec(i.fields||{});
           if(normStr(f.Pedido||'')===normStr(pedido)) todos2.push(f);
         });
         var next=d['@odata.nextLink']||d['odata.nextLink']||null;
@@ -834,13 +851,23 @@ function cargarMovimientosPedido(pedido){
   }
 
   // Filtrar en servidor por Pedido — evita traer toda la lista
-  var filtro="fields/Pedido eq '"+pedido.replace(/'/g,"''")+"'";
-  var url=urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=500&$filter='+encodeURIComponent(filtro);
+  var filtro="fields/field_1 eq '"+pedido.replace(/'/g,"''")+"'";
+  var preferMov={'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'};
+  var url=urlLista(DB.listIds.movimientos)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15)&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
+  function aliasMov(f){
+    f.Pedido=f.field_1||'';f.LPN=f.field_3||'';f.SKU=f.field_4||'';
+    f.Descripcion=f.field_5||'';f.Cantidad=f.field_6||0;
+    f.TipoMovimiento=f.field_7||'';f.AlmacenOrigen=f.field_8||'';
+    f.UbicacionOrigen=f.field_9||'';f.AlmacenDestino=f.field_10||'';
+    f.UbicacionDestino=f.field_11||'';f.DestinoSeparacion=f.field_12||'';
+    f.Operador=f.field_13||'';f.FechaMovimiento=f.field_14||'';
+    return f;
+  }
   function paginar(u){
-    return gGet(u).then(function(d){
+    return gGet(u,preferMov).then(function(d){
       (d.value||[]).forEach(function(i){
-        var f=i.fields||{};
+        var f=aliasMov(i.fields||{});
         f.Created=f.Created||i.createdDateTime||i.Created||f.FechaMovimiento||'';
         f._itemId=i.id||null; // Guardar ID de SP para PATCH posterior
         todos.push(f);
@@ -860,13 +887,12 @@ function cargarMovimientosPedido(pedido){
     // Fallback sin filtro si OData falla
     console.warn('[MOV] Filtro OData falló, usando fallback:',e.message);
     var todos2=[];
-    var urlFb=urlLista(DB.listIds.movimientos)+'/items?$expand=fields&$top=500';
+    var urlFb=urlLista(DB.listIds.movimientos)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15)&$top=500';
     function pagFb(u){
-      return gGet(u).then(function(d){
+      return gGet(u,preferMov).then(function(d){
         (d.value||[]).forEach(function(i){
-          var p=(i.fields||{}).Pedido||'';
-          if(normStr(p)===normStr(pedido)){
-            var f=i.fields||{};
+          var f=aliasMov(i.fields||{});
+          if(normStr(f.Pedido||'')===normStr(pedido)){
             f.Created=f.Created||i.createdDateTime||i.Created||f.FechaMovimiento||'';
             f._itemId=i.id||null;
             todos2.push(f);
@@ -1857,21 +1883,21 @@ function ejecutarMovimiento(sku,cant,alm,ubic,obs){
   var t=ahora();
   var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
   // NOTA: campo Empresa NO incluido — no existe en RF_PRecepciones_LMovimientos
+  // field_2=Contenedor(Number) no usado aquí; field_15=Observacion es Number→omitir texto
   var fields={
     Title:          S.pedido+'-PERC-'+t.ts.replace(/[:.]/g,''),
-    Pedido:         S.pedido,
-    LPN:            S.lpnActual,
-    SKU:            sku,
-    Descripcion:    cb?cb.desc:'',
-    Cantidad:       cant,
-    TipoMovimiento: 'PERCHADO',
-    AlmacenOrigen:  origData.almacenOrigen,
-    UbicacionOrigen:origData.ubicOrigen,
-    AlmacenDestino: alm,
-    UbicacionDestino:ubic,
-    Operador:       S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'',
-    FechaMovimiento:t.ts,  // ISO completo con hora para trazabilidad
-    Observacion:    obs,
+    field_1:        S.pedido,                // Pedido (Text)
+    field_3:        S.lpnActual,             // LPN (Text)
+    field_4:        sku,                     // SKU (Text)
+    field_5:        cb?cb.desc:'',           // Descripcion (Text)
+    field_6:        Number(cant)||0,         // Cantidad (Number)
+    field_7:        'PERCHADO',              // TipoMovimiento (Text)
+    field_8:        origData.almacenOrigen,  // AlmacenOrigen (Text)
+    field_9:        origData.ubicOrigen,     // UbicacionOrigen (Text)
+    field_10:       alm,                     // AlmacenDestino (Text)
+    field_11:       ubic,                    // UbicacionDestino (Text)
+    field_13:       S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'', // Operador (Text)
+    field_14:       t.ts.replace(' ','T')+'Z', // FechaMovimiento (DateTime ISO8601)
   };
   var _d=new Date();
   console.log('[POST-MOV] new Date()='+_d.toString());
@@ -2319,20 +2345,20 @@ function _ejecutarSepConLPN(sku,cantReq,destino,lpnOrigen){
   var t=ahora();
   var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
   var fields={
-    Title:           S.pedido+'-SEP-'+t.ts.replace(/[:.]/g,''),
-    Pedido:          S.pedido,
-    LPN:             lpnOrigen,
-    SKU:             sku,
-    Descripcion:     cb?cb.desc:'',
-    Cantidad:        cantReq,
-    TipoMovimiento:  'SEPARACION',
-    AlmacenOrigen:   origData.almacenOrigen,
-    UbicacionOrigen: origData.ubicOrigen,
-    AlmacenDestino:  destInfo.almacen,
-    UbicacionDestino:destInfo.ubicacion,
-    DestinoSeparacion:destino,
-    Operador:        S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'',
-    FechaMovimiento: t.ts,
+    Title:    S.pedido+'-SEP-'+t.ts.replace(/[:.]/g,''),
+    field_1:  S.pedido,                // Pedido (Text)
+    field_3:  lpnOrigen,               // LPN (Text)
+    field_4:  sku,                     // SKU (Text)
+    field_5:  cb?cb.desc:'',           // Descripcion (Text)
+    field_6:  Number(cantReq)||0,      // Cantidad (Number)
+    field_7:  'SEPARACION',            // TipoMovimiento (Text)
+    field_8:  origData.almacenOrigen,  // AlmacenOrigen (Text)
+    field_9:  origData.ubicOrigen,     // UbicacionOrigen (Text)
+    field_10: destInfo.almacen,        // AlmacenDestino (Text)
+    field_11: destInfo.ubicacion,      // UbicacionDestino (Text)
+    field_12: destino,                 // DestinoSeparacion (Text)
+    field_13: S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'', // Operador (Text)
+    field_14: t.ts.replace(' ','T')+'Z', // FechaMovimiento (DateTime ISO8601)
   };
   console.log('[SEP-LPN] LPN='+lpnOrigen+' SKU='+sku+' Cant='+cantReq+' Dest='+destino);
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Registrando separación...</div></div>');
@@ -2387,20 +2413,20 @@ function _ejecutarSepDesdeDestino(sku,cantReq,destino,saldoDisp){
       var tomar=Math.min(pendiente,s.saldo);
       var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
       posts.push({fields:{
-        Title:          S.pedido+'-SEP-'+t.ts.replace(/[:.]/g,'')+'-'+i,
-        Pedido:         S.pedido,
-        LPN:            s.lpn,
-        SKU:            sku,
-        Descripcion:    cb?cb.desc:'',
-        Cantidad:       tomar,
-        TipoMovimiento: 'SEPARACION',
-        AlmacenOrigen:  origData.almacenOrigen,
-        UbicacionOrigen:origData.ubicOrigen,
-        AlmacenDestino: destInfo.almacen,
-        UbicacionDestino:destInfo.ubicacion,
-        DestinoSeparacion:destino,
-        Operador:       S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'',
-        FechaMovimiento:t.ts,
+        Title:    S.pedido+'-SEP-'+t.ts.replace(/[:.]/g,'')+'-'+i,
+        field_1:  S.pedido,                // Pedido (Text)
+        field_3:  s.lpn,                   // LPN (Text)
+        field_4:  sku,                     // SKU (Text)
+        field_5:  cb?cb.desc:'',           // Descripcion (Text)
+        field_6:  Number(tomar)||0,        // Cantidad (Number)
+        field_7:  'SEPARACION',            // TipoMovimiento (Text)
+        field_8:  origData.almacenOrigen,  // AlmacenOrigen (Text)
+        field_9:  origData.ubicOrigen,     // UbicacionOrigen (Text)
+        field_10: destInfo.almacen,        // AlmacenDestino (Text)
+        field_11: destInfo.ubicacion,      // UbicacionDestino (Text)
+        field_12: destino,                 // DestinoSeparacion (Text)
+        field_13: S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'', // Operador (Text)
+        field_14: t.ts.replace(' ','T')+'Z', // FechaMovimiento (DateTime ISO8601)
       }});
       pendiente-=tomar;
     }
@@ -2470,22 +2496,20 @@ function ejecutarSeparacion(idx,sku,cantReq,destino,saldoDisp){
       var tomar=Math.min(pendiente,s.saldo);
       var cb=DB.codigosBarra.find(function(x){return normStr(x.sku)===normStr(sku);});
       posts.push({fields:{
-        Title:          S.pedido+'-SEP-'+t.ts.replace(/[:.]/g,'')+'-'+i,
-        Pedido:         S.pedido,
-        LPN:            s.lpn,
-        SKU:            sku,
-        Descripcion:    cb?cb.desc:'',
-        Cantidad:       tomar,
-        TipoMovimiento: 'SEPARACION',
-        AlmacenOrigen:  origData.almacenOrigen,
-        UbicacionOrigen:origData.ubicOrigen,
-        AlmacenDestino: destInfo.almacen,
-        UbicacionDestino:destInfo.ubicacion,
-        DestinoSeparacion:destino,
-        // Empresa no existe en SP
-        Operador:       S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'',
-        FechaMovimiento:t.ts,  // ISO completo con hora para trazabilidad
-        Observacion:    '',
+        Title:    S.pedido+'-SEP-'+t.ts.replace(/[:.]/g,'')+'-'+i,
+        field_1:  S.pedido,                // Pedido (Text)
+        field_3:  s.lpn,                   // LPN (Text)
+        field_4:  sku,                     // SKU (Text)
+        field_5:  cb?cb.desc:'',           // Descripcion (Text)
+        field_6:  Number(tomar)||0,        // Cantidad (Number)
+        field_7:  'SEPARACION',            // TipoMovimiento (Text)
+        field_8:  origData.almacenOrigen,  // AlmacenOrigen (Text)
+        field_9:  origData.ubicOrigen,     // UbicacionOrigen (Text)
+        field_10: destInfo.almacen,        // AlmacenDestino (Text)
+        field_11: destInfo.ubicacion,      // UbicacionDestino (Text)
+        field_12: destino,                 // DestinoSeparacion (Text)
+        field_13: S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'', // Operador (Text)
+        field_14: t.ts.replace(' ','T')+'Z', // FechaMovimiento (DateTime ISO8601)
       }});
       pendiente-=tomar;
     }
@@ -2615,12 +2639,12 @@ function boot(){
     var promPedidos=DB.listIds.recepciones
       ? (function(){
           var tPed=performance.now();
-          var urlP=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select=Pedido)&$top=500';
+          var urlP=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select=field_5)&$top=500';
           var setPeds={};
           function pagP(u){
             return gGet(u).then(function(d){
               (d.value||[]).forEach(function(i){
-                var p=((i.fields||{}).Pedido||'').trim();
+                var p=((i.fields||{}).field_5||'').trim(); // Pedido
                 if(p) setPeds[p]=true;
               });
               var next=d['@odata.nextLink']||d['odata.nextLink']||null;
@@ -2640,17 +2664,18 @@ function boot(){
       ? (function(){
           var tEst=performance.now();
           return gGet(urlLista(DB.listIds.estadoPerchado)+
-            '/items?$expand=fields($select=Pedido,Estado,FechaActualizacion,UsuarioActualizacion)&$top=2000')
+            '/items?$expand=fields($select=field_1,field_2,field_3,field_4)&$top=2000')
             .then(function(d){
               DB.estadosPerchado={};
               (d.value||[]).forEach(function(i){
                 var f=i.fields||{};
-                var ped=(f.Pedido||'').trim();
+                // Alias display names
+                var ped=(f.field_1||'').trim(); // Pedido
                 if(ped) DB.estadosPerchado[ped]={
-                  estado:f.Estado||'Abierto',
+                  estado:f.field_2||'Abierto',               // Estado
                   itemId:i.id||null,
-                  fecha:f.FechaActualizacion||null,
-                  usuario:f.UsuarioActualizacion||null,
+                  fecha:f.field_3||null,                     // FechaActualizacion (DateTime)
+                  usuario:f.field_4||null,                   // UsuarioActualizacion
                 };
               });
               console.log('[TIME] EstadosPerchado (RF_EstadoPerchado):',Math.round(performance.now()-tEst),'ms ('+Object.keys(DB.estadosPerchado).length+' registros)');
@@ -2830,11 +2855,11 @@ window._accionEstadoPerchado=function(pedido,nuevoEstado){
 
   function _doWrite(itemId){
     var url=urlLista(DB.listIds.estadoPerchado)+'/items/'+itemId+'/fields';
-    return gPatch(url,{Estado:nuevoEstado,FechaActualizacion:fecha,UsuarioActualizacion:usuario});
+    return gPatch(url,{field_2:nuevoEstado,field_3:fecha,field_4:usuario});
   }
   function _doInsert(){
     var url=urlLista(DB.listIds.estadoPerchado)+'/items';
-    return gPost(url,{fields:{Pedido:pedido,Estado:nuevoEstado,FechaActualizacion:fecha,UsuarioActualizacion:usuario}})
+    return gPost(url,{fields:{field_1:pedido,field_2:nuevoEstado,field_3:fecha,field_4:usuario}})
       .then(function(r){
         var newId=(r&&r.id)||null;
         if(newId) DB.estadosPerchado[pedido]={estado:nuevoEstado,itemId:newId,fecha:fecha,usuario:usuario};
@@ -2850,18 +2875,18 @@ window._accionEstadoPerchado=function(pedido,nuevoEstado){
     // Verificar en SP antes de insertar: carga todos los items y busca en memoria
     // (evita problemas de compatibilidad OData $filter con SP Graph API)
     p=gGet(urlLista(DB.listIds.estadoPerchado)+
-        '/items?$expand=fields($select=Pedido,Estado,FechaActualizacion,UsuarioActualizacion)&$top=2000')
+        '/items?$expand=fields($select=field_1,field_2,field_3,field_4)&$top=2000')
       .then(function(d){
         // Actualizar cache completo de paso
         DB.estadosPerchado={};
         (d.value||[]).forEach(function(i){
           var f=i.fields||{};
-          var p2=(f.Pedido||'').trim();
+          var p2=(f.field_1||'').trim(); // Pedido
           if(p2) DB.estadosPerchado[p2]={
-            estado:f.Estado||'Abierto',
+            estado:f.field_2||'Abierto',              // Estado
             itemId:i.id||null,
-            fecha:f.FechaActualizacion||null,
-            usuario:f.UsuarioActualizacion||null,
+            fecha:f.field_3||null,                    // FechaActualizacion (DateTime)
+            usuario:f.field_4||null,                  // UsuarioActualizacion
           };
         });
         var found=DB.estadosPerchado[pedido];
@@ -3476,7 +3501,7 @@ function anularPerchado(itemId, lpnSku, pedido){
 
   var url=urlLista(DB.listIds.movimientos)+'/items/'+itemId+'/fields';
   toast('Anulando...');
-  gPatch(url,{TipoMovimiento:'ANULADO'}).then(function(){
+  gPatch(url,{field_7:'ANULADO'}).then(function(){
     // Invalidar caché para que la próxima carga traiga el estado actualizado
     _invalidarCachePedido();
     console.log('[ANULAR] Perchado anulado. ItemId='+itemId+' LPN|SKU='+lpnSku);
