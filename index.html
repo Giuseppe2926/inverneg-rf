@@ -691,8 +691,8 @@ function urlLista(listId) {
 // Obtiene los listId por nombre — nunca hardcodeados
 // ============================================================
 function descubrirListas() {
-  // Cache de listIds en sessionStorage
-  var cacheKey = 'listIds_inverneg';
+  // Cache de listIds en sessionStorage — clave incluye siteId para invalidar al migrar sitios
+  var cacheKey = 'listIds_'+CFG.siteId.split(',')[1]; // usa el id del sitio, no el host
   var cached = sessionStorage.getItem(cacheKey);
   if (cached) {
     try {
