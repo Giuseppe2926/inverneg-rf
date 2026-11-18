@@ -220,7 +220,7 @@ select.inp{appearance:none}
 var CFG={
   clientId:   'ec976114-e146-4ce4-850c-5d978e12acfd',
   tenantId:   '5e008bd3-17b6-4f83-8d23-019691a40609',
-  siteId:     'inverneg.sharepoint.com,8b946a6c-31b9-4bf7-95d0-ab47d29a4d63,ad88c61f-b207-49a4-9105-8b3b57b31906',
+  siteId:     'inverneg.sharepoint.com,65348f57-a25e-4137-ac5c-1347926aad8f,66ece2da-3fcc-473d-add2-0eccc5cd3863',
   catalogoNombre:'Inverneg_ConteoRF_Base_Live.xlsx',
   listas:{
     recepciones: 'RF_PRecepciones_LRecepciones',
@@ -305,10 +305,20 @@ function urlLista(id){return GRAPH+'/sites/'+CFG.siteId+'/lists/'+id;}
 
 /* ── DESCUBRIMIENTO ───────────────────────────── */
 function descubrirListas(){
+  var cacheKey='listIds_'+CFG.siteId.split(',')[1];
+  try{
+    var cached=JSON.parse(sessionStorage.getItem(cacheKey)||'null');
+    if(cached){
+      Object.keys(cached).forEach(function(k){DB.listIds[k]=cached[k];});
+      console.log('[INIT] listIds desde cache');
+      return Promise.resolve();
+    }
+  }catch(e){}
   return gGet(GRAPH+'/sites/'+CFG.siteId+'/lists?$select=id,displayName&$top=200').then(function(d){
     (d.value||[]).forEach(function(l){
       Object.keys(CFG.listas).forEach(function(k){if(l.displayName===CFG.listas[k])DB.listIds[k]=l.id;});
     });
+    try{sessionStorage.setItem(cacheKey,JSON.stringify(DB.listIds));}catch(e){}
   }).catch(function(e){console.error('[INIT] listas:',e.message);});
 }
 function descubrirExcel(){
@@ -432,9 +442,28 @@ function cargarHorasPedido(pedido){
         '" HoraLlegada="'+(f.HoraLlegada||'?')+
         '" Sello1="'+(f.Sello1||'?')+'"');
     });
-    var fields=items.map(function(i){return i.fields||{};});
+    var fields=items.map(function(i){
+      var f=i.fields||{};
+      // Mapear field_N → nombres de display para LHoras
+      f.Pedido          = f.field_1||f.Pedido||'';
+      f.Contenedor      = f.field_2||f.Contenedor||'';
+      f.Operario        = f.field_3||f.Operario||'';
+      f.HoraLlegada     = f.field_4||f.HoraLlegada||'';
+      f.HoraApertura    = f.field_5||f.HoraApertura||'';
+      f.HoraCierre      = f.field_6||f.HoraCierre||'';
+      f.HoraSalida      = f.field_7||f.HoraSalida||'';
+      f.FechaRegistro   = f.field_8||f.FechaRegistro||'';
+      f.Personas        = f.field_9||f.Personas||0;
+      f.Novedades       = f.field_10||f.Novedades||'';
+      f.Estado          = f.field_11||f.Estado||'';
+      f.Sello1          = f.field_13||f.Sello1||'';
+      f.Sello2          = f.field_14||f.Sello2||'';
+      f.Capacidad       = f.field_15||f.Capacidad||'';
+      f.PalletsRecibidos= f.field_16||f.PalletsRecibidos||0;
+      return f;
+    });
     var filtrados=fields.filter(function(f){
-      var pedSP=f.Pedido||f.pedido||'';
+      var pedSP=f.Pedido||'';
       var match=normStr(pedSP)===normStr(pedido);
       return match;
     });
@@ -462,13 +491,30 @@ function cargarHorasPedido(pedido){
 }
 function cargarRecepcionesPedido(pedido){
   if(!DB.listIds.recepciones) return Promise.resolve([]);
-  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields&$top=500';
+  var sel='field_1,field_5,field_6,field_13,field_15,field_17,field_20,field_21,field_22,field_27';
+  var filtro="fields/field_5 eq '"+pedido.replace(/'/g,"''")+"'";
+  var prefer={'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'};
+  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select='+sel+')&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
   function paginar(u){
-    return gGet(u).then(function(d){
+    return getToken().then(function(r){
+      return fetch(u,{headers:{'Authorization':'Bearer '+r.accessToken,'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'}});
+    }).then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(r.status+':'+t.slice(0,120));});return r.json();})
+    .then(function(d){
       (d.value||[]).forEach(function(i){
         var f=i.fields||{};
-        if(normStr(f.Pedido||'')===normStr(pedido)) todos.push(f);
+        // Mapear field_N → nombres de display para compatibilidad con el resto del código
+        f.RecepcionId = f.field_1||'';
+        f.Pedido      = f.field_5||'';
+        f.Contenedor  = f.field_6||'';
+        f.LPN         = f.field_13||'';
+        f.CodProducto = f.field_15||'';
+        f.Nombre      = f.field_17||'';
+        f.Cantidad    = f.field_20||0;
+        f.Estado      = f.field_21||'';
+        f.Novedades   = f.field_22||'';
+        f.Lote        = f.field_27||'';
+        todos.push(f);
       });
       var next=d['@odata.nextLink']||d['odata.nextLink']||null;
       if(next) return paginar(next);
