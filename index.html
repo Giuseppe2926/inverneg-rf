@@ -436,11 +436,38 @@ function generarSesion() {
   return 'SES-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+
          '-'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
 }
+// Recupera o crea el sesionId para un operador dado.
+// Se persiste en localStorage para que recargas del Zebra mantengan el mismo ID.
+// Se descarta si el prefijo de fecha cambió (nuevo día → nueva sesión).
+function obtenerSesionOperador(operador) {
+  var key = 'sesionId_'+operador;
+  var d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
+  var prefijHoy = 'SES-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-';
+  try {
+    var guardado = localStorage.getItem(key);
+    if (guardado && guardado.indexOf(prefijHoy) === 0) {
+      console.log('[Sesion] recuperada:', guardado);
+      return guardado;
+    }
+  } catch(e){}
+  // Nueva sesión para hoy
+  var nueva = prefijHoy+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
+  try { localStorage.setItem(key, nueva); } catch(e){}
+  console.log('[Sesion] nueva generada:', nueva);
+  return nueva;
+}
 function ahora() {
   var d = new Date(), pad = function(n){ return String(n).padStart(2,'0'); };
   var fecha = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
   var hora  = pad(d.getHours())+':'+pad(d.getMinutes());
-  return { fecha:fecha, hora:hora, ts:fecha+' '+hora+':'+pad(d.getSeconds()), raw:d };
+  var ts    = fecha+' '+hora+':'+pad(d.getSeconds());
+  // ISO 8601 con offset local (ej. -05:00) para que SP almacene la hora correcta
+  var off   = -d.getTimezoneOffset(); // minutos positivos = adelante de UTC
+  var offH  = pad(Math.floor(Math.abs(off)/60));
+  var offM  = pad(Math.abs(off)%60);
+  var offStr= (off>=0?'+':'-')+offH+':'+offM;
+  var iso   = fecha+'T'+hora+':'+pad(d.getSeconds())+offStr;
+  return { fecha:fecha, hora:hora, ts:ts, iso:iso, raw:d };
 }
 function toast(msg, tipo, dur) {
   tipo=tipo||'ok'; dur=dur||2400;
@@ -558,7 +585,7 @@ var activasVarias = (function() {
 })();
 var variaSeleccionada = null;
 var estado = {
-  operadorActual:'', ordenActual:'', accionPendiente:null, sesionId:generarSesion(),
+  operadorActual:'', ordenActual:'', accionPendiente:null, sesionId:'',
 };
 
 var ETAPAS      = ['PICKING','CHECKING','PACKING','FACTURACION'];
@@ -878,7 +905,7 @@ function escribirEnExcel(fila) {
     field_2:  fila.Etapa         || '',
     field_3:  fila.Evento        || '',
     field_4:  fila.Operador      || '',
-    field_5:  fila.Timestamp ? fila.Timestamp.replace(' ','T')+'Z' : null,
+    field_5:  fila.TimestampISO || (fila.Timestamp ? fila.Timestamp.replace(' ','T')+'Z' : null),
     field_6:  fila.Sesion        || '',
     field_7:  fila.Multipersona === 'SI' ? 'SI' : 'NO',
     field_8:  fila.Total_Personas!==undefined ? Number(fila.Total_Personas) : 1,
@@ -908,7 +935,7 @@ function avCrearEnSP(op, actividad, sesionAV, t) {
     field_2: 'Iniciada',
     field_3: op,
     field_4: sesionAV,
-    field_5: t.ts.replace(' ','T')+'Z',
+    field_5: t.iso || t.ts.replace(' ','T')+'Z',
     field_6: 0,
   };
   console.log('[AV POST] fields:', JSON.stringify(fields));
@@ -925,7 +952,7 @@ function avCerrarEnSP(spItemId, actividad, durMin, tFin) {
   if (!listId) return Promise.reject(new Error('Lista RF_Actividades_Varias no encontrada'));
   var fields = {
     field_2: 'Finalizada',
-    field_5: tFin.ts.replace(' ','T')+'Z',
+    field_5: tFin.iso || tFin.ts.replace(' ','T')+'Z',
     field_6: durMin,
   };
   console.log('[AV PATCH] item:', spItemId, 'fields:', JSON.stringify(fields));
@@ -953,7 +980,7 @@ function actualizarEstadoOrden(ordenId, etapa, nuevoEstado) {
   var campoSP = mapaEtapaCampo[etapa] || ('field_2');
   var fields = {};
   fields[campoSP] = nuevoEstado;
-  fields['field_6'] = ahora().ts.replace(' ','T')+'Z';
+  fields['field_6'] = ahora().iso;
 
   var o = DB.ordenes[ordenId];
   if (o && o._spItemId) {
@@ -1080,6 +1107,7 @@ function loginContinuar() {
   var op=document.getElementById('sel-operador').value;
   if (!op){ toast('Selecciona tu nombre primero','err'); return; }
   estado.operadorActual=op;
+  estado.sesionId=obtenerSesionOperador(op); // persistente por operador/día
   document.getElementById('header-sub').textContent=op+' · CND';
   // Recuperar actividad varia activa desde SP al seleccionar operador
   // Cubre el caso en que el timeout de inactividad regresó a s-login
@@ -1387,7 +1415,7 @@ function ejecutarAccion() {
     Fecha:t.fecha, Hora:t.hora, Sesion:estado.sesionId,
     Orden:ordenId, Etapa:etapa, Evento:evento, Operador:op,
     Multipersona:esMulti?'SI':'NO', Total_Personas:tot,
-    Timestamp:t.ts, Duracion_min:duracion!==null?duracion:'',
+    Timestamp:t.ts, TimestampISO:t.iso, Duracion_min:duracion!==null?duracion:'',
     Dia_Semana:['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'][t.raw.getDay()],
     Semana:getSemana(t.raw), Mes:t.raw.getMonth()+1, Anio:t.raw.getFullYear(), Novedades:'',
   };
