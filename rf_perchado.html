@@ -786,7 +786,7 @@ function cargarRecepcionesPedido(pedido){
   // Filtrar en servidor por Pedido — evita traer toda la lista
   var filtro="fields/field_5 eq '"+pedido.replace(/'/g,"''")+"'";
   var prefer={'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'};
-  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15,field_16,field_17,field_18,field_19,field_20,field_21,field_22,field_23,field_24,field_25)&$top=500&$filter='+encodeURIComponent(filtro);
+  var url=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15,field_16,field_17,field_18,field_19,field_20,field_21,field_22,field_23,field_24,field_25,field_26,field_27)&$top=500&$filter='+encodeURIComponent(filtro);
   var todos=[];
   function aliasRec(f){
     f.Sesion=f.field_1||'';f.Operario=f.field_2||'';f.Solicitante=f.field_3||'';
@@ -799,7 +799,8 @@ function cargarRecepcionesPedido(pedido){
     f.Nombre=f.field_17||'';f.UnXCaja=f.field_18||1;
     f.NumCajas=f.field_19||1;f.Cantidad=f.field_20||0;
     f.Estado=f.field_21||'';f.Novedades=f.field_22||0;
-    f.Personas=f.field_23||0;f.AlertaProducto=f.field_24||0;
+    f.Personas=f.field_23||0;f.AlertaProducto=f.field_24||'';
+    f.Hora=f.field_26||'';f.Lote=f.field_27||'';
     f.Fecha=f.field_25||'';
     return f;
   }
@@ -820,7 +821,7 @@ function cargarRecepcionesPedido(pedido){
     // Fallback sin filtro si OData falla
     console.warn('[REC] Filtro OData falló, usando fallback:',e.message);
     var todos2=[];
-    var urlFb=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15,field_16,field_17,field_18,field_19,field_20,field_21,field_22,field_23,field_24,field_25)&$top=500';
+    var urlFb=urlLista(DB.listIds.recepciones)+'/items?$expand=fields($select=field_1,field_2,field_3,field_4,field_5,field_6,field_7,field_8,field_9,field_10,field_11,field_12,field_13,field_14,field_15,field_16,field_17,field_18,field_19,field_20,field_21,field_22,field_23,field_24,field_25,field_26,field_27)&$top=500';
     function pagFb(u){
       return gGet(u,prefer).then(function(d){
         (d.value||[]).forEach(function(i){
