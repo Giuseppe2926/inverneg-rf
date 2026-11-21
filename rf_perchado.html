@@ -1898,7 +1898,7 @@ function ejecutarMovimiento(sku,cant,alm,ubic,obs){
     field_10:       alm,                     // AlmacenDestino (Text)
     field_11:       ubic,                    // UbicacionDestino (Text)
     field_13:       S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'', // Operador (Text)
-    field_14:       t.ts.replace(' ','T')+'Z', // FechaMovimiento (DateTime ISO8601)
+    field_14:       t.ts, // FechaMovimiento (DateTime ISO8601) — toISOString() ya incluye Z
   };
   var _d=new Date();
   console.log('[POST-MOV] new Date()='+_d.toString());
@@ -2359,7 +2359,7 @@ function _ejecutarSepConLPN(sku,cantReq,destino,lpnOrigen){
     field_11: destInfo.ubicacion,      // UbicacionDestino (Text)
     field_12: destino,                 // DestinoSeparacion (Text)
     field_13: S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'', // Operador (Text)
-    field_14: t.ts.replace(' ','T')+'Z', // FechaMovimiento (DateTime ISO8601)
+    field_14: t.ts, // FechaMovimiento (DateTime ISO8601) — toISOString() ya incluye Z
   };
   console.log('[SEP-LPN] LPN='+lpnOrigen+' SKU='+sku+' Cant='+cantReq+' Dest='+destino);
   render('<div class="loading"><div class="loading-icon">⏳</div><div>Registrando separación...</div></div>');
@@ -2427,7 +2427,7 @@ function _ejecutarSepDesdeDestino(sku,cantReq,destino,saldoDisp){
         field_11: destInfo.ubicacion,      // UbicacionDestino (Text)
         field_12: destino,                 // DestinoSeparacion (Text)
         field_13: S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'', // Operador (Text)
-        field_14: t.ts.replace(' ','T')+'Z', // FechaMovimiento (DateTime ISO8601)
+        field_14: t.ts, // FechaMovimiento (DateTime ISO8601) — toISOString() ya incluye Z
       }});
       pendiente-=tomar;
     }
@@ -2510,7 +2510,7 @@ function ejecutarSeparacion(idx,sku,cantReq,destino,saldoDisp){
         field_11: destInfo.ubicacion,      // UbicacionDestino (Text)
         field_12: destino,                 // DestinoSeparacion (Text)
         field_13: S.operador||msalAcc&&(msalAcc.username||msalAcc.name)||'', // Operador (Text)
-        field_14: t.ts.replace(' ','T')+'Z', // FechaMovimiento (DateTime ISO8601)
+        field_14: t.ts, // FechaMovimiento (DateTime ISO8601) — toISOString() ya incluye Z
       }});
       pendiente-=tomar;
     }
