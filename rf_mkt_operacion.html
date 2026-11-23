@@ -1094,7 +1094,7 @@ async function reloadData() {
       gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`)
     ]);
     sols   = s.map(i=>({id:i.id,...i.fields}));
-    lineas = l.map(i=>({id:i.id,...i.fields}));
+    lineas = l.map(i=>{const f={id:i.id,...i.fields};if(f['Observaci_x00f3_nMKT']!==undefined){f.ObservacionMKT=f['Observaci_x00f3_nMKT'];}return f;});
   } catch(e){ console.warn('[DATA]',e.message); }
   busy=false;render();
 }
@@ -1129,7 +1129,7 @@ async function postLogin(){
       gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`)
     ]);
     sols   = s.map(i=>({id:i.id,...i.fields}));
-    lineas = l.map(i=>({id:i.id,...i.fields}));
+    lineas = l.map(i=>{const f={id:i.id,...i.fields};if(f['Observaci_x00f3_nMKT']!==undefined){f.ObservacionMKT=f['Observaci_x00f3_nMKT'];}return f;});
   } catch(e){ console.warn('[DATA]',e.message); }
   busy=false;render();
 }
