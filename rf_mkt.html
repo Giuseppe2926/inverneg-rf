@@ -519,7 +519,7 @@ async function doSubmit() {
           fields:{Title:lbl,SolicitudId:solId,NroSolicitud:nro,
                   Proveedor:g.proveedor,Marca:l.marca,Material:l.material,
                   Cantidad:parseInt(l.cantidad),FechaSolicitada:l.fecha,
-                  HoraSolicitada:l.hora||'',ObservacionMKT:l.obs||'',
+                  HoraSolicitada:l.hora||'',Observaci_x00f3_nMKT:l.obs||'',
                   EstadoLinea:'Pendiente',EstadoRecepcion:'Pendiente',
                   EsAnticipada:false,EsReprogramacion:false}
         });
@@ -1448,7 +1448,7 @@ async function postLogin() {
           gAll(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items?$expand=fields&$top=500`)
         ]);
         sols   = s.map(i=>({id:i.id,...i.fields}));
-        lineas = l.map(i=>({id:i.id,...i.fields}));
+        lineas = l.map(i=>{const f={id:i.id,...i.fields};if(f['Observaci_x00f3_nMKT']!==undefined){f.ObservacionMKT=f['Observaci_x00f3_nMKT'];}return f;});
       } catch(e){ console.error('[DATA]', e); }
     })()]);
   } catch(e){ console.error('[CATS]', e); }
