@@ -518,7 +518,7 @@ async function doSubmit() {
         const lR=await gPost(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items`,{
           fields:{Title:lbl,SolicitudId:solId,NroSolicitud:nro,
                   Proveedor:g.proveedor,Marca:l.marca,Material:l.material,
-                  Cantidad:parseInt(l.cantidad),FechaSolicitada:l.fecha,
+                  Cantidad:parseInt(l.cantidad),FechaSolicitada:l.fecha?l.fecha+'T00:00:00Z':null,
                   HoraSolicitada:l.hora||'',Observaci_x00f3_nMKT:l.obs||'',
                   EstadoLinea:'Pendiente',EstadoRecepcion:'Pendiente',
                   EsAnticipada:false,EsReprogramacion:false}
@@ -1159,7 +1159,7 @@ async function reprogramarNP(lineaId, nuevaFecha, nuevaHora) {
     {
       EstadoLinea:       'Pendiente',
       EstadoRecepcion:   '',
-      FechaSolicitada:   nuevaFecha,
+      FechaSolicitada:   nuevaFecha?nuevaFecha+'T00:00:00Z':null,
       HoraSolicitada:    nuevaHora || '',
       // Limpiar aprobación previa — Jefatura debe revisar de nuevo
       // Date fields → null; text/choice fields → ''
@@ -1216,7 +1216,7 @@ async function reprogramarSaldo(lineaId, nuevaFecha, nuevaHora) {
     {
       EstadoLinea:        'Pendiente',
       EstadoRecepcion:    '',
-      FechaSolicitada:    nuevaFecha,
+      FechaSolicitada:    nuevaFecha?nuevaFecha+'T00:00:00Z':null,
       HoraSolicitada:     nuevaHora || '',
       Cantidad:           cantPendiente,
       CicloRecepcion:     cicloNuevo,
