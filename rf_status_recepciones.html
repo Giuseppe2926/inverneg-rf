@@ -195,12 +195,14 @@ async function init(){
 }
 
 async function findFile(){
-  // Search in the specific folder path
-  const folderPath = "Documentos compartidos/Documentos de Trabajo CND/03. Para Dashboard";
-  const url=`${BASE}/v1.0/sites/${SITE_ID}/drive/root:/${folderPath}/${FILE_NAME}`;
-  const f=await gGet(url);
-  driveId=f.parentReference.driveId;
-  itemId=f.id;
+  // Get the default drive for the site
+  const driveInfo=await gGet(`${BASE}/v1.0/sites/${SITE_ID}/drive`);
+  driveId=driveInfo.id;
+  // Search for the file by name across the drive
+  const search=await gGet(`${BASE}/v1.0/drives/${driveId}/root/search(q='${encodeURIComponent(FILE_NAME)}')?$select=id,name,parentReference`);
+  const found=search.value.find(f=>f.name===FILE_NAME);
+  if(!found) throw new Error(`No se encontró el archivo: ${FILE_NAME}`);
+  itemId=found.id;
 }
 
 // ── LOAD DATA ─────────────────────────────────────────────────────────
