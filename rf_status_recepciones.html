@@ -7,62 +7,101 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 <style>
 :root{
-  --bg:#f0f2f5;--surface:#fff;--surface2:#f8f9fa;
+  --bg:#f0f2f5;--surface:#fff;
   --blue:#1a56db;--blue-dark:#1341a8;--blue-light:#e8eeff;
   --green:#0e9f6e;--green-light:#d1fae5;
   --yellow:#c27803;--yellow-light:#fef3c7;
   --orange:#d03801;--orange-light:#ffe4d6;
-  --red:#e02424;--red-light:#fde8e8;
   --gray:#6b7280;--gray-light:#e5e7eb;--gray-bg:#f3f4f6;
   --purple:#7c3aed;--purple-light:#ede9fe;
   --text:#111827;--text2:#374151;--text3:#6b7280;
-  --radius:10px;--shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
-  --shadow-md:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06);
+  --radius:10px;
+  --shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 6px rgba(0,0,0,.12);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
 /* NAV */
 .nav{background:var(--blue);color:#fff;padding:0 24px;display:flex;align-items:center;gap:16px;height:56px;box-shadow:var(--shadow-md)}
-.nav-logo{font-weight:700;font-size:1.1rem;letter-spacing:.3px}
-.nav-logo span{opacity:.7;font-weight:400}
+.nav-logo{font-weight:700;font-size:1.1rem}
+.nav-logo span{opacity:.65;font-weight:400}
 .nav-user{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:.85rem}
 .nav-avatar{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem}
+
 /* MAIN */
-.main{max-width:1200px;margin:0 auto;padding:24px 16px}
+.main{max-width:1240px;margin:0 auto;padding:24px 16px}
+
 /* TABS */
-.tabs{display:flex;gap:4px;background:var(--surface);border-radius:var(--radius);padding:4px;box-shadow:var(--shadow);margin-bottom:20px;width:fit-content}
-.tab{padding:8px 20px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:.9rem;font-weight:500;color:var(--text3);transition:.15s}
+.tabs{display:flex;gap:4px;background:var(--surface);border-radius:var(--radius);padding:4px;box-shadow:var(--shadow);margin-bottom:24px;width:fit-content}
+.tab{padding:8px 22px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:.9rem;font-weight:500;color:var(--text3);transition:.15s}
 .tab.active{background:var(--blue);color:#fff;box-shadow:var(--shadow)}
 .tab:hover:not(.active){background:var(--gray-bg)}
-/* SUMMARY CARDS */
-.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-.scard{background:var(--surface);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid transparent}
-.scard-n{font-size:2rem;font-weight:700;line-height:1}
-.scard-l{font-size:.8rem;color:var(--text3);margin-top:4px}
-.scard.total{border-color:var(--blue)}.scard.total .scard-n{color:var(--blue)}
-.scard.arribo{border-color:var(--gray)}.scard.arribo .scard-n{color:var(--gray)}
-.scard.recibido{border-color:var(--yellow)}.scard.recibido .scard-n{color:var(--yellow)}
-.scard.informe{border-color:var(--orange)}.scard.informe .scard-n{color:var(--orange)}
-.scard.ingresado{border-color:var(--purple)}.scard.ingresado .scard-n{color:var(--purple)}
-.scard.perchado{border-color:var(--green)}.scard.perchado .scard-n{color:var(--green)}
+
+/* DASHBOARD ROW */
+.dash-row{display:grid;grid-template-columns:1fr 2fr;gap:20px;margin-bottom:24px}
+@media(max-width:800px){.dash-row{grid-template-columns:1fr}}
+
+/* PIE CHART */
+.pie-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column}
+.pie-card h3{font-size:.88rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px}
+.pie-wrap{display:flex;align-items:center;gap:20px}
+.pie-svg{flex-shrink:0}
+.pie-legend{display:flex;flex-direction:column;gap:8px;flex:1}
+.pie-leg-item{display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer;padding:4px 6px;border-radius:6px;transition:.15s}
+.pie-leg-item:hover{background:var(--gray-bg)}
+.pie-leg-item.active-filter{background:var(--blue-light);font-weight:600}
+.pie-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.pie-leg-count{margin-left:auto;font-weight:700;font-size:.88rem}
+
+/* STAT CARDS */
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.scard{background:var(--surface);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);border-top:3px solid transparent;cursor:pointer;transition:.15s;user-select:none}
+.scard:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.scard.active-filter{box-shadow:0 0 0 2px var(--blue),var(--shadow-md);transform:translateY(-2px)}
+.scard-n{font-size:1.8rem;font-weight:700;line-height:1}
+.scard-l{font-size:.75rem;color:var(--text3);margin-top:3px;line-height:1.3}
+.scard.c-total{border-color:var(--blue)}.scard.c-total .scard-n{color:var(--blue)}
+.scard.c-arribo{border-color:var(--gray)}.scard.c-arribo .scard-n{color:var(--gray)}
+.scard.c-recibido{border-color:var(--yellow)}.scard.c-recibido .scard-n{color:var(--yellow)}
+.scard.c-informe{border-color:var(--orange)}.scard.c-informe .scard-n{color:var(--orange)}
+.scard.c-ingresado{border-color:var(--purple)}.scard.c-ingresado .scard-n{color:var(--purple)}
+.scard.c-perchado{border-color:var(--green)}.scard.c-perchado .scard-n{color:var(--green)}
+
 /* SEARCH */
-.search-bar{background:var(--surface);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow);margin-bottom:16px;display:flex;align-items:center;gap:10px}
-.search-bar input{flex:1;border:1px solid var(--gray-light);border-radius:7px;padding:8px 12px;font-size:.9rem;outline:none;transition:.15s}
-.search-bar input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
-.search-bar .search-icon{color:var(--text3);font-size:1.1rem}
-/* TABLE */
-.tbl-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-.tbl-head{padding:14px 18px;border-bottom:1px solid var(--gray-light);display:flex;align-items:center;justify-content:space-between}
-.tbl-head-title{font-weight:600;font-size:.95rem}
-.tbl-count{font-size:.8rem;color:var(--text3);background:var(--gray-bg);padding:3px 10px;border-radius:20px}
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.search-wrap{flex:1;position:relative}
+.search-wrap input{width:100%;border:1px solid var(--gray-light);border-radius:8px;padding:9px 12px 9px 36px;font-size:.9rem;outline:none;background:var(--surface);box-shadow:var(--shadow);transition:.15s}
+.search-wrap input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:.95rem;pointer-events:none}
+.btn-refresh{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:.85rem;font-weight:600;white-space:nowrap;transition:.15s;box-shadow:var(--shadow)}
+.btn-refresh:hover{background:var(--blue-dark)}
+.filter-active-label{background:var(--blue-light);color:var(--blue);border-radius:6px;padding:6px 12px;font-size:.82rem;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.filter-active-label button{background:none;border:none;cursor:pointer;color:var(--blue);font-size:1rem;line-height:1;padding:0}
+
+/* GROUPS */
+.groups{display:flex;flex-direction:column;gap:10px}
+.group{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.group-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;user-select:none;transition:.1s}
+.group-header:hover{background:var(--gray-bg)}
+.group-chevron{font-size:.75rem;transition:.2s;color:var(--text3)}
+.group-chevron.open{transform:rotate(90deg)}
+.group-name{font-weight:700;font-size:.95rem;flex:1}
+.group-badges{display:flex;gap:6px;flex-wrap:wrap}
+.gbadge{font-size:.72rem;padding:2px 8px;border-radius:12px;font-weight:600}
+.group-count{font-size:.8rem;color:var(--text3);background:var(--gray-bg);padding:2px 10px;border-radius:12px;flex-shrink:0}
+
+/* TABLE inside group */
+.group-table{border-top:1px solid var(--gray-light)}
 table{width:100%;border-collapse:collapse}
-th{text-align:left;padding:11px 14px;font-size:.78rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;background:var(--gray-bg);border-bottom:1px solid var(--gray-light)}
-td{padding:12px 14px;font-size:.88rem;border-bottom:1px solid var(--gray-light);vertical-align:middle}
+th{text-align:left;padding:9px 18px;font-size:.75rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;background:var(--gray-bg);border-bottom:1px solid var(--gray-light)}
+td{padding:12px 18px;font-size:.87rem;border-bottom:1px solid var(--gray-light);vertical-align:middle}
 tr:last-child td{border-bottom:none}
-tr.clickable{cursor:pointer;transition:.1s}
-tr.clickable:hover td{background:var(--blue-light)}
-/* STATUS BADGE */
-.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:.78rem;font-weight:600;white-space:nowrap}
+tr.row-click{cursor:pointer;transition:.1s}
+tr.row-click:hover td{background:#f5f8ff}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.78rem;font-weight:600;white-space:nowrap}
 .badge-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .b-arribo{background:var(--gray-bg);color:var(--gray)}.b-arribo .badge-dot{background:var(--gray)}
 .b-recibido{background:var(--yellow-light);color:var(--yellow)}.b-recibido .badge-dot{background:var(--yellow)}
@@ -70,51 +109,48 @@ tr.clickable:hover td{background:var(--blue-light)}
 .b-ingresado{background:var(--purple-light);color:var(--purple)}.b-ingresado .badge-dot{background:var(--purple)}
 .b-perchado{background:var(--green-light);color:var(--green)}.b-perchado .badge-dot{background:var(--green)}
 .b-cerrado{background:var(--gray-light);color:#374151}.b-cerrado .badge-dot{background:#9ca3af}
-/* PENDING TAGS */
-.pend-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
-.ptag{font-size:.72rem;padding:2px 7px;border-radius:4px;font-weight:500}
-.ptag-warn{background:#fff3cd;color:#856404}
-.ptag-err{background:#f8d7da;color:#721c24}
-.ptag-ok{background:#d1e7dd;color:#0a3622}
-/* DETAIL MODAL */
+.b-completo{background:var(--green-light);color:var(--green)}.b-completo .badge-dot{background:var(--green)}
+
+/* MODAL */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
-.modal{background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:580px;max-height:90vh;overflow-y:auto}
+.modal{background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:560px;max-height:90vh;overflow-y:auto}
 .modal-head{padding:20px 24px 16px;border-bottom:1px solid var(--gray-light);display:flex;align-items:flex-start;gap:12px}
 .modal-title{font-size:1.1rem;font-weight:700}
-.modal-sub{font-size:.82rem;color:var(--text3);margin-top:3px}
-.modal-close{margin-left:auto;background:var(--gray-bg);border:none;border-radius:7px;width:32px;height:32px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-sub{margin-top:5px}
+.modal-close{margin-left:auto;background:var(--gray-bg);border:none;border-radius:7px;width:32px;height:32px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .modal-close:hover{background:var(--gray-light)}
 .modal-body{padding:20px 24px}
+
 /* TIMELINE */
-.timeline{display:flex;flex-direction:column;gap:0}
 .tl-step{display:flex;gap:14px;padding-bottom:20px;position:relative}
 .tl-step:last-child{padding-bottom:0}
 .tl-step:not(:last-child)::before{content:'';position:absolute;left:15px;top:32px;bottom:0;width:2px;background:var(--gray-light)}
 .tl-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0;z-index:1}
 .tl-icon.done{background:var(--green-light);color:var(--green)}
-.tl-icon.active{background:var(--yellow-light);color:var(--yellow)}
+.tl-icon.next{background:var(--yellow-light);color:var(--yellow)}
 .tl-icon.pending{background:var(--gray-bg);color:var(--text3)}
 .tl-content{flex:1;padding-top:5px}
 .tl-label{font-weight:600;font-size:.88rem}
 .tl-date{font-size:.8rem;color:var(--text3);margin-top:2px}
-/* DATE INPUT in modal */
 .date-row{display:flex;align-items:center;gap:8px;margin-top:6px}
 .date-input{border:1px solid var(--gray-light);border-radius:7px;padding:5px 10px;font-size:.83rem;outline:none;transition:.15s;background:var(--surface)}
 .date-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
-.btn-save-date{background:var(--blue);color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:.8rem;font-weight:600;cursor:pointer;transition:.15s}
-.btn-save-date:hover{background:var(--blue-dark)}
-.btn-save-date:disabled{opacity:.5;cursor:not-allowed}
-/* COMMENTS */
-.comment-box{background:var(--gray-bg);border-radius:8px;padding:12px 14px;margin-top:12px;font-size:.85rem;color:var(--text2);line-height:1.5}
+.btn-save{background:var(--blue);color:#fff;border:none;border-radius:7px;padding:5px 14px;font-size:.8rem;font-weight:600;cursor:pointer}
+.btn-save:hover{background:var(--blue-dark)}
+.btn-save:disabled{opacity:.5;cursor:not-allowed}
+
+/* COMMENT */
+.comment-box{background:var(--gray-bg);border-radius:8px;padding:12px 14px;margin-top:14px;font-size:.85rem;color:var(--text2);line-height:1.5}
 .comment-label{font-size:.75rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-/* LOADER */
-.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;gap:12px;color:var(--text3)}
+
+/* LOADER / EMPTY */
+.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;gap:14px;color:var(--text3)}
 .spinner{width:36px;height:36px;border:3px solid var(--gray-light);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.empty{text-align:center;padding:60px 20px;color:var(--text3)}
-.empty-icon{font-size:2.5rem;margin-bottom:8px}
+.empty{text-align:center;padding:50px 20px;color:var(--text3);font-size:.9rem}
+
 /* TOAST */
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1f2937;color:#fff;padding:10px 20px;border-radius:8px;font-size:.88rem;z-index:200;transition:.3s;white-space:nowrap}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1f2937;color:#fff;padding:10px 22px;border-radius:8px;font-size:.88rem;z-index:200;transition:.3s;white-space:nowrap;box-shadow:var(--shadow-md)}
 .toast.show{transform:translateX(-50%) translateY(0)}
 </style>
 </head>
@@ -124,51 +160,53 @@ tr.clickable:hover td{background:var(--blue-light)}
   <div class="nav-logo">📦 Status <span>Recepciones</span></div>
   <div class="nav-user" id="navUser"></div>
 </nav>
-
 <div class="main" id="app">
   <div class="loader"><div class="spinner"></div><span>Iniciando sesión…</span></div>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-// ── CONFIG ──────────────────────────────────────────────────────────
-const CLIENT_ID = 'ec976114-e146-4ce4-850c-5d978e12acfd';
-const TENANT_ID = '5e008bd3-17b6-4f83-8d23-019691a40609';
-const SITE_ID   = 'inverneg.sharepoint.com,65348f57-a25e-4137-ac5c-1347926aad8f,66ece2da-3fcc-473d-add2-0eccc5cd3863';
-const BASE      = 'https://graph.microsoft.com';
-const FILE_NAME = '06. Status Recepciones.xlsx';
-const SHEET     = 'Control';
+// ── CONFIG ───────────────────────────────────────────────────────────
+const CLIENT_ID='ec976114-e146-4ce4-850c-5d978e12acfd';
+const TENANT_ID='5e008bd3-17b6-4f83-8d23-019691a40609';
+const SITE_ID  ='inverneg.sharepoint.com,65348f57-a25e-4137-ac5c-1347926aad8f,66ece2da-3fcc-473d-add2-0eccc5cd3863';
+const BASE     ='https://graph.microsoft.com';
+const FILE_NAME='06. Status Recepciones.xlsx';
+const SHEET    ='Control';
+const COL={pedido:0,tentativa:1,recepcion:2,informe:3,ingresado:4,perchado:5,cerrado:6,informeEnv:7,comentarios:8};
 
-// Column indices (0-based) after inserting Fecha Tentativa Arribo
-// A=Pedido, B=FechaTentativa, C=FechaRecepcion, D=Informe, E=Ingresado, F=PerchadoD365, G=PerchadoD3652(checkbox), H=InformeEnviado, I=Comentarios
-const COL = {pedido:0,tentativa:1,recepcion:2,informe:3,ingresado:4,perchado:5,cerrado:6,informeEnv:7,comentarios:8};
+// ── STATUS COLORS (pie + badges) ─────────────────────────────────────
+const STATUS_META={
+  arribo:  {label:'Pend. Arribo',   cls:'b-arribo',  color:'#9ca3af', pieColor:'#9ca3af'},
+  recibido:{label:'Pend. Informe',  cls:'b-recibido',color:'#c27803', pieColor:'#f59e0b'},
+  informe: {label:'Informe Enviado',cls:'b-informe', color:'#d03801', pieColor:'#f97316'},
+  ingresado:{label:'Ingresado D365',cls:'b-ingresado',color:'#7c3aed',pieColor:'#8b5cf6'},
+  perchado:{label:'Perchado',       cls:'b-perchado',color:'#0e9f6e', pieColor:'#10b981'},
+  completo:{label:'Perchado',       cls:'b-completo',color:'#0e9f6e', pieColor:'#10b981'},
+  cerrado: {label:'Cerrado',        cls:'b-cerrado', color:'#6b7280', pieColor:'#d1d5db'},
+  sininfo: {label:'Sin info',       cls:'b-arribo',  color:'#9ca3af', pieColor:'#9ca3af'},
+};
 
 // ── MSAL ─────────────────────────────────────────────────────────────
 const msalConfig={auth:{clientId:CLIENT_ID,authority:`https://login.microsoftonline.com/${TENANT_ID}`,redirectUri:location.href},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:false}};
 const msalApp=new msal.PublicClientApplication(msalConfig);
 const SCOPES=['https://graph.microsoft.com/Files.ReadWrite','https://graph.microsoft.com/User.Read'];
 
-let me=null, token=null, driveId=null, itemId=null;
-let allRows=[], view='abiertos', searchQ='', detailRow=null;
+let me=null,token=null,driveId=null,itemId=null;
+let allRows=[],view='abiertos',searchQ='',filterStatus=null,expandedGroups={};
 
 // ── AUTH ─────────────────────────────────────────────────────────────
 async function getToken(){
   const acc=msalApp.getAllAccounts()[0];
-  if(acc){
-    try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:acc});return r.accessToken;}catch(e){}
-  }
-  // Use redirect flow instead of popup
+  if(acc){try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:acc});return r.accessToken;}catch(e){}}
   await msalApp.acquireTokenRedirect({scopes:SCOPES});
-  return null; // page will reload after redirect
+  return null;
 }
-
 async function gGet(url){
-  const r=await fetch(url,{headers:{Authorization:'Bearer '+token,'Accept':'application/json'}});
+  const r=await fetch(url,{headers:{Authorization:'Bearer '+token,Accept:'application/json'}});
   if(!r.ok) throw new Error(await r.text());
   return r.json();
 }
-
 async function gPatch(url,body){
   const r=await fetch(url,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(!r.ok) throw new Error(await r.text());
@@ -179,54 +217,44 @@ async function gPatch(url,body){
 async function init(){
   await msalApp.initialize();
   try{
-    const resp = await msalApp.handleRedirectPromise();
+    const resp=await msalApp.handleRedirectPromise();
     if(resp) token=resp.accessToken;
     else token=await getToken();
-    if(!token) return; // redirecting
-    me=(await gGet(`${BASE}/v1.0/me`));
-    document.getElementById('navUser').innerHTML=`
-      <span>${me.displayName||me.userPrincipalName}</span>
-      <div class="nav-avatar">${(me.displayName||'U')[0].toUpperCase()}</div>`;
+    if(!token) return;
+    me=await gGet(`${BASE}/v1.0/me`);
+    document.getElementById('navUser').innerHTML=`<span>${me.displayName||me.userPrincipalName}</span><div class="nav-avatar">${(me.displayName||'U')[0].toUpperCase()}</div>`;
     await findFile();
     await loadData();
   }catch(e){
-    document.getElementById('app').innerHTML=`<div class="loader"><span>❌ Error: ${e.message}</span></div>`;
+    document.getElementById('app').innerHTML=`<div class="loader"><span>❌ ${e.message}</span></div>`;
   }
 }
 
 async function findFile(){
-  // Get the default drive for the site
   const driveInfo=await gGet(`${BASE}/v1.0/sites/${SITE_ID}/drive`);
   driveId=driveInfo.id;
-  // Search for the file by name across the drive
-  const search=await gGet(`${BASE}/v1.0/drives/${driveId}/root/search(q='${encodeURIComponent(FILE_NAME)}')?$select=id,name,parentReference`);
+  const search=await gGet(`${BASE}/v1.0/drives/${driveId}/root/search(q='${encodeURIComponent(FILE_NAME)}')?$select=id,name`);
   const found=search.value.find(f=>f.name===FILE_NAME);
-  if(!found) throw new Error(`No se encontró el archivo: ${FILE_NAME}`);
+  if(!found) throw new Error(`No se encontró: ${FILE_NAME}`);
   itemId=found.id;
 }
 
-// ── LOAD DATA ─────────────────────────────────────────────────────────
+// ── DATA ─────────────────────────────────────────────────────────────
 function parseDate(v){
   if(!v) return null;
-  if(v instanceof Date) return v;
-  // Excel serial or string
-  if(typeof v==='number'){
-    // Excel serial date (days since 1899-12-30)
-    const d=new Date((v-25569)*86400*1000);
-    return new Date(d.getFullYear(),d.getMonth(),d.getDate());
-  }
-  if(typeof v==='string' && v.match(/^\d{4}-\d{2}-\d{2}/)){
-    const p=v.split('T')[0].split('-');
-    return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
-  }
+  if(typeof v==='number'){const d=new Date((v-25569)*86400*1000);return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
+  if(typeof v==='string'&&v.match(/^\d{4}-\d{2}-\d{2}/)){const p=v.split('T')[0].split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
   return null;
 }
-
-function fmtDate(d){
+function fmtDate(v){
+  const d=parseDate(v);
   if(!d) return '—';
-  const dt=parseDate(d);
-  if(!dt) return '—';
-  return dt.toLocaleDateString('es-EC',{day:'2-digit',month:'2-digit',year:'numeric'});
+  return d.toLocaleDateString('es-EC',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function toInputDate(v){
+  const d=parseDate(v);
+  if(!d) return '';
+  return d.toISOString().split('T')[0];
 }
 
 function getStatus(row){
@@ -235,243 +263,373 @@ function getStatus(row){
   const informe=parseDate(row[COL.informe]);
   const ingresado=parseDate(row[COL.ingresado]);
   const perchado=parseDate(row[COL.perchado]);
-  const cerrado=row[COL.cerrado]===true||row[COL.cerrado]==='TRUE'||row[COL.cerrado]==='true';
-  const today=new Date(); today.setHours(0,0,0,0);
+  const cerrado=row[COL.cerrado]===true||row[COL.cerrado]==='TRUE';
+  const today=new Date();today.setHours(0,0,0,0);
+  if(cerrado) return 'cerrado';
+  if(perchado&&ingresado) return 'completo';
+  if(perchado) return 'perchado';
+  if(ingresado) return 'ingresado';
+  if(informe) return 'informe';
+  if(recepcion||(tentativa&&tentativa<=today)) return 'recibido';
+  if(tentativa&&tentativa>today) return 'arribo';
+  return 'sininfo';
+}
 
-  if(cerrado) return {status:'cerrado',label:'Cerrado',cls:'b-cerrado',pendings:[]};
+function getPendings(row){
+  const s=getStatus(row);
+  const map={
+    arribo:[],
+    recibido:['⚠ Pendiente Informe'],
+    informe:['⚠ Pendiente Ingreso','⚠ Pendiente Perchado'],
+    ingresado:['⚠ Pendiente Perchado'],
+    perchado:['⚠ Pendiente Ingreso D365'],
+    completo:[],cerrado:[],sininfo:[]
+  };
+  return map[s]||[];
+}
 
-  if(perchado && ingresado){
-    return {status:'completo',label:'Perchado D365',cls:'b-perchado',pendings:[{t:'✓ Proceso completo',cls:'ptag-ok'}]};
-  }
-  if(perchado && !ingresado){
-    return {status:'perchado',label:'Perchado Físicamente',cls:'b-perchado',pendings:[{t:'⚠ Pendiente Ingreso D365',cls:'ptag-err'}]};
-  }
-  if(ingresado && !perchado){
-    return {status:'ingresado',label:'Ingresado D365',cls:'b-ingresado',pendings:[{t:'⚠ Pendiente Perchado',cls:'ptag-err'}]};
-  }
-  if(informe){
-    return {status:'informe',label:'Informe Enviado',cls:'b-informe',pendings:[{t:'⚠ Pendiente Ingreso',cls:'ptag-warn'},{t:'⚠ Pendiente Perchado',cls:'ptag-warn'}]};
-  }
-  if(recepcion || (tentativa && tentativa<=today)){
-    return {status:'recibido',label:'Pedido Recibido',cls:'b-recibido',pendings:[{t:'⚠ Pendiente Informe',cls:'ptag-warn'}]};
-  }
-  if(tentativa && tentativa>today){
-    return {status:'arribo',label:'Pendiente de Arribo',cls:'b-arribo',pendings:[{t:`📅 Arribo esperado: ${fmtDate(tentativa)}`,cls:'ptag-ok'}]};
-  }
-  return {status:'sininfo',label:'Sin información',cls:'b-arribo',pendings:[]};
+function getPrefix(name){
+  if(!name) return 'OTROS';
+  // Extract prefix: letters until first digit
+  const m=name.match(/^([A-Za-z0-9]+?)(\d{4})/);
+  return m?m[1].replace(/-$/,'').toUpperCase():'OTROS';
 }
 
 async function loadData(){
-  setLoading('Cargando datos…');
-  const url=`${BASE}/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets('${SHEET}')/usedRange`;
-  const data=await gGet(url);
-  const values=data.values;
-  // Skip header row
-  allRows=values.slice(1).filter(r=>r[COL.pedido]);
+  document.getElementById('app').innerHTML='<div class="loader"><div class="spinner"></div><span>Cargando datos…</span></div>';
+  const data=await gGet(`${BASE}/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets('${SHEET}')/usedRange`);
+  allRows=data.values.slice(1).filter(r=>r[COL.pedido]);
   renderApp();
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────
-function setLoading(msg){
-  document.getElementById('app').innerHTML=`<div class="loader"><div class="spinner"></div><span>${msg}</span></div>`;
-}
-
 function getFiltered(){
   let rows=allRows;
-  if(view==='abiertos') rows=rows.filter(r=>{
-    const cerrado=r[COL.cerrado]===true||r[COL.cerrado]==='TRUE'||r[COL.cerrado]==='true';
-    return !cerrado;
+  if(view==='abiertos') rows=rows.filter(r=>getStatus(r)!=='cerrado');
+  if(filterStatus) rows=rows.filter(r=>{
+    const s=getStatus(r);
+    // completo and perchado both map to perchado filter
+    if(filterStatus==='perchado') return s==='perchado'||s==='completo';
+    return s===filterStatus;
   });
   if(searchQ) rows=rows.filter(r=>String(r[COL.pedido]||'').toLowerCase().includes(searchQ.toLowerCase()));
   return rows;
 }
 
 function renderApp(){
-  const filtered=getFiltered();
-  const abiertos=allRows.filter(r=>{const c=r[COL.cerrado];return !(c===true||c==='TRUE'||c==='true');});
+  const abiertos=allRows.filter(r=>getStatus(r)!=='cerrado');
+  const counts={arribo:0,recibido:0,informe:0,ingresado:0,perchado:0};
+  abiertos.forEach(r=>{
+    const s=getStatus(r);
+    if(s==='completo') counts.perchado++;
+    else if(counts[s]!==undefined) counts[s]++;
+  });
 
-  // Summary counts (only for abiertos view)
-  let summaryHtml='';
+  const filtered=getFiltered();
+
+  // Group by prefix
+  const groups={};
+  filtered.forEach((r,i)=>{
+    const idx=allRows.indexOf(r);
+    const prefix=getPrefix(r[COL.pedido]);
+    if(!groups[prefix]) groups[prefix]=[];
+    groups[prefix].push({row:r,idx});
+  });
+
+  // PIE chart
+  const pieData=[
+    {key:'arribo',  n:counts.arribo,  color:'#9ca3af'},
+    {key:'recibido',n:counts.recibido,color:'#f59e0b'},
+    {key:'informe', n:counts.informe, color:'#f97316'},
+    {key:'ingresado',n:counts.ingresado,color:'#8b5cf6'},
+    {key:'perchado',n:counts.perchado,color:'#10b981'},
+  ].filter(d=>d.n>0);
+  const total=pieData.reduce((s,d)=>s+d.n,0)||1;
+
+  let pieHtml='';
   if(view==='abiertos'){
-    const counts={arribo:0,recibido:0,informe:0,ingresado:0,perchado:0,completo:0};
-    abiertos.forEach(r=>{const s=getStatus(r).status;if(counts[s]!==undefined)counts[s]++;});
-    summaryHtml=`<div class="summary">
-      <div class="scard total"><div class="scard-n">${abiertos.length}</div><div class="scard-l">Pedidos Abiertos</div></div>
-      <div class="scard arribo"><div class="scard-n">${counts.arribo}</div><div class="scard-l">Pendiente Arribo</div></div>
-      <div class="scard recibido"><div class="scard-n">${counts.recibido}</div><div class="scard-l">Recibidos sin Informe</div></div>
-      <div class="scard informe"><div class="scard-n">${counts.informe}</div><div class="scard-l">Informe Enviado</div></div>
-      <div class="scard ingresado"><div class="scard-n">${counts.ingresado}</div><div class="scard-l">Ingresado D365</div></div>
-      <div class="scard perchado"><div class="scard-n">${counts.perchado+counts.completo}</div><div class="scard-l">Perchado</div></div>
+    // Build SVG pie
+    let startAngle=-Math.PI/2;
+    let slices='';
+    pieData.forEach(d=>{
+      const angle=(d.n/total)*2*Math.PI;
+      const x1=50+45*Math.cos(startAngle);
+      const y1=50+45*Math.sin(startAngle);
+      startAngle+=angle;
+      const x2=50+45*Math.cos(startAngle);
+      const y2=50+45*Math.sin(startAngle);
+      const large=angle>Math.PI?1:0;
+      if(pieData.length===1){
+        slices+=`<circle cx="50" cy="50" r="45" fill="${d.color}" opacity=".85"/>`;
+      } else {
+        slices+=`<path d="M50,50 L${x1},${y1} A45,45 0 ${large},1 ${x2},${y2} Z" fill="${d.color}" opacity=".85"/>`;
+      }
+    });
+    const legendItems=pieData.map(d=>`
+      <div class="pie-leg-item${filterStatus===d.key?' active-filter':''}" onclick="toggleFilter('${d.key}')">
+        <span class="pie-dot" style="background:${d.color}"></span>
+        <span>${STATUS_META[d.key].label}</span>
+        <span class="pie-leg-count" style="color:${d.color}">${d.n}</span>
+      </div>`).join('');
+
+    pieHtml=`<div class="pie-card">
+      <h3>Distribución de Pedidos Abiertos</h3>
+      <div class="pie-wrap">
+        <svg class="pie-svg" width="100" height="100" viewBox="0 0 100 100">
+          ${slices}
+          <circle cx="50" cy="50" r="22" fill="white"/>
+          <text x="50" y="47" text-anchor="middle" font-size="11" font-weight="700" fill="#111">${abiertos.length}</text>
+          <text x="50" y="58" text-anchor="middle" font-size="7" fill="#6b7280">abiertos</text>
+        </svg>
+        <div class="pie-legend">${legendItems}</div>
+      </div>
     </div>`;
   }
 
-  const tableRows=filtered.map((r,idx)=>{
-    const s=getStatus(r);
-    const pendHtml=s.pendings.map(p=>`<span class="ptag ${p.cls}">${p.t}</span>`).join('');
-    return `<tr class="clickable" onclick="openDetail(${allRows.indexOf(r)})">
-      <td><strong>${r[COL.pedido]||''}</strong></td>
-      <td>${fmtDate(r[COL.tentativa])}</td>
-      <td>${fmtDate(r[COL.recepcion])}</td>
-      <td>
-        <span class="badge ${s.cls}"><span class="badge-dot"></span>${s.label}</span>
-        ${pendHtml?`<div class="pend-tags">${pendHtml}</div>`:''}
-      </td>
-    </tr>`;
+  // Stat cards
+  const cardDefs=view==='abiertos'?[
+    {key:'total', n:abiertos.length, label:'Total Abiertos', cls:'c-total', noFilter:true},
+    {key:'arribo', n:counts.arribo, label:'Pend. Arribo', cls:'c-arribo'},
+    {key:'recibido', n:counts.recibido, label:'Pend. Informe', cls:'c-recibido'},
+    {key:'informe', n:counts.informe, label:'Informe Enviado', cls:'c-informe'},
+    {key:'ingresado', n:counts.ingresado, label:'Ingresado D365', cls:'c-ingresado'},
+    {key:'perchado', n:counts.perchado, label:'Perchado', cls:'c-perchado'},
+  ]:[
+    {key:'total', n:allRows.length, label:'Total Pedidos', cls:'c-total', noFilter:true},
+    {key:'cerrado', n:allRows.filter(r=>getStatus(r)==='cerrado').length, label:'Cerrados', cls:'c-perchado'},
+  ];
+
+  const statCardsHtml=`<div style="display:flex;flex-direction:column;gap:10px">
+    <div class="stat-cards">
+      ${cardDefs.map(c=>`
+        <div class="scard ${c.cls}${!c.noFilter&&filterStatus===c.key?' active-filter':''}"
+             onclick="${c.noFilter?'':'toggleFilter(\''+c.key+'\')'}">
+          <div class="scard-n">${c.n}</div>
+          <div class="scard-l">${c.label}</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+
+  // Filter label
+  let filterLabelHtml='';
+  if(filterStatus){
+    const meta=STATUS_META[filterStatus];
+    filterLabelHtml=`<div class="filter-active-label">
+      Filtrando: ${meta.label}
+      <button onclick="toggleFilter('${filterStatus}')">✕</button>
+    </div>`;
+  }
+
+  // Groups HTML
+  const groupsHtml=Object.entries(groups).map(([prefix,items])=>{
+    const isOpen=expandedGroups[prefix]!==false; // open by default
+    const statusCounts={};
+    items.forEach(({row})=>{
+      const s=getStatus(row);
+      statusCounts[s]=(statusCounts[s]||0)+1;
+    });
+    const badgesHtml=Object.entries(statusCounts).map(([s,n])=>{
+      const m=STATUS_META[s]||STATUS_META.sininfo;
+      return `<span class="gbadge ${m.cls}">${n} ${m.label}</span>`;
+    }).join('');
+
+    const rowsHtml=items.map(({row,idx})=>{
+      const s=getStatus(row);
+      const m=STATUS_META[s]||STATUS_META.sininfo;
+      return `<tr class="row-click" onclick="openDetail(${idx})">
+        <td><strong>${row[COL.pedido]||''}</strong></td>
+        <td style="color:var(--text3)">${fmtDate(row[COL.tentativa])}</td>
+        <td style="color:var(--text3)">${fmtDate(row[COL.recepcion])}</td>
+        <td><span class="badge ${m.cls}"><span class="badge-dot"></span>${m.label}</span></td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="group">
+      <div class="group-header" onclick="toggleGroup('${prefix}')">
+        <span class="group-chevron${isOpen?' open':''}">▶</span>
+        <span class="group-name">${prefix}</span>
+        <div class="group-badges">${badgesHtml}</div>
+        <span class="group-count">${items.length} pedido${items.length!==1?'s':''}</span>
+      </div>
+      ${isOpen?`<div class="group-table">
+        <table>
+          <thead><tr><th>Pedido</th><th>F. Tentativa</th><th>F. Recepción</th><th>Status</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>`:''}
+    </div>`;
   }).join('');
+
+  const emptyHtml=`<div class="empty">📭 No hay pedidos que mostrar</div>`;
 
   document.getElementById('app').innerHTML=`
     <div class="tabs">
       <button class="tab ${view==='abiertos'?'active':''}" onclick="switchView('abiertos')">📋 Pedidos Abiertos</button>
       <button class="tab ${view==='todos'?'active':''}" onclick="switchView('todos')">📦 Pedidos Totales</button>
     </div>
-    ${summaryHtml}
-    <div class="search-bar">
-      <span class="search-icon">🔍</span>
-      <input type="text" placeholder="Buscar pedido…" value="${searchQ}" oninput="onSearch(this.value)"/>
-      <button onclick="loadData()" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:7px 14px;cursor:pointer;font-size:.82rem;font-weight:600">↻ Actualizar</button>
-    </div>
-    <div class="tbl-wrap">
-      <div class="tbl-head">
-        <span class="tbl-head-title">${view==='abiertos'?'Pedidos Abiertos':'Todos los Pedidos'}</span>
-        <span class="tbl-count">${filtered.length} pedidos</span>
+    ${view==='abiertos'?`<div class="dash-row">${pieHtml}<div>${statCardsHtml}</div></div>`:statCardsHtml}
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="searchInput" type="text" placeholder="Buscar pedido…" value="${searchQ.replace(/"/g,'&quot;')}"
+               oninput="onSearch(this.value)" autocomplete="off"/>
       </div>
-      ${filtered.length?`<table>
-        <thead><tr>
-          <th>Pedido</th><th>F. Tentativa Arribo</th><th>F. Recepción</th><th>Status</th>
-        </tr></thead>
-        <tbody>${tableRows}</tbody>
-      </table>`:`<div class="empty"><div class="empty-icon">📭</div><div>No hay pedidos que mostrar</div></div>`}
-    </div>`;
+      ${filterLabelHtml}
+      <button class="btn-refresh" onclick="loadData()">↻ Actualizar</button>
+    </div>
+    <div class="groups">${Object.keys(groups).length?groupsHtml:emptyHtml}</div>`;
+
+  // Keep search focus
+  if(searchQ){
+    const inp=document.getElementById('searchInput');
+    if(inp){inp.focus();const l=inp.value.length;inp.setSelectionRange(l,l);}
+  }
 }
 
-function switchView(v){view=v;renderApp();}
-function onSearch(v){searchQ=v;renderApp();}
+function switchView(v){filterStatus=null;view=v;renderApp();}
+function onSearch(v){searchQ=v;renderPartial();}
+function toggleFilter(key){filterStatus=filterStatus===key?null:key;renderApp();}
+function toggleGroup(prefix){expandedGroups[prefix]=expandedGroups[prefix]===false?true:false;renderApp();}
+
+// Partial re-render: only rebuild groups (keeps search focused)
+function renderPartial(){
+  const filtered=getFiltered();
+  const groups={};
+  filtered.forEach(r=>{
+    const idx=allRows.indexOf(r);
+    const prefix=getPrefix(r[COL.pedido]);
+    if(!groups[prefix]) groups[prefix]=[];
+    groups[prefix].push({row:r,idx});
+  });
+  const groupsEl=document.querySelector('.groups');
+  if(!groupsEl){renderApp();return;}
+
+  const groupsHtml=Object.entries(groups).map(([prefix,items])=>{
+    const isOpen=expandedGroups[prefix]!==false;
+    const statusCounts={};
+    items.forEach(({row})=>{const s=getStatus(row);statusCounts[s]=(statusCounts[s]||0)+1;});
+    const badgesHtml=Object.entries(statusCounts).map(([s,n])=>{
+      const m=STATUS_META[s]||STATUS_META.sininfo;
+      return `<span class="gbadge ${m.cls}">${n} ${m.label}</span>`;
+    }).join('');
+    const rowsHtml=items.map(({row,idx})=>{
+      const s=getStatus(row);const m=STATUS_META[s]||STATUS_META.sininfo;
+      return `<tr class="row-click" onclick="openDetail(${idx})">
+        <td><strong>${row[COL.pedido]||''}</strong></td>
+        <td style="color:var(--text3)">${fmtDate(row[COL.tentativa])}</td>
+        <td style="color:var(--text3)">${fmtDate(row[COL.recepcion])}</td>
+        <td><span class="badge ${m.cls}"><span class="badge-dot"></span>${m.label}</span></td>
+      </tr>`;
+    }).join('');
+    return `<div class="group">
+      <div class="group-header" onclick="toggleGroup('${prefix}')">
+        <span class="group-chevron${isOpen?' open':''}">▶</span>
+        <span class="group-name">${prefix}</span>
+        <div class="group-badges">${badgesHtml}</div>
+        <span class="group-count">${items.length} pedido${items.length!==1?'s':''}</span>
+      </div>
+      ${isOpen?`<div class="group-table"><table><thead><tr><th>Pedido</th><th>F. Tentativa</th><th>F. Recepción</th><th>Status</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`:''}
+    </div>`;
+  }).join('');
+  groupsEl.innerHTML=groupsHtml||'<div class="empty">📭 No hay pedidos que mostrar</div>';
+}
 
 // ── DETAIL MODAL ──────────────────────────────────────────────────────
 function openDetail(idx){
-  detailRow=idx;
-  renderModal();
-}
-
-function renderModal(){
-  const r=allRows[detailRow];
+  const r=allRows[idx];
   const s=getStatus(r);
-  const cerrado=s.status==='cerrado';
-
+  const cerrado=s==='cerrado';
   const steps=[
-    {icon:'🚢',label:'Fecha Tentativa Arribo',col:COL.tentativa,date:r[COL.tentativa]},
-    {icon:'📥',label:'Fecha Recepción',col:COL.recepcion,date:r[COL.recepcion]},
-    {icon:'📄',label:'Informe Enviado',col:COL.informe,date:r[COL.informe]},
-    {icon:'💻',label:'Ingresado D365',col:COL.ingresado,date:r[COL.ingresado]},
-    {icon:'📦',label:'Perchado D365',col:COL.perchado,date:r[COL.perchado]},
+    {icon:'🚢',label:'Fecha Tentativa Arribo',col:COL.tentativa},
+    {icon:'📥',label:'Fecha Recepción',col:COL.recepcion},
+    {icon:'📄',label:'Informe Enviado',col:COL.informe},
+    {icon:'💻',label:'Ingresado D365',col:COL.ingresado},
+    {icon:'📦',label:'Perchado D365',col:COL.perchado},
   ];
+  const doneSet=new Set(steps.filter(st=>r[st.col]).map(st=>st.col));
+  const nextCol=steps.find(st=>!r[st.col])?.col;
 
-  const tlHtml=steps.map(step=>{
-    const hasDate=!!step.date;
-    const iconCls=hasDate?'done':s.status!=='cerrado'&&isNextStep(r,step.col)?'active':'pending';
-    const dateStr=fmtDate(step.date);
-    let inputHtml='';
-    if(!cerrado){
-      const colLetter=String.fromCharCode(65+step.col); // A-based
-      inputHtml=`<div class="date-row">
-        <input type="date" class="date-input" id="inp_${step.col}" value="${toInputDate(step.date)}" placeholder="dd/mm/aaaa"/>
-        <button class="btn-save-date" onclick="saveDate(${detailRow},${step.col})" ${!token?'disabled':''}>Guardar</button>
+  const tlHtml=steps.map(st=>{
+    const done=!!r[st.col];
+    const isNext=!cerrado&&st.col===nextCol;
+    const cls=done?'done':isNext?'next':'pending';
+    const inputHtml=cerrado?'':
+      `<div class="date-row">
+        <input type="date" class="date-input" id="inp_${idx}_${st.col}" value="${toInputDate(r[st.col])}"/>
+        <button class="btn-save" onclick="saveDate(${idx},${st.col})">Guardar</button>
       </div>`;
-    }
     return `<div class="tl-step">
-      <div class="tl-icon ${iconCls}">${hasDate?'✓':step.icon}</div>
+      <div class="tl-icon ${cls}">${done?'✓':st.icon}</div>
       <div class="tl-content">
-        <div class="tl-label">${step.label}</div>
-        <div class="tl-date">${hasDate?dateStr:'Sin fecha registrada'}</div>
+        <div class="tl-label">${st.label}</div>
+        <div class="tl-date">${done?fmtDate(r[st.col]):'Sin fecha registrada'}</div>
         ${inputHtml}
       </div>
     </div>`;
   }).join('');
 
-  let commentHtml='';
-  if(cerrado && r[COL.comentarios]){
-    commentHtml=`<div style="margin-top:16px">
-      <div class="comment-label">Comentarios</div>
-      <div class="comment-box">${r[COL.comentarios]}</div>
-    </div>`;
-  }
+  const pendings=getPendings(r);
+  const pendHtml=pendings.length?`<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">
+    ${pendings.map(p=>`<span style="background:#fef3c7;color:#92400e;border-radius:6px;padding:4px 10px;font-size:.8rem;font-weight:600">${p}</span>`).join('')}
+  </div>`:'';
 
+  const commentHtml=cerrado&&r[COL.comentarios]?`<div style="margin-top:16px">
+    <div class="comment-label">Comentarios</div>
+    <div class="comment-box">${r[COL.comentarios]}</div>
+  </div>`:'';
+
+  const meta=STATUS_META[s]||STATUS_META.sininfo;
   const html=`<div class="overlay" onclick="closeModal(event)">
     <div class="modal" onclick="event.stopPropagation()">
       <div class="modal-head">
         <div>
           <div class="modal-title">${r[COL.pedido]}</div>
-          <div class="modal-sub"><span class="badge ${s.cls}"><span class="badge-dot"></span>${s.label}</span></div>
+          <div class="modal-sub"><span class="badge ${meta.cls}"><span class="badge-dot"></span>${meta.label}</span></div>
         </div>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
       <div class="modal-body">
-        <div class="timeline">${tlHtml}</div>
+        <div>${tlHtml}</div>
+        ${pendHtml}
         ${commentHtml}
       </div>
     </div>
   </div>`;
-
   document.body.insertAdjacentHTML('beforeend',html);
 }
 
-function isNextStep(r,col){
-  // Returns true if this is the logical next unfilled step
-  const filled=[COL.tentativa,COL.recepcion,COL.informe,COL.ingresado,COL.perchado].filter(c=>!!r[c]);
-  const nextFill=[COL.tentativa,COL.recepcion,COL.informe,COL.ingresado,COL.perchado].find(c=>!r[c]);
-  return col===nextFill;
-}
-
-function toInputDate(v){
-  if(!v) return '';
-  const d=parseDate(v);
-  if(!d) return '';
-  return d.toISOString().split('T')[0];
-}
-
 function closeModal(e){
-  if(e && e.target!==e.currentTarget) return;
-  const ov=document.querySelector('.overlay');
-  if(ov) ov.remove();
+  if(e&&e.target!==e.currentTarget) return;
+  document.querySelector('.overlay')?.remove();
 }
 
 // ── SAVE DATE ─────────────────────────────────────────────────────────
-async function saveDate(rowIdx, col){
-  const inp=document.getElementById(`inp_${col}`);
-  if(!inp||!inp.value){showToast('Selecciona una fecha primero');return;}
+async function saveDate(rowIdx,col){
+  const inp=document.getElementById(`inp_${rowIdx}_${col}`);
+  if(!inp?.value){showToast('Selecciona una fecha');return;}
   const btn=inp.nextElementSibling;
-  btn.disabled=true; btn.textContent='…';
-
+  btn.disabled=true;btn.textContent='…';
   try{
-    // Row in spreadsheet = rowIdx + 2 (1 header + 1-based)
     const rowNum=rowIdx+2;
     const colLetter=String.fromCharCode(65+col);
-    const cellAddr=`${colLetter}${rowNum}`;
-
-    // Write via workbook range update
-    const url=`${BASE}/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets('${SHEET}')/range(address='${cellAddr}')`;
+    const url=`${BASE}/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets('${SHEET}')/range(address='${colLetter}${rowNum}')`;
     await gPatch(url,{values:[[inp.value]]});
-
-    // Update local data
     allRows[rowIdx][col]=inp.value;
-
     showToast('✓ Fecha guardada');
     closeModal();
     renderApp();
   }catch(e){
     showToast('Error: '+e.message);
-    btn.disabled=false; btn.textContent='Guardar';
+    btn.disabled=false;btn.textContent='Guardar';
   }
 }
 
-// ── TOAST ─────────────────────────────────────────────────────────────
 function showToast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),3000);
 }
 
-// ── START ─────────────────────────────────────────────────────────────
 init();
 </script>
 </body>
