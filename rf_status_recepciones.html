@@ -194,6 +194,8 @@ const SCOPES=['https://graph.microsoft.com/Files.ReadWrite','https://graph.micro
 
 let me=null,token=null,driveId=null,itemId=null;
 let allRows=[],view='abiertos',searchQ='',filterStatus=null,expandedGroups={};
+let dataCache=null,dataCacheTime=0;
+const CACHE_TTL=5*60*1000; // 5 min cache
 
 // ── AUTH ─────────────────────────────────────────────────────────────
 async function getToken(){
@@ -295,11 +297,28 @@ function getPrefix(name){
   return m?m[1].replace(/-$/,'').toUpperCase():'OTROS';
 }
 
-async function loadData(){
+async function loadData(force=false){
+  const now=Date.now();
+  if(!force&&dataCache&&(now-dataCacheTime)<CACHE_TTL){
+    allRows=dataCache;renderApp();return;
+  }
   document.getElementById('app').innerHTML='<div class="loader"><div class="spinner"></div><span>Cargando datos…</span></div>';
-  const data=await gGet(`${BASE}/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets('${SHEET}')/usedRange`);
-  allRows=data.values.slice(1).filter(r=>r[COL.pedido]);
-  renderApp();
+  try{
+    const data=await gGet(`${BASE}/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets('${SHEET}')/usedRange`);
+    allRows=data.values.slice(1).filter(r=>r[COL.pedido]);
+    dataCache=allRows;dataCacheTime=Date.now();
+    renderApp();
+  }catch(e){
+    // Token may have expired — refresh and retry once
+    try{token=await getToken();if(!token)return;
+      const data=await gGet(`${BASE}/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets('${SHEET}')/usedRange`);
+      allRows=data.values.slice(1).filter(r=>r[COL.pedido]);
+      dataCache=allRows;dataCacheTime=Date.now();
+      renderApp();
+    }catch(e2){
+      document.getElementById('app').innerHTML=`<div class="loader"><span>❌ ${e2.message}</span></div>`;
+    }
+  }
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────
@@ -475,7 +494,7 @@ function renderApp(){
                oninput="onSearch(this.value)" autocomplete="off"/>
       </div>
       ${filterLabelHtml}
-      <button class="btn-refresh" onclick="loadData()">↻ Actualizar</button>
+      <button class="btn-refresh" onclick="loadData(true)">↻ Actualizar</button>
     </div>
     <div class="groups">${Object.keys(groups).length?groupsHtml:emptyHtml}</div>`;
 
@@ -535,10 +554,53 @@ function renderPartial(){
 }
 
 // ── DETAIL MODAL ──────────────────────────────────────────────────────
+function daysBetween(a,b){
+  // a,b = Date objects or null; b defaults to today
+  if(!a) return null;
+  const ref=b||new Date();ref.setHours(0,0,0,0);
+  const aa=new Date(a);aa.setHours(0,0,0,0);
+  return Math.round((ref-aa)/(1000*60*60*24));
+}
+function daysLabel(n,color){
+  if(n===null||n===undefined) return '';
+  const txt=n===0?'Hoy':n===1?'1 día':`${n} días`;
+  return `<span style="font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:10px;background:${color}22;color:${color};margin-left:8px">${txt}</span>`;
+}
+
 function openDetail(idx){
   const r=allRows[idx];
   const s=getStatus(r);
   const cerrado=s==='cerrado';
+  const today=new Date();today.setHours(0,0,0,0);
+
+  // Dates for delta calculations
+  const dRecepcion=parseDate(r[COL.recepcion]);
+  const dTentativa=parseDate(r[COL.tentativa]);
+  const dInforme=parseDate(r[COL.informe]);
+  const dIngresado=parseDate(r[COL.ingresado]);
+  const dPerchado=parseDate(r[COL.perchado]);
+
+  // "Pedido abierto X días" — from recepcion (or tentativa if no recepcion) to today
+  const startDate=dRecepcion||dTentativa;
+  const totalDays=daysBetween(startDate,today);
+  const totalLabel=totalDays!==null
+    ?(cerrado?`Pedido cerrado`:`Pedido abierto ${totalDays===0?'hoy':totalDays===1?'1 día':`${totalDays} días`}`)
+    :'';
+
+  // Deltas per step:
+  // Informe: desde recepcion → informe (o hoy)
+  const deltaInforme=dRecepcion?daysBetween(dRecepcion,dInforme||today):null;
+  // Ingresado: desde informe → ingresado (o hoy)
+  const deltaIngresado=dInforme?daysBetween(dInforme,dIngresado||today):null;
+  // Perchado: desde informe → perchado (o hoy)
+  const deltaPerchado=dInforme?daysBetween(dInforme,dPerchado||today):null;
+
+  const stepDeltas={
+    [COL.informe]:  {delta:deltaInforme,  color:'#d03801'},
+    [COL.ingresado]:{delta:deltaIngresado,color:'#7c3aed'},
+    [COL.perchado]: {delta:deltaPerchado, color:'#0e9f6e'},
+  };
+
   const steps=[
     {icon:'🚢',label:'Fecha Tentativa Arribo',col:COL.tentativa},
     {icon:'📥',label:'Fecha Recepción',col:COL.recepcion},
@@ -546,7 +608,6 @@ function openDetail(idx){
     {icon:'💻',label:'Ingresado D365',col:COL.ingresado},
     {icon:'📦',label:'Perchado D365',col:COL.perchado},
   ];
-  const doneSet=new Set(steps.filter(st=>r[st.col]).map(st=>st.col));
   const nextCol=steps.find(st=>!r[st.col])?.col;
 
   const tlHtml=steps.map(st=>{
@@ -558,10 +619,12 @@ function openDetail(idx){
         <input type="date" class="date-input" id="inp_${idx}_${st.col}" value="${toInputDate(r[st.col])}"/>
         <button class="btn-save" onclick="saveDate(${idx},${st.col})">Guardar</button>
       </div>`;
+    const delta=stepDeltas[st.col];
+    const deltaHtml=delta?daysLabel(delta.delta,delta.color):'';
     return `<div class="tl-step">
       <div class="tl-icon ${cls}">${done?'✓':st.icon}</div>
       <div class="tl-content">
-        <div class="tl-label">${st.label}</div>
+        <div class="tl-label" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">${st.label}${deltaHtml}</div>
         <div class="tl-date">${done?fmtDate(r[st.col]):'Sin fecha registrada'}</div>
         ${inputHtml}
       </div>
@@ -584,7 +647,10 @@ function openDetail(idx){
       <div class="modal-head">
         <div>
           <div class="modal-title">${r[COL.pedido]}</div>
-          <div class="modal-sub"><span class="badge ${meta.cls}"><span class="badge-dot"></span>${meta.label}</span></div>
+          <div class="modal-sub" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px">
+            <span class="badge ${meta.cls}"><span class="badge-dot"></span>${meta.label}</span>
+            ${totalLabel?`<span style="font-size:.8rem;color:var(--text3);font-weight:600">⏱ ${totalLabel}</span>`:''}
+          </div>
         </div>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
