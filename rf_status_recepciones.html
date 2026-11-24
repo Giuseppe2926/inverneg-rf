@@ -158,8 +158,9 @@ async function getToken(){
   if(acc){
     try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:acc});return r.accessToken;}catch(e){}
   }
-  const r=await msalApp.acquireTokenPopup({scopes:SCOPES});
-  return r.accessToken;
+  // Use redirect flow instead of popup
+  await msalApp.acquireTokenRedirect({scopes:SCOPES});
+  return null; // page will reload after redirect
 }
 
 async function gGet(url){
@@ -181,6 +182,7 @@ async function init(){
     const resp = await msalApp.handleRedirectPromise();
     if(resp) token=resp.accessToken;
     else token=await getToken();
+    if(!token) return; // redirecting
     me=(await gGet(`${BASE}/v1.0/me`));
     document.getElementById('navUser').innerHTML=`
       <span>${me.displayName||me.userPrincipalName}</span>
