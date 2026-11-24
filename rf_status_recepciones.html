@@ -146,7 +146,7 @@ const COL = {pedido:0,tentativa:1,recepcion:2,informe:3,ingresado:4,perchado:5,c
 
 // ── MSAL ─────────────────────────────────────────────────────────────
 const msalConfig={auth:{clientId:CLIENT_ID,authority:`https://login.microsoftonline.com/${TENANT_ID}`,redirectUri:location.href},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:false}};
-const msal=new msal.PublicClientApplication(msalConfig);
+const msalApp=new msal.PublicClientApplication(msalConfig);
 const SCOPES=['https://graph.microsoft.com/Files.ReadWrite','https://graph.microsoft.com/User.Read'];
 
 let me=null, token=null, driveId=null, itemId=null;
@@ -154,11 +154,11 @@ let allRows=[], view='abiertos', searchQ='', detailRow=null;
 
 // ── AUTH ─────────────────────────────────────────────────────────────
 async function getToken(){
-  const acc=msal.getAllAccounts()[0];
+  const acc=msalApp.getAllAccounts()[0];
   if(acc){
-    try{const r=await msal.acquireTokenSilent({scopes:SCOPES,account:acc});return r.accessToken;}catch(e){}
+    try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:acc});return r.accessToken;}catch(e){}
   }
-  const r=await msal.acquireTokenPopup({scopes:SCOPES});
+  const r=await msalApp.acquireTokenPopup({scopes:SCOPES});
   return r.accessToken;
 }
 
@@ -176,9 +176,9 @@ async function gPatch(url,body){
 
 // ── INIT ─────────────────────────────────────────────────────────────
 async function init(){
-  await msal.initialize();
+  await msalApp.initialize();
   try{
-    const resp = await msal.handleRedirectPromise();
+    const resp = await msalApp.handleRedirectPromise();
     if(resp) token=resp.accessToken;
     else token=await getToken();
     me=(await gGet(`${BASE}/v1.0/me`));
