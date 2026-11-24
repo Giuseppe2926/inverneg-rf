@@ -516,7 +516,7 @@ async function doSubmit() {
       for(const l of g.lineas){
         const lbl=`${nro}-L${String(n).padStart(2,'0')}`;
         const lR=await gPost(`${BASE}/sites/${SITE}/lists/MKT_Lineas/items`,{
-          fields:{Title:lbl,SolicitudId:solId,NroSolicitud:nro,
+          fields:{Title:lbl,SolicitudId:String(solId),NroSolicitud:nro,
                   Proveedor:g.proveedor,Marca:l.marca,Material:l.material,
                   Cantidad:parseInt(l.cantidad),FechaSolicitada:l.fecha?l.fecha+'T00:00:00Z':null,
                   HoraSolicitada:l.hora||'',Observaci_x00f3_nMKT:l.obs||'',
@@ -1128,9 +1128,9 @@ async function cancelLinea(lineaId, motivo) {
   const estadoAnterior = lineas.find(l=>l.id===lineaId)?.EstadoLinea || 'Pendiente';
   await gPost(`${BASE}/sites/${SITE}/lists/MKT_Historial/items`, {
     fields:{
-      SolicitudId: viewId,
+      SolicitudId: parseInt(viewId),
       NroSolicitud: sol?.NroSolicitud||'',
-      LineaId: lineaId,
+      LineaId: parseInt(lineaId),
       Campo: 'EstadoLinea',
       ValorAnterior: estadoAnterior,
       ValorNuevo: 'Cancelada',
@@ -1174,9 +1174,9 @@ async function reprogramarNP(lineaId, nuevaFecha, nuevaHora) {
   // Registrar en MKT_Historial — evento de reprogramación
   await gPost(`${BASE}/sites/${SITE}/lists/MKT_Historial/items`, {
     fields: {
-      SolicitudId:   viewId,
+      SolicitudId:   parseInt(viewId),
       NroSolicitud:  sol?.NroSolicitud || '',
-      LineaId:       lineaId,
+      LineaId:       parseInt(lineaId),
       Campo:         'EstadoRecepcion → EstadoLinea',
       ValorAnterior: `${estadoRecepAnterior} / ${estadoLineaAnterior}`,
       ValorNuevo:    `'' / Pendiente (Reprogramada al ${nuevaFecha}${nuevaHora?' '+nuevaHora:''})`,
@@ -1241,9 +1241,9 @@ async function reprogramarSaldo(lineaId, nuevaFecha, nuevaHora) {
 
   await gPost(`${BASE}/sites/${SITE}/lists/MKT_Historial/items`, {
     fields: {
-      SolicitudId:   viewId,
+      SolicitudId:   parseInt(viewId),
       NroSolicitud:  sol?.NroSolicitud || '',
-      LineaId:       lineaId,
+      LineaId:       parseInt(lineaId),
       Campo:         'CicloRecepcion',
       ValorAnterior: String(cicloActual),
       ValorNuevo:    String(cicloNuevo),
