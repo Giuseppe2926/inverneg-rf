@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Status Recepciones</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-msal-browser/2.38.3/msal-browser.min.js"></script>
+<style>
+:root{
+  --bg:#f0f2f5;--surface:#fff;--surface2:#f8f9fa;
+  --blue:#1a56db;--blue-dark:#1341a8;--blue-light:#e8eeff;
+  --green:#0e9f6e;--green-light:#d1fae5;
+  --yellow:#c27803;--yellow-light:#fef3c7;
+  --orange:#d03801;--orange-light:#ffe4d6;
+  --red:#e02424;--red-light:#fde8e8;
+  --gray:#6b7280;--gray-light:#e5e7eb;--gray-bg:#f3f4f6;
+  --purple:#7c3aed;--purple-light:#ede9fe;
+  --text:#111827;--text2:#374151;--text3:#6b7280;
+  --radius:10px;--shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+/* NAV */
+.nav{background:var(--blue);color:#fff;padding:0 24px;display:flex;align-items:center;gap:16px;height:56px;box-shadow:var(--shadow-md)}
+.nav-logo{font-weight:700;font-size:1.1rem;letter-spacing:.3px}
+.nav-logo span{opacity:.7;font-weight:400}
+.nav-user{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:.85rem}
+.nav-avatar{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem}
+/* MAIN */
+.main{max-width:1200px;margin:0 auto;padding:24px 16px}
+/* TABS */
+.tabs{display:flex;gap:4px;background:var(--surface);border-radius:var(--radius);padding:4px;box-shadow:var(--shadow);margin-bottom:20px;width:fit-content}
+.tab{padding:8px 20px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:.9rem;font-weight:500;color:var(--text3);transition:.15s}
+.tab.active{background:var(--blue);color:#fff;box-shadow:var(--shadow)}
+.tab:hover:not(.active){background:var(--gray-bg)}
+/* SUMMARY CARDS */
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.scard{background:var(--surface);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid transparent}
+.scard-n{font-size:2rem;font-weight:700;line-height:1}
+.scard-l{font-size:.8rem;color:var(--text3);margin-top:4px}
+.scard.total{border-color:var(--blue)}.scard.total .scard-n{color:var(--blue)}
+.scard.arribo{border-color:var(--gray)}.scard.arribo .scard-n{color:var(--gray)}
+.scard.recibido{border-color:var(--yellow)}.scard.recibido .scard-n{color:var(--yellow)}
+.scard.informe{border-color:var(--orange)}.scard.informe .scard-n{color:var(--orange)}
+.scard.ingresado{border-color:var(--purple)}.scard.ingresado .scard-n{color:var(--purple)}
+.scard.perchado{border-color:var(--green)}.scard.perchado .scard-n{color:var(--green)}
+/* SEARCH */
+.search-bar{background:var(--surface);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.search-bar input{flex:1;border:1px solid var(--gray-light);border-radius:7px;padding:8px 12px;font-size:.9rem;outline:none;transition:.15s}
+.search-bar input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+.search-bar .search-icon{color:var(--text3);font-size:1.1rem}
+/* TABLE */
+.tbl-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.tbl-head{padding:14px 18px;border-bottom:1px solid var(--gray-light);display:flex;align-items:center;justify-content:space-between}
+.tbl-head-title{font-weight:600;font-size:.95rem}
+.tbl-count{font-size:.8rem;color:var(--text3);background:var(--gray-bg);padding:3px 10px;border-radius:20px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:11px 14px;font-size:.78rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;background:var(--gray-bg);border-bottom:1px solid var(--gray-light)}
+td{padding:12px 14px;font-size:.88rem;border-bottom:1px solid var(--gray-light);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.clickable{cursor:pointer;transition:.1s}
+tr.clickable:hover td{background:var(--blue-light)}
+/* STATUS BADGE */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:.78rem;font-weight:600;white-space:nowrap}
+.badge-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.b-arribo{background:var(--gray-bg);color:var(--gray)}.b-arribo .badge-dot{background:var(--gray)}
+.b-recibido{background:var(--yellow-light);color:var(--yellow)}.b-recibido .badge-dot{background:var(--yellow)}
+.b-informe{background:var(--orange-light);color:var(--orange)}.b-informe .badge-dot{background:var(--orange)}
+.b-ingresado{background:var(--purple-light);color:var(--purple)}.b-ingresado .badge-dot{background:var(--purple)}
+.b-perchado{background:var(--green-light);color:var(--green)}.b-perchado .badge-dot{background:var(--green)}
+.b-cerrado{background:var(--gray-light);color:#374151}.b-cerrado .badge-dot{background:#9ca3af}
+/* PENDING TAGS */
+.pend-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.ptag{font-size:.72rem;padding:2px 7px;border-radius:4px;font-weight:500}
+.ptag-warn{background:#fff3cd;color:#856404}
+.ptag-err{background:#f8d7da;color:#721c24}
+.ptag-ok{background:#d1e7dd;color:#0a3622}
+/* DETAIL MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:580px;max-height:90vh;overflow-y:auto}
+.modal-head{padding:20px 24px 16px;border-bottom:1px solid var(--gray-light);display:flex;align-items:flex-start;gap:12px}
+.modal-title{font-size:1.1rem;font-weight:700}
+.modal-sub{font-size:.82rem;color:var(--text3);margin-top:3px}
+.modal-close{margin-left:auto;background:var(--gray-bg);border:none;border-radius:7px;width:32px;height:32px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-close:hover{background:var(--gray-light)}
+.modal-body{padding:20px 24px}
+/* TIMELINE */
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-step{display:flex;gap:14px;padding-bottom:20px;position:relative}
+.tl-step:last-child{padding-bottom:0}
+.tl-step:not(:last-child)::before{content:'';position:absolute;left:15px;top:32px;bottom:0;width:2px;background:var(--gray-light)}
+.tl-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0;z-index:1}
+.tl-icon.done{background:var(--green-light);color:var(--green)}
+.tl-icon.active{background:var(--yellow-light);color:var(--yellow)}
+.tl-icon.pending{background:var(--gray-bg);color:var(--text3)}
+.tl-content{flex:1;padding-top:5px}
+.tl-label{font-weight:600;font-size:.88rem}
+.tl-date{font-size:.8rem;color:var(--text3);margin-top:2px}
+/* DATE INPUT in modal */
+.date-row{display:flex;align-items:center;gap:8px;margin-top:6px}
+.date-input{border:1px solid var(--gray-light);border-radius:7px;padding:5px 10px;font-size:.83rem;outline:none;transition:.15s;background:var(--surface)}
+.date-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+.btn-save-date{background:var(--blue);color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:.8rem;font-weight:600;cursor:pointer;transition:.15s}
+.btn-save-date:hover{background:var(--blue-dark)}
+.btn-save-date:disabled{opacity:.5;cursor:not-allowed}
+/* COMMENTS */
+.comment-box{background:var(--gray-bg);border-radius:8px;padding:12px 14px;margin-top:12px;font-size:.85rem;color:var(--text2);line-height:1.5}
+.comment-label{font-size:.75rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+/* LOADER */
+.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;gap:12px;color:var(--text3)}
+.spinner{width:36px;height:36px;border:3px solid var(--gray-light);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.empty-icon{font-size:2.5rem;margin-bottom:8px}
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1f2937;color:#fff;padding:10px 20px;border-radius:8px;font-size:.88rem;z-index:200;transition:.3s;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">📦 Status <span>Recepciones</span></div>
+  <div class="nav-user" id="navUser"></div>
+</nav>
+
+<div class="main" id="app">
+  <div class="loader"><div class="spinner"></div><span>Iniciando sesión…</span></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────
+const CLIENT_ID = 'ec976114-e146-4ce4-850c-5d978e12acfd';
+const TENANT_ID = '5e008bd3-17b6-4f83-8d23-019691a40609';
+const SITE_ID   = 'inverneg.sharepoint.com,65348f57-a25e-4137-ac5c-1347926aad8f,66ece2da-3fcc-473d-add2-0eccc5cd3863';
+const BASE      = 'https://graph.microsoft.com';
+const FILE_NAME = '06. Status Recepciones.xlsx';
+const SHEET     = 'Control';
+
+// Column indices (0-based) after inserting Fecha Tentativa Arribo
+// A=Pedido, B=FechaTentativa, C=FechaRecepcion, D=Informe, E=Ingresado, F=PerchadoD365, G=PerchadoD3652(checkbox), H=InformeEnviado, I=Comentarios
+const COL = {pedido:0,tentativa:1,recepcion:2,informe:3,ingresado:4,perchado:5,cerrado:6,informeEnv:7,comentarios:8};
+
+// ── MSAL ─────────────────────────────────────────────────────────────
+const msalConfig={auth:{clientId:CLIENT_ID,authority:`https://login.microsoftonline.com/${TENANT_ID}`,redirectUri:location.href},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:false}};
+const msal=new msal.PublicClientApplication(msalConfig);
+const SCOPES=['https://graph.microsoft.com/Files.ReadWrite','https://graph.microsoft.com/User.Read'];
+
+let me=null, token=null, driveId=null, itemId=null;
+let allRows=[], view='abiertos', searchQ='', detailRow=null;
+
+// ── AUTH ─────────────────────────────────────────────────────────────
+async function getToken(){
+  const acc=msal.getAllAccounts()[0];
+  if(acc){
+    try{const r=await msal.acquireTokenSilent({scopes:SCOPES,account:acc});return r.accessToken;}catch(e){}
+  }
+  const r=await msal.acquireTokenPopup({scopes:SCOPES});
+  return r.accessToken;
+}
+
+async function gGet(url){
+  const r=await fetch(url,{headers:{Authorization:'Bearer '+token,'Accept':'application/json'}});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function gPatch(url,body){
+  const r=await fetch(url,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────
+async function init(){
+  await msal.initialize();
+  try{
+    const resp = await msal.handleRedirectPromise();
+    if(resp) token=resp.accessToken;
+    else token=await getToken();
+    me=(await gGet(`${BASE}/v1.0/me`));
+    document.getElementById('navUser').innerHTML=`
+      <span>${me.displayName||me.userPrincipalName}</span>
+      <div class="nav-avatar">${(me.displayName||'U')[0].toUpperCase()}</div>`;
+    await findFile();
+    await loadData();
+  }catch(e){
+    document.getElementById('app').innerHTML=`<div class="loader"><span>❌ Error: ${e.message}</span></div>`;
+  }
+}
+
+async function findFile(){
+  // Search in the specific folder path
+  const folderPath = "Documentos compartidos/Documentos de Trabajo CND/03. Para Dashboard";
+  const url=`${BASE}/v1.0/sites/${SITE_ID}/drive/root:/${folderPath}/${FILE_NAME}`;
+  const f=await gGet(url);
+  driveId=f.parentReference.driveId;
+  itemId=f.id;
+}
+
+// ── LOAD DATA ─────────────────────────────────────────────────────────
+function parseDate(v){
+  if(!v) return null;
+  if(v instanceof Date) return v;
+  // Excel serial or string
+  if(typeof v==='number'){
+    // Excel serial date (days since 1899-12-30)
+    const d=new Date((v-25569)*86400*1000);
+    return new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  }
+  if(typeof v==='string' && v.match(/^\d{4}-\d{2}-\d{2}/)){
+    const p=v.split('T')[0].split('-');
+    return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
+  }
+  return null;
+}
+
+function fmtDate(d){
+  if(!d) return '—';
+  const dt=parseDate(d);
+  if(!dt) return '—';
+  return dt.toLocaleDateString('es-EC',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
+function getStatus(row){
+  const tentativa=parseDate(row[COL.tentativa]);
+  const recepcion=parseDate(row[COL.recepcion]);
+  const informe=parseDate(row[COL.informe]);
+  const ingresado=parseDate(row[COL.ingresado]);
+  const perchado=parseDate(row[COL.perchado]);
+  const cerrado=row[COL.cerrado]===true||row[COL.cerrado]==='TRUE'||row[COL.cerrado]==='true';
+  const today=new Date(); today.setHours(0,0,0,0);
+
+  if(cerrado) return {status:'cerrado',label:'Cerrado',cls:'b-cerrado',pendings:[]};
+
+  if(perchado && ingresado){
+    return {status:'completo',label:'Perchado D365',cls:'b-perchado',pendings:[{t:'✓ Proceso completo',cls:'ptag-ok'}]};
+  }
+  if(perchado && !ingresado){
+    return {status:'perchado',label:'Perchado Físicamente',cls:'b-perchado',pendings:[{t:'⚠ Pendiente Ingreso D365',cls:'ptag-err'}]};
+  }
+  if(ingresado && !perchado){
+    return {status:'ingresado',label:'Ingresado D365',cls:'b-ingresado',pendings:[{t:'⚠ Pendiente Perchado',cls:'ptag-err'}]};
+  }
+  if(informe){
+    return {status:'informe',label:'Informe Enviado',cls:'b-informe',pendings:[{t:'⚠ Pendiente Ingreso',cls:'ptag-warn'},{t:'⚠ Pendiente Perchado',cls:'ptag-warn'}]};
+  }
+  if(recepcion || (tentativa && tentativa<=today)){
+    return {status:'recibido',label:'Pedido Recibido',cls:'b-recibido',pendings:[{t:'⚠ Pendiente Informe',cls:'ptag-warn'}]};
+  }
+  if(tentativa && tentativa>today){
+    return {status:'arribo',label:'Pendiente de Arribo',cls:'b-arribo',pendings:[{t:`📅 Arribo esperado: ${fmtDate(tentativa)}`,cls:'ptag-ok'}]};
+  }
+  return {status:'sininfo',label:'Sin información',cls:'b-arribo',pendings:[]};
+}
+
+async function loadData(){
+  setLoading('Cargando datos…');
+  const url=`${BASE}/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets('${SHEET}')/usedRange`;
+  const data=await gGet(url);
+  const values=data.values;
+  // Skip header row
+  allRows=values.slice(1).filter(r=>r[COL.pedido]);
+  renderApp();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────
+function setLoading(msg){
+  document.getElementById('app').innerHTML=`<div class="loader"><div class="spinner"></div><span>${msg}</span></div>`;
+}
+
+function getFiltered(){
+  let rows=allRows;
+  if(view==='abiertos') rows=rows.filter(r=>{
+    const cerrado=r[COL.cerrado]===true||r[COL.cerrado]==='TRUE'||r[COL.cerrado]==='true';
+    return !cerrado;
+  });
+  if(searchQ) rows=rows.filter(r=>String(r[COL.pedido]||'').toLowerCase().includes(searchQ.toLowerCase()));
+  return rows;
+}
+
+function renderApp(){
+  const filtered=getFiltered();
+  const abiertos=allRows.filter(r=>{const c=r[COL.cerrado];return !(c===true||c==='TRUE'||c==='true');});
+
+  // Summary counts (only for abiertos view)
+  let summaryHtml='';
+  if(view==='abiertos'){
+    const counts={arribo:0,recibido:0,informe:0,ingresado:0,perchado:0,completo:0};
+    abiertos.forEach(r=>{const s=getStatus(r).status;if(counts[s]!==undefined)counts[s]++;});
+    summaryHtml=`<div class="summary">
+      <div class="scard total"><div class="scard-n">${abiertos.length}</div><div class="scard-l">Pedidos Abiertos</div></div>
+      <div class="scard arribo"><div class="scard-n">${counts.arribo}</div><div class="scard-l">Pendiente Arribo</div></div>
+      <div class="scard recibido"><div class="scard-n">${counts.recibido}</div><div class="scard-l">Recibidos sin Informe</div></div>
+      <div class="scard informe"><div class="scard-n">${counts.informe}</div><div class="scard-l">Informe Enviado</div></div>
+      <div class="scard ingresado"><div class="scard-n">${counts.ingresado}</div><div class="scard-l">Ingresado D365</div></div>
+      <div class="scard perchado"><div class="scard-n">${counts.perchado+counts.completo}</div><div class="scard-l">Perchado</div></div>
+    </div>`;
+  }
+
+  const tableRows=filtered.map((r,idx)=>{
+    const s=getStatus(r);
+    const pendHtml=s.pendings.map(p=>`<span class="ptag ${p.cls}">${p.t}</span>`).join('');
+    return `<tr class="clickable" onclick="openDetail(${allRows.indexOf(r)})">
+      <td><strong>${r[COL.pedido]||''}</strong></td>
+      <td>${fmtDate(r[COL.tentativa])}</td>
+      <td>${fmtDate(r[COL.recepcion])}</td>
+      <td>
+        <span class="badge ${s.cls}"><span class="badge-dot"></span>${s.label}</span>
+        ${pendHtml?`<div class="pend-tags">${pendHtml}</div>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('app').innerHTML=`
+    <div class="tabs">
+      <button class="tab ${view==='abiertos'?'active':''}" onclick="switchView('abiertos')">📋 Pedidos Abiertos</button>
+      <button class="tab ${view==='todos'?'active':''}" onclick="switchView('todos')">📦 Pedidos Totales</button>
+    </div>
+    ${summaryHtml}
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" placeholder="Buscar pedido…" value="${searchQ}" oninput="onSearch(this.value)"/>
+      <button onclick="loadData()" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:7px 14px;cursor:pointer;font-size:.82rem;font-weight:600">↻ Actualizar</button>
+    </div>
+    <div class="tbl-wrap">
+      <div class="tbl-head">
+        <span class="tbl-head-title">${view==='abiertos'?'Pedidos Abiertos':'Todos los Pedidos'}</span>
+        <span class="tbl-count">${filtered.length} pedidos</span>
+      </div>
+      ${filtered.length?`<table>
+        <thead><tr>
+          <th>Pedido</th><th>F. Tentativa Arribo</th><th>F. Recepción</th><th>Status</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>`:`<div class="empty"><div class="empty-icon">📭</div><div>No hay pedidos que mostrar</div></div>`}
+    </div>`;
+}
+
+function switchView(v){view=v;renderApp();}
+function onSearch(v){searchQ=v;renderApp();}
+
+// ── DETAIL MODAL ──────────────────────────────────────────────────────
+function openDetail(idx){
+  detailRow=idx;
+  renderModal();
+}
+
+function renderModal(){
+  const r=allRows[detailRow];
+  const s=getStatus(r);
+  const cerrado=s.status==='cerrado';
+
+  const steps=[
+    {icon:'🚢',label:'Fecha Tentativa Arribo',col:COL.tentativa,date:r[COL.tentativa]},
+    {icon:'📥',label:'Fecha Recepción',col:COL.recepcion,date:r[COL.recepcion]},
+    {icon:'📄',label:'Informe Enviado',col:COL.informe,date:r[COL.informe]},
+    {icon:'💻',label:'Ingresado D365',col:COL.ingresado,date:r[COL.ingresado]},
+    {icon:'📦',label:'Perchado D365',col:COL.perchado,date:r[COL.perchado]},
+  ];
+
+  const tlHtml=steps.map(step=>{
+    const hasDate=!!step.date;
+    const iconCls=hasDate?'done':s.status!=='cerrado'&&isNextStep(r,step.col)?'active':'pending';
+    const dateStr=fmtDate(step.date);
+    let inputHtml='';
+    if(!cerrado){
+      const colLetter=String.fromCharCode(65+step.col); // A-based
+      inputHtml=`<div class="date-row">
+        <input type="date" class="date-input" id="inp_${step.col}" value="${toInputDate(step.date)}" placeholder="dd/mm/aaaa"/>
+        <button class="btn-save-date" onclick="saveDate(${detailRow},${step.col})" ${!token?'disabled':''}>Guardar</button>
+      </div>`;
+    }
+    return `<div class="tl-step">
+      <div class="tl-icon ${iconCls}">${hasDate?'✓':step.icon}</div>
+      <div class="tl-content">
+        <div class="tl-label">${step.label}</div>
+        <div class="tl-date">${hasDate?dateStr:'Sin fecha registrada'}</div>
+        ${inputHtml}
+      </div>
+    </div>`;
+  }).join('');
+
+  let commentHtml='';
+  if(cerrado && r[COL.comentarios]){
+    commentHtml=`<div style="margin-top:16px">
+      <div class="comment-label">Comentarios</div>
+      <div class="comment-box">${r[COL.comentarios]}</div>
+    </div>`;
+  }
+
+  const html=`<div class="overlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">${r[COL.pedido]}</div>
+          <div class="modal-sub"><span class="badge ${s.cls}"><span class="badge-dot"></span>${s.label}</span></div>
+        </div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="timeline">${tlHtml}</div>
+        ${commentHtml}
+      </div>
+    </div>
+  </div>`;
+
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+function isNextStep(r,col){
+  // Returns true if this is the logical next unfilled step
+  const filled=[COL.tentativa,COL.recepcion,COL.informe,COL.ingresado,COL.perchado].filter(c=>!!r[c]);
+  const nextFill=[COL.tentativa,COL.recepcion,COL.informe,COL.ingresado,COL.perchado].find(c=>!r[c]);
+  return col===nextFill;
+}
+
+function toInputDate(v){
+  if(!v) return '';
+  const d=parseDate(v);
+  if(!d) return '';
+  return d.toISOString().split('T')[0];
+}
+
+function closeModal(e){
+  if(e && e.target!==e.currentTarget) return;
+  const ov=document.querySelector('.overlay');
+  if(ov) ov.remove();
+}
+
+// ── SAVE DATE ─────────────────────────────────────────────────────────
+async function saveDate(rowIdx, col){
+  const inp=document.getElementById(`inp_${col}`);
+  if(!inp||!inp.value){showToast('Selecciona una fecha primero');return;}
+  const btn=inp.nextElementSibling;
+  btn.disabled=true; btn.textContent='…';
+
+  try{
+    // Row in spreadsheet = rowIdx + 2 (1 header + 1-based)
+    const rowNum=rowIdx+2;
+    const colLetter=String.fromCharCode(65+col);
+    const cellAddr=`${colLetter}${rowNum}`;
+
+    // Write via workbook range update
+    const url=`${BASE}/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets('${SHEET}')/range(address='${cellAddr}')`;
+    await gPatch(url,{values:[[inp.value]]});
+
+    // Update local data
+    allRows[rowIdx][col]=inp.value;
+
+    showToast('✓ Fecha guardada');
+    closeModal();
+    renderApp();
+  }catch(e){
+    showToast('Error: '+e.message);
+    btn.disabled=false; btn.textContent='Guardar';
+  }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ── START ─────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
